@@ -175,3 +175,22 @@ aside { overflow-y: auto; }
 /* Odds window collapsed */
 .odds.collapsed #oddsBody { display: none; }
 .odds.collapsed .odds-head { margin-bottom: 0; }
+
+/* Chat / game log tabs */
+.side-tabs .tab { font-size: 13px; padding: 6px 8px; position: relative; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #e0606f; vertical-align: middle; margin-left: 4px; }
+.chat-list .msg { margin-bottom: 6px; }
+.chat-list .msg b { margin-right: 4px; }
+.chat-list .msg.mine b { color: #9fe3b5; }
+.chat-list .msg .time { color: var(--muted); font-size: 11px; margin-left: 4px; }
+.chat-list .empty { color: var(--muted); font-style: italic; }
+
+/* Speech bubbles at seats */
+.bubble { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  background: #fff; color: #111; border-radius: 14px; padding: 6px 12px; font-size: 14px; font-weight: 500;
+  max-width: 220px; width: max-content; text-align: center; box-shadow: 0 4px 14px #0008; z-index: 6;
+  overflow-wrap: anywhere; animation: pop .2s ease-out; }
+.bubble::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  border: 8px solid transparent; border-top-color: #fff; }
+.bubble.fade { opacity: 0; transition: opacity .5s; }
+@keyframes pop { from { transform: translateX(-50%) scale(.6); opacity: 0; } }

@@ -149,6 +149,14 @@ class Table {
     this.variant = this.settings.variant;
   }
 
+  // Chat is kept apart from the game log so busy hands don't push messages out.
+  addChat(seat, from, text) {
+    this.chatSeq = (this.chatSeq || 0) + 1;
+    this.chat = this.chat || [];
+    this.chat.push({ id: this.chatSeq, seat, from, text: String(text).slice(0, 200), at: Date.now() });
+    if (this.chat.length > 50) this.chat.shift();
+  }
+
   addLog(msg) {
     this.log.push(msg);
     if (this.log.length > 60) this.log.shift();
@@ -437,7 +445,8 @@ class Table {
       mySeat: me,
       limits: me !== -1 && me === this.toAct ? this.limits(me) : null,
       results: this.results,
-      log: this.log.slice(-30),
+      log: this.log.slice(-40),
+      chat: (this.chat || []).slice(-50),
       seats: this.seats.map((s, i) => s && {
         name: s.name, chips: s.chips, bet: s.bet, folded: s.folded, allIn: s.allIn,
         inHand: s.inHand, connected: s.connected, lastAction: s.lastAction, isBot: s.isBot, hasAccount: !!s.accountId,

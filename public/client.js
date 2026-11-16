@@ -136,6 +136,7 @@ function cardEl(c, cls = '') {
 
 function render() {
   const st = S.state;
+  renderChat(st); // first, so new messages get bubbles on this draw
   $('roomLabel').textContent = S.room;
   $('variantLabel').textContent = st.variantName + (st.stage === 'waiting' ? '' : ` · Hand #${st.handNo}`);
   const winCards = new Set();
@@ -225,6 +226,7 @@ function render() {
       b.style.transform = 'translate(-50%, -50%)';
       el.appendChild(b);
     }
+    addBubble(el, i);
     seatsEl.appendChild(el);
 
     if (isMe && s.chips === 0 && !(s.inHand && ['preflop', 'flop', 'turn', 'river'].includes(st.stage))) {
@@ -343,18 +345,79 @@ function renderLog(st) {
   const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 10;
   log.innerHTML = '';
   for (const entry of st.log) {
+    if (typeof entry !== 'string') continue; // old-style chat entries
     const d = document.createElement('div');
-    if (typeof entry === 'object' && entry.chat) {
-      d.className = 'chat';
-      const b = document.createElement('b'); b.textContent = entry.from + ': ';
-      d.appendChild(b); d.appendChild(document.createTextNode(entry.text));
-    } else {
-      d.className = 'sys';
-      d.textContent = entry;
-    }
+    d.className = 'sys';
+    d.textContent = entry;
     log.appendChild(d);
   }
   if (atBottom) log.scrollTop = log.scrollHeight;
+}
+
+// ---------- chat ----------
+let chatTab = 'chat';
+let lastChatId = null; // newest message already seen
+const bubbles = {};    // seat -> { text, until }
+const BUBBLE_MS = 5000;
+
+function setSideTab(tab) {
+  chatTab = tab;
+  $('tabChat').classList.toggle('on', tab === 'chat');
+  $('tabLog').classList.toggle('on', tab === 'log');
+  $('chatList').classList.toggle('hidden', tab !== 'chat');
+  $('log').classList.toggle('hidden', tab !== 'log');
+  if (tab === 'chat') { $('chatDot').classList.add('hidden'); $('chatList').scrollTop = $('chatList').scrollHeight; }
+  else $('log').scrollTop = $('log').scrollHeight;
+}
+$('tabChat').onclick = () => setSideTab('chat');
+$('tabLog').onclick = () => setSideTab('log');
+
+function renderChat(st) {
+  const msgs = st.chat || [];
+  // New messages: show a bubble at the sender's seat, and mark unread.
+  const newest = msgs.length ? msgs[msgs.length - 1].id : 0;
+  if (lastChatId !== null) {
+    for (const m of msgs) {
+      if (m.id <= lastChatId || m.seat < 0) continue;
+      bubbles[m.seat] = { text: m.text, until: Date.now() + BUBBLE_MS };
+      setTimeout(() => S && render(), BUBBLE_MS + 50);
+      if (chatTab !== 'chat' && m.seat !== st.mySeat) $('chatDot').classList.remove('hidden');
+    }
+  }
+  lastChatId = newest;
+
+  const list = $('chatList');
+  const atBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 10;
+  list.innerHTML = '';
+  if (!msgs.length) {
+    list.innerHTML = '<div class="empty">No messages yet. Say hi! 👋</div>';
+    return;
+  }
+  for (const m of msgs) {
+    const d = document.createElement('div');
+    d.className = 'msg' + (m.seat === st.mySeat ? ' mine' : '');
+    const b = document.createElement('b');
+    b.textContent = m.from + ':';
+    const time = document.createElement('span');
+    time.className = 'time';
+    time.textContent = new Date(m.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    d.append(b, document.createTextNode(m.text), time);
+    list.appendChild(d);
+  }
+  if (atBottom) list.scrollTop = list.scrollHeight;
+}
+
+// Adds a speech bubble to a seat element if that player spoke recently.
+function addBubble(el, seat) {
+  const bub = bubbles[seat];
+  if (!bub) return;
+  const left = bub.until - Date.now();
+  if (left <= 0) { delete bubbles[seat]; return; }
+  const d = document.createElement('div');
+  d.className = 'bubble' + (left < 600 ? ' fade' : '');
+  d.textContent = bub.text.length > 80 ? bub.text.slice(0, 77) + '…' : bub.text;
+  el.appendChild(d);
+  if (left > 600) setTimeout(() => { d.classList.add('fade'); }, left - 600);
 }
 
 $('chatForm').onsubmit = (e) => {

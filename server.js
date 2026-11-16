@@ -242,8 +242,8 @@ function removeBot(room) {
   return true;
 }
 
-function addChat(room, from, text) {
-  room.table.addLog({ chat: true, from, text: String(text).slice(0, 200) });
+function addChat(room, seat, from, text) {
+  room.table.addChat(seat, from, text);
 }
 
 const wss = new WebSocketServer({ server });
@@ -337,7 +337,10 @@ wss.on('connection', (ws) => {
         }
         break;
       case 'chat':
-        if (me && m.text) { addChat(room, me.name, m.text); broadcast(room, { t: 'sfx', name: 'chat' }); }
+        if (me && String(m.text || '').trim()) {
+          addChat(room, t.seatOf(pid), me.name, String(m.text).trim());
+          broadcast(room, { t: 'sfx', name: 'chat' });
+        }
         break;
       case 'leave':
         if (me && me.accountId && me.inHand && t.isPlaying()) {
