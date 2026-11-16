@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Connect Poker Night to a database — picture guide</title>
+<style>
+  :root { --ink: #1f2933; --muted: #616e7c; --line: #cbd2d9; --hl: #e12d39; --ok: #2f9e44; --bg: #f5f7fa; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 28px 18px 60px; }
+  h1 { margin: 0 0 6px; font-size: 28px; }
+  .lead { color: var(--muted); margin: 0 0 8px; }
+  .note { background: #fff8e1; border: 1px solid #f0c36d; border-radius: 10px; padding: 10px 14px; font-size: 14px; margin: 14px 0 28px; }
+  .step { display: grid; grid-template-columns: 52px 1fr; gap: 14px; margin-bottom: 34px; }
+  .num { width: 46px; height: 46px; border-radius: 50%; background: var(--ink); color: #fff; font-weight: 800; font-size: 22px; display: grid; place-items: center; }
+  .step h2 { margin: 6px 0 4px; font-size: 20px; }
+  .step p { margin: 0 0 12px; }
+  .where { font-size: 13px; color: var(--muted); }
+  /* sketch of a web page */
+  .window { background: #fff; border: 2px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: 0 6px 18px #0000000f; }
+  .bar { background: #e4e7eb; padding: 7px 10px; display: flex; gap: 6px; align-items: center; }
+  .bar i { width: 10px; height: 10px; border-radius: 50%; background: #9aa5b1; display: inline-block; }
+  .bar .url { margin-left: 8px; background: #fff; border-radius: 6px; padding: 2px 10px; font-size: 12px; color: var(--muted); flex: 1; }
+  .page { display: grid; grid-template-columns: 150px 1fr; min-height: 190px; }
+  .side { background: #f0f2f5; padding: 12px; font-size: 13px; color: var(--muted); }
+  .side div { padding: 5px 8px; border-radius: 6px; margin-bottom: 3px; }
+  .side .sel { background: #fff; color: var(--ink); font-weight: 700; }
+  .content { padding: 16px; position: relative; }
+  .content h3 { margin: 0 0 10px; font-size: 17px; }
+  .btn { display: inline-block; border: 1.5px solid var(--ink); border-radius: 7px; padding: 5px 12px; font-size: 14px; font-weight: 600; background: #fff; }
+  .btn.dark { background: var(--ink); color: #fff; }
+  .field { border: 1.5px solid var(--line); border-radius: 7px; padding: 6px 10px; font-size: 13px; background: #fff; font-family: ui-monospace, Menlo, monospace; }
+  .label { font-size: 12px; color: var(--muted); margin: 8px 0 3px; }
+  .grey { height: 9px; background: #e4e7eb; border-radius: 5px; margin: 8px 0; }
+  /* highlights */
+  .hl { outline: 3px solid var(--hl); outline-offset: 3px; border-radius: 8px; position: relative; }
+  .tag { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; position: absolute; background: var(--hl); color: #fff; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .copy { display: flex; gap: 8px; align-items: center; }
+  .copy .field { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .done { background: #ebfbee; border: 1px solid #8ce99a; border-radius: 10px; padding: 12px 14px; }
+  .done b { color: var(--ok); }
+  .warn { color: var(--hl); font-weight: 700; }
+  .lb { font-size: 13px; border: 1.5px solid var(--line); border-radius: 8px; padding: 8px 10px; background: #fff; }
+  .lb .y { background: #fff3bf; border-radius: 6px; padding: 4px 8px; margin-top: 6px; }
+  .arrow { font-size: 26px; color: var(--hl); line-height: 1; }
+  @media (max-width: 600px) { .page { grid-template-columns: 1fr; } .side { display: none; } .step { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Connect Poker Night to a database</h1>
+  <p class="lead">This makes accounts and the leaderboard permanent. It takes 3 steps and about 5 minutes.</p>
+  <div class="note">These pictures are <b>simplified sketches</b>, not real screenshots, so the real pages look a bit different. The <span class="warn">red boxes</span> show what to click, and the button names match the real ones.</div>
+
+  <!-- STEP 1 -->
+  <div class="step">
+    <div class="num">1</div>
+    <div>
+      <h2>Copy the connection string in Neon</h2>
+      <p>Open <b>console.neon.tech</b>, choose your project, and click <b>Connect</b>.</p>
+      <div class="window">
+        <div class="bar"><i></i><i></i><i></i><span class="url">console.neon.tech › your project</span></div>
+        <div class="page">
+          <div class="side"><div class="sel">Dashboard</div><div>Branches</div><div>Tables</div><div>Settings</div></div>
+          <div class="content">
+            <div class="row" style="justify-content:space-between">
+              <h3>Project dashboard</h3>
+              <span class="btn dark hl">Connect<span class="tag" style="top:-30px; right:-6px">① click</span></span>
+            </div>
+            <div class="grey" style="width:70%"></div><div class="grey" style="width:50%"></div><div class="grey" style="width:60%"></div>
+          </div>
+        </div>
+      </div>
+      <p style="margin-top:14px">A window opens with the connection string. Click <b>Copy</b>.</p>
+      <div class="window">
+        <div class="bar"><i></i><i></i><i></i><span class="url">Connect to your database</span></div>
+        <div class="content">
+          <div class="label">Connection string</div>
+          <div class="copy">
+            <div class="field">postgresql://••••••••@ep-••••••.neon.tech/neondb?sslmode=require</div>
+            <span class="btn hl">Copy<span class="tag" style="top:-30px; right:-6px">② click</span></span>
+          </div>
+          <p class="where" style="margin-top:10px">It starts with <code>postgresql://</code>. It works like a password, so paste it only into Render (step 2), never into a chat.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step">
+    <div class="num">2</div>
+    <div>
+      <h2>Paste it into Render</h2>
+      <p>Open <b>dashboard.render.com</b>, click your <b>poker-night</b> service, then <b>Environment</b> in the left menu.</p>
+      <div class="window">
+        <div class="bar"><i></i><i></i><i></i><span class="url">dashboard.render.com › poker-night</span></div>
+        <div class="page">
+          <div class="side" style="overflow:visible; position:relative; z-index:2">
+            <div>Events</div><div>Logs</div>
+            <div class="sel hl" style="position:relative">Environment<span class="tag" style="top:50%; left:calc(100% + 10px); transform:translateY(-50%); z-index:2">③ click</span></div>
+            <div>Settings</div>
+          </div>
+          <div class="content">
+            <h3>Environment Variables</h3>
+            <div class="row"><span class="btn hl">+ Add Environment Variable<span class="tag" style="top:50%; left:calc(100% + 12px); transform:translateY(-50%)">④ click</span></span></div>
+            <div class="row" style="margin-top:22px">
+              <div style="flex:1">
+                <div class="label">Key</div>
+                <div class="field hl" style="position:relative">DATABASE_URL<span class="tag" style="bottom:-28px; left:0">⑤ type exactly this</span></div>
+              </div>
+              <div style="flex:2">
+                <div class="label">Value</div>
+                <div class="field hl" style="position:relative">postgresql://••••••••…<span class="tag" style="bottom:-28px; left:0">⑥ paste (Ctrl+V / ⌘V)</span></div>
+              </div>
+            </div>
+            <div class="row" style="margin-top:42px; justify-content:flex-end">
+              <span class="btn dark hl" style="position:relative">Save Changes<span class="tag" style="top:-30px; right:-6px">⑦ click</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="where" style="margin-top:10px">Render may ask how to apply the change. Choose <b>Save, rebuild, and deploy</b> or <b>Save and deploy</b>.</p>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step">
+    <div class="num">3</div>
+    <div>
+      <h2>Wait about 1 minute, then check</h2>
+      <p>Render restarts the game, and the game sets up its tables in Neon by itself. Then open your game and click <b>🥇 Leaderboard</b>.</p>
+      <div class="row">
+        <div class="lb" style="flex:1; min-width:240px">
+          <b>Before</b>, with no database:
+          <div class="y">⚠ Test mode: no database is connected, so accounts and scores are deleted whenever the server restarts.</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="lb" style="flex:1; min-width:240px">
+          <b>After</b>: the yellow warning is gone. ✅<br>Accounts and scores are now permanent.
+        </div>
+      </div>
+      <div class="done" style="margin-top:16px">
+        <b>Done!</b> Tell Claude it's saved. Claude will check the live site, create a test account and confirm it survives a restart.
+      </div>
+    </div>
+  </div>
+
+  <div class="note"><b>Not working?</b> In Render, open <b>Logs</b>. A line saying <code>Could not open the database</code> means the connection string was pasted incompletely. Copy it again and replace the value.</div>
+</main>
+</body>
+</html>
