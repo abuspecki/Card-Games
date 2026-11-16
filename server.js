@@ -6,6 +6,9 @@ const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const { Table, VARIANTS } = require('./poker');
 const bots = require('./bots');
+const { createStore, hashPassword, checkPassword, MODES } = require('./store');
+
+const store = createStore();
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, 'public');
@@ -18,8 +21,80 @@ const TYPES = {
   '.png': 'image/png', '.svg': 'image/svg+xml',
 };
 
+// ---------- accounts API ----------
+const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', (c) => { data += c; if (data.length > 10000) { reject(new Error('too large')); req.destroy(); } });
+    req.on('end', () => { try { resolve(JSON.parse(data || '{}')); } catch { reject(new Error('bad json')); } });
+  });
+}
+
+// Slow down password guessing: max 10 failed attempts per IP per 10 minutes.
+const failures = new Map();
+const clientIp = (req) => String(req.headers['x-forwarded-for'] || req.socket.remoteAddress).split(',')[0].trim();
+function tooManyFailures(ip) {
+  const f = failures.get(ip);
+  if (!f || Date.now() > f.reset) return false;
+  return f.count >= 10;
+}
+function noteFailure(ip) {
+  const f = failures.get(ip);
+  if (!f || Date.now() > f.reset) failures.set(ip, { count: 1, reset: Date.now() + 10 * 60 * 1000 });
+  else f.count++;
+}
+
+const bearer = (req) => String(req.headers.authorization || '').replace(/^Bearer /, '');
+
+async function newSession(user) {
+  const token = crypto.randomBytes(32).toString('hex');
+  await store.createSession(token, user.id);
+  return { token, username: user.username };
+}
+
+async function handleApi(req, res, url) {
+  const ip = clientIp(req);
+  if (req.method === 'POST' && (url === '/api/register' || url === '/api/login')) {
+    if (tooManyFailures(ip)) return json(res, 429, { error: 'Too many attempts. Try again in a few minutes.' });
+    const body = await readBody(req);
+    const username = String(body.username || '').trim();
+    const password = String(body.password || '');
+    if (url === '/api/register') {
+      if (!/^[A-Za-z0-9_-]{3,16}$/.test(username)) return json(res, 400, { error: 'Username: 3–16 letters, numbers, _ or -' });
+      if (password.length < 6 || password.length > 100) return json(res, 400, { error: 'Password must be at least 6 characters' });
+      const user = await store.createUser(username, hashPassword(password));
+      if (!user) { noteFailure(ip); return json(res, 409, { error: 'That username is taken' }); }
+      return json(res, 200, await newSession(user));
+    }
+    const user = await store.getUserByName(username);
+    if (!user || !checkPassword(password, user.pass)) { noteFailure(ip); return json(res, 401, { error: 'Wrong username or password' }); }
+    return json(res, 200, await newSession(user));
+  }
+  if (req.method === 'POST' && url === '/api/logout') {
+    const token = bearer(req);
+    if (token) await store.deleteSession(token);
+    return json(res, 200, { ok: true });
+  }
+  if (req.method === 'GET' && url === '/api/me') {
+    const user = bearer(req) && await store.getUserBySession(bearer(req));
+    if (!user) return json(res, 401, { error: 'Not logged in' });
+    return json(res, 200, { username: user.username, stats: await store.userStats(user.id) });
+  }
+  if (req.method === 'GET' && url === '/api/leaderboard') {
+    const mode = new URL(req.url, 'http://x').searchParams.get('mode');
+    const m = MODES.includes(mode) ? mode : 'friends';
+    return json(res, 200, { mode: m, persistent: store.kind === 'postgres', rows: await store.leaderboard(m) });
+  }
+  return json(res, 404, { error: 'Not found' });
+}
+
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0]);
+  if (url.startsWith('/api/')) {
+    return handleApi(req, res, url).catch((e) => { console.error('api error', e); json(res, 500, { error: 'Server error' }); });
+  }
   // Share the poker engine with the browser (used by the odds window).
   if (url === '/engine.js') {
     return fs.readFile(path.join(__dirname, 'poker.js'), (err, data) => {
@@ -56,7 +131,10 @@ function makeCode() {
 function createRoom() {
   const code = makeCode();
   const room = { code, table: new Table(), clients: new Map(), host: null, nextTimer: null, turnTimer: null };
-  room.table.onEvent = (kind) => broadcast(room, { t: 'sfx', name: kind });
+  room.table.onEvent = (kind) => {
+    broadcast(room, { t: 'sfx', name: kind });
+    if (kind === 'win') recordResults(room.table);
+  };
   rooms.set(code, room);
   return room;
 }
@@ -112,6 +190,20 @@ function scheduleTimers(room) {
   }
 }
 
+// Save each account's result for the hand that just ended.
+// Hands with 2+ humans count for the "friends" leaderboard, others for "bots".
+function recordResults(t) {
+  const humans = t.seats.filter((s) => s && s.inHand && !s.isBot).length;
+  const mode = humans >= 2 ? 'friends' : 'bots';
+  const winners = new Map((t.results ? t.results.winners : []).map((w) => [w.seat, w.amount]));
+  t.seats.forEach((s, i) => {
+    if (!s || !s.accountId || !s.inHand) return;
+    const net = s.chips - s.startChips;
+    store.recordHand(s.accountId, mode, net, winners.has(i), winners.get(i) || 0)
+      .catch((e) => console.error('record error', e));
+  });
+}
+
 function hasHuman(room) {
   return room.table.seats.some((s) => s && !s.isBot && s.connected);
 }
@@ -153,27 +245,32 @@ wss.on('connection', (ws) => {
   let room = null;
   let pid = null;
 
-  ws.on('message', (raw) => {
+  ws.on('message', async (raw) => {
     let m;
     try { m = JSON.parse(raw); } catch { return; }
 
     if (m.t === 'join') {
-      const name = String(m.name || 'Player').trim().slice(0, 16) || 'Player';
+      let user = null;
+      if (m.session) {
+        try { user = await store.getUserBySession(String(m.session)); } catch (e) { console.error('session lookup', e); }
+      }
+      const name = user ? user.username : String(m.name || 'Player').trim().slice(0, 16) || 'Player';
       let code = String(m.room || '').toUpperCase().trim();
       if (!code) room = createRoom();
       else room = rooms.get(code);
       if (!room) return send(ws, { t: 'error', msg: `Room ${code} not found` });
       const table = room.table;
-      // Rejoin with a saved token if this player already has a seat.
-      if (m.token && table.seatOf(m.token) !== -1) {
-        pid = m.token;
+      // Rejoin a seat: by saved seat token, or because this account already sits here.
+      const accountSeat = user ? table.seats.findIndex((s) => s && s.accountId === user.id) : -1;
+      if (accountSeat !== -1 || (m.token && table.seatOf(m.token) !== -1)) {
+        pid = accountSeat !== -1 ? table.seats[accountSeat].id : m.token;
         const old = room.clients.get(pid);
         if (old && old !== ws) old.close();
         table.seats[table.seatOf(pid)].connected = true;
       } else {
         pid = crypto.randomUUID();
         if (table.seats.every(Boolean)) removeBot(room); // make room for a human
-        if (table.sit({ id: pid, name }) === -1) { room = null; return send(ws, { t: 'error', msg: 'Table is full (8 players)' }); }
+        if (table.sit({ id: pid, name, accountId: user ? user.id : null }) === -1) { room = null; return send(ws, { t: 'error', msg: 'Table is full (8 players)' }); }
         table.addLog(`${name} joined`);
       }
       room.clients.set(pid, ws);
@@ -236,6 +333,11 @@ wss.on('connection', (ws) => {
         if (me && m.text) { addChat(room, me.name, m.text); broadcast(room, { t: 'sfx', name: 'chat' }); }
         break;
       case 'leave':
+        if (me && me.accountId && me.inHand && t.isPlaying()) {
+          store.recordHand(me.accountId, t.seats.filter((s) => s && s.inHand && !s.isBot).length >= 2 ? 'friends' : 'bots',
+            me.chips - me.startChips, false, 0).catch((e) => console.error('record error', e));
+        }
+        if (me) me.accountId = null; // already recorded; don't count this hand twice
         t.leave(pid);
         room.clients.delete(pid);
         pid = null;
@@ -265,4 +367,6 @@ wss.on('connection', (ws) => {
   });
 });
 
-server.listen(PORT, () => console.log(`Poker server running on http://localhost:${PORT}`));
+store.init()
+  .then(() => server.listen(PORT, () => console.log(`Poker server running on http://localhost:${PORT} (accounts: ${store.kind})`)))
+  .catch((e) => { console.error('Could not open the database:', e.message); process.exit(1); });

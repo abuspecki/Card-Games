@@ -48,6 +48,21 @@ Example: `public/sounds/win.mp3` replaces the win jingle.
   It's calculated in your own browser from only your cards and the board. The host can turn it off for everyone with **Allow odds window**.
 - **🏆 Hand rankings** (key **H**) lists every hand from best to worst with example cards, and highlights the hand you currently hold.
 
+## Accounts and leaderboard
+
+- **Accounts:** players can create an account (username + password) or play as a guest. Only accounts appear on the leaderboard.
+- **🥇 Leaderboard** (key **L**) has two tabs:
+  - **With friends:** hands with at least 2 people;
+  - **Vs bots:** solo practice.
+
+  Players are ranked by total chips won. Losses count, and rebuys don't hide them.
+- **Passwords** are stored as scrypt hashes, never as plain text.
+- **Storage:** accounts need a permanent database. On Render, the server's disk is wiped on every restart.
+  1. Create a free Postgres database, for example at neon.tech.
+  2. In Render, under Environment, add a variable named `DATABASE_URL` with the database's connection string.
+
+  Without `DATABASE_URL`, accounts are saved to `data/db.json`. That's fine for local testing, but they're temporary on Render.
+
 ## Controls
 
 - Keyboard shortcuts: **F** to fold, **C** to check or call, **R** to raise.

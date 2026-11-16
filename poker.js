@@ -161,6 +161,7 @@ class Table {
       id: player.id, name: player.name, chips: this.settings.startingStack,
       hole: [], folded: true, allIn: false, bet: 0, totalBet: 0, acted: false,
       inHand: false, connected: true, isBot: !!player.isBot, botStyle: player.botStyle,
+      accountId: player.accountId || null, startChips: 0,
     };
     return idx;
   }
@@ -207,6 +208,7 @@ class Table {
       if (!s) continue;
       Object.assign(s, { hole: [], bet: 0, totalBet: 0, acted: false, allIn: false });
       s.inHand = s.chips > 0;
+      s.startChips = s.chips;
       s.folded = !s.inHand;
       s.lastAction = null;
     }
@@ -438,7 +440,7 @@ class Table {
       log: this.log.slice(-30),
       seats: this.seats.map((s, i) => s && {
         name: s.name, chips: s.chips, bet: s.bet, folded: s.folded, allIn: s.allIn,
-        inHand: s.inHand, connected: s.connected, lastAction: s.lastAction, isBot: s.isBot,
+        inHand: s.inHand, connected: s.connected, lastAction: s.lastAction, isBot: s.isBot, hasAccount: !!s.accountId,
         cardCount: s.hole.length,
         hole: i === me || (showAll && s.inHand && !s.folded) ? s.hole : null,
         handName: (i === me || showAll) && s.inHand && !s.folded && this.board.length >= 3

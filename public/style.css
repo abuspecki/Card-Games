@@ -152,3 +152,26 @@ aside { overflow-y: auto; }
 .panel-body { display: flex; flex-direction: column; gap: 8px; }
 .collapsible { cursor: pointer; user-select: none; display: flex; justify-content: space-between; }
 .panel.collapsed .panel-body { display: none; }
+
+/* Accounts */
+.account { text-align: center; color: var(--muted); display: flex; gap: 10px; justify-content: center; align-items: center; }
+.account b { color: var(--gold); }
+.account-box { display: flex; flex-direction: column; gap: 8px; }
+.tabs { display: flex; gap: 4px; }
+.tab { flex: 1; background: #161b22; border-color: #2c3746; }
+.tab.on { background: #2e3a4a; border-color: var(--gold); color: var(--gold); }
+.auth { display: flex; flex-direction: column; gap: 6px; }
+#lobbyLeaderboard { align-self: center; }
+
+/* Leaderboard */
+.lb { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 6px; }
+.lb th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; padding: 6px; border-bottom: 1px solid #2c3746; }
+.lb td { padding: 7px 6px; border-bottom: 1px solid #ffffff0d; }
+.lb tr.me td { background: #1d3a2a; }
+.lb .pos { color: #4fd17d; } .lb .neg { color: #e0606f; }
+.lb td:first-child { width: 36px; font-weight: 700; }
+.lb .empty { text-align: center; color: var(--muted); padding: 20px; }
+
+/* Odds window collapsed */
+.odds.collapsed #oddsBody { display: none; }
+.odds.collapsed .odds-head { margin-bottom: 0; }

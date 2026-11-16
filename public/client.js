@@ -9,6 +9,64 @@ let S = null; // latest state message
 let myTurnBefore = false;
 let raiseTouched = false;
 
+// ---------- accounts ----------
+let session = localStorage.getItem('poker.session');
+let account = null; // username when logged in
+let authMode = 'login';
+
+function api(path, body) {
+  const opts = { headers: { 'Content-Type': 'application/json' } };
+  if (session) opts.headers.Authorization = 'Bearer ' + session;
+  if (body) { opts.method = 'POST'; opts.body = JSON.stringify(body); }
+  return fetch(path, opts).then(async (r) => ({ ok: r.ok, status: r.status, data: await r.json().catch(() => ({})) }));
+}
+
+function showAccount() {
+  $('accountIn').classList.toggle('hidden', !account);
+  $('accountOut').classList.toggle('hidden', !!account);
+  if (account) $('accountName').textContent = account;
+}
+
+function setAuthMode(mode) {
+  authMode = mode;
+  $('tabLogin').classList.toggle('on', mode === 'login');
+  $('tabRegister').classList.toggle('on', mode === 'register');
+  $('authBtn').textContent = mode === 'login' ? 'Log in' : 'Create account';
+  $('authPass').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+  $('authPass').placeholder = mode === 'login' ? 'Password' : 'Password (at least 6 characters)';
+  $('authError').textContent = '';
+}
+$('tabLogin').onclick = () => setAuthMode('login');
+$('tabRegister').onclick = () => setAuthMode('register');
+
+$('authForm').onsubmit = async (e) => {
+  e.preventDefault();
+  $('authError').textContent = '';
+  const r = await api(authMode === 'login' ? '/api/login' : '/api/register', { username: $('authUser').value.trim(), password: $('authPass').value });
+  if (!r.ok) { $('authError').textContent = r.data.error || 'Something went wrong'; return; }
+  session = r.data.token;
+  account = r.data.username;
+  localStorage.setItem('poker.session', session);
+  $('authPass').value = '';
+  showAccount();
+};
+
+$('logoutBtn').onclick = async () => {
+  await api('/api/logout', {});
+  localStorage.removeItem('poker.session');
+  session = null;
+  account = null;
+  showAccount();
+};
+
+const accountReady = session
+  ? api('/api/me').then((r) => {
+    if (r.ok) account = r.data.username;
+    else if (r.status === 401) { localStorage.removeItem('poker.session'); session = null; }
+    showAccount();
+  }).catch(() => showAccount())
+  : Promise.resolve(showAccount());
+
 // ---------- lobby ----------
 $('name').value = localStorage.getItem('poker.name') || '';
 const params = new URLSearchParams(location.search);
@@ -20,13 +78,13 @@ $('joinBtn').onclick = () => join($('roomCode').value.trim());
 $('roomCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('joinBtn').click(); });
 
 function join(code, bots = 0) {
-  const name = $('name').value.trim();
-  if (!name) { $('lobbyError').textContent = 'Enter your name first'; return; }
-  localStorage.setItem('poker.name', name);
+  const name = account || $('name').value.trim();
+  if (!name) { $('lobbyError').textContent = 'Log in, or enter a guest name first'; return; }
+  if (!account) localStorage.setItem('poker.name', name);
   Sound.unlock();
   connect(() => {
     const token = code ? localStorage.getItem('poker.token.' + code.toUpperCase()) : null;
-    send({ t: 'join', room: code, name, token, bots });
+    send({ t: 'join', room: code, name, token, bots, session });
   });
 }
 
@@ -44,7 +102,7 @@ function connect(onOpen) {
 function rejoin() {
   if (!S) return;
   const code = S.room;
-  connect(() => send({ t: 'join', room: code, name: $('name').value, token: localStorage.getItem('poker.token.' + code) }));
+  connect(() => send({ t: 'join', room: code, name: account || $('name').value, token: localStorage.getItem('poker.token.' + code), session }));
 }
 
 const send = (m) => ws && ws.readyState === 1 && ws.send(JSON.stringify(m));
@@ -270,7 +328,8 @@ $('raiseBtn').onclick = () => send({ t: 'action', action: 'raise', amount: Numbe
 document.addEventListener('keydown', (e) => {
   if (!S || ['INPUT', 'SELECT'].includes(document.activeElement.tagName)) return;
   const k = e.key.toLowerCase();
-  if (k === 'escape') $('rankingsModal').classList.add('hidden');
+  if (k === 'escape') { $('rankingsModal').classList.add('hidden'); $('leaderboardModal').classList.add('hidden'); }
+  if (k === 'l') $('leaderboardBtn').click();
   if (k === 'h') $('rankingsBtn').click();
   if (k === 'o') $('oddsToggle').click();
   if (!S.state.limits) return;
@@ -333,9 +392,11 @@ function toast(t) {
 }
 
 // Auto-rejoin after a page refresh if we have a seat token for the room in the URL.
-if (params.get('room') && localStorage.getItem('poker.token.' + params.get('room').toUpperCase()) && $('name').value) {
-  join(params.get('room'));
-}
+accountReady.then(() => {
+  if (params.get('room') && localStorage.getItem('poker.token.' + params.get('room').toUpperCase()) && (account || $('name').value)) {
+    join(params.get('room'));
+  }
+});
 
 // ---------- odds window ----------
 const HAND_NAMES = ['High Card', 'Pair', 'Two Pair', 'Three of a Kind', 'Straight', 'Flush', 'Full House', 'Four of a Kind', 'Straight Flush'];
@@ -352,7 +413,7 @@ function setOddsOpen(open) {
   if (S) renderOdds(S.state);
 }
 $('oddsToggle').onclick = () => setOddsOpen(!oddsOpen);
-$('oddsClose').onclick = () => setOddsOpen(false);
+$('oddsClose').onclick = () => setOddsOpen(!oddsOpen);
 
 function renderOdds(st) {
   const allowed = st.settings.showOdds;
@@ -360,8 +421,10 @@ function renderOdds(st) {
   const panel = $('oddsPanel');
   const me = st.mySeat !== -1 ? st.seats[st.mySeat] : null;
   const inHand = me && me.inHand && !me.folded && me.hole && ['preflop', 'flop', 'turn', 'river', 'showdown'].includes(st.stage);
-  panel.classList.toggle('hidden', !allowed || !oddsOpen || st.stage === 'waiting');
-  if (panel.classList.contains('hidden')) return;
+  panel.classList.toggle('hidden', !allowed || st.stage === 'waiting');
+  panel.classList.toggle('collapsed', !oddsOpen);
+  $('oddsClose').textContent = oddsOpen ? 'Hide' : 'Show';
+  if (panel.classList.contains('hidden') || !oddsOpen) return;
   const body = $('oddsBody');
   if (!inHand) {
     body.innerHTML = `<div class="muted">${me && me.folded && me.inHand ? 'You folded this hand.' : 'You are not in this hand.'}</div>`;
@@ -467,3 +530,47 @@ function setHostCollapsed(c) {
 }
 $('hostToggle').onclick = () => setHostCollapsed(!$('hostPanel').classList.contains('collapsed'));
 setHostCollapsed(localStorage.getItem('poker.hostCollapsed') === '1');
+
+// ---------- leaderboard ----------
+let lbMode = 'friends';
+async function loadLeaderboard() {
+  $('lbNote').textContent = lbMode === 'friends'
+    ? 'Hands with at least 2 people. Ranked by total chips won (losses count, rebuys don\'t hide them).'
+    : 'Hands where you were the only person at the table, playing against bots.';
+  $('lbBody').innerHTML = '<tr><td colspan="6" class="empty">Loading…</td></tr>';
+  const r = await api('/api/leaderboard?mode=' + lbMode).catch(() => ({ ok: false }));
+  if (!r.ok) { $('lbBody').innerHTML = '<tr><td colspan="6" class="empty">Could not load the leaderboard.</td></tr>'; return; }
+  if (!r.data.persistent) {
+    $('lbNote').innerHTML += '<br><b style="color:#f4c95d">⚠ Test mode: no database is connected, so accounts and scores are deleted whenever the server restarts.</b>';
+  }
+  if (!r.data.rows.length) {
+    $('lbBody').innerHTML = '<tr><td colspan="6" class="empty">No results yet. Create an account and play a hand!</td></tr>';
+    return;
+  }
+  $('lbBody').innerHTML = '';
+  r.data.rows.forEach((row, i) => {
+    const tr = document.createElement('tr');
+    if (account && row.username.toLowerCase() === account.toLowerCase()) tr.className = 'me';
+    const medal = ['🥇', '🥈', '🥉'][i] || i + 1;
+    const net = Number(row.net);
+    tr.innerHTML = `<td>${medal}</td><td></td><td class="${net >= 0 ? 'pos' : 'neg'}">${net > 0 ? '+' : ''}${net.toLocaleString()}</td>
+      <td>${row.hands}</td><td>${Math.round((row.wins / row.hands) * 100)}%</td><td>${Number(row.biggest_pot || 0).toLocaleString()}</td>`;
+    tr.children[1].textContent = row.username;
+    $('lbBody').appendChild(tr);
+  });
+}
+function openLeaderboard() { $('leaderboardModal').classList.remove('hidden'); loadLeaderboard(); }
+$('leaderboardBtn').onclick = () => {
+  if ($('leaderboardModal').classList.contains('hidden')) openLeaderboard();
+  else $('leaderboardModal').classList.add('hidden');
+};
+$('lobbyLeaderboard').onclick = openLeaderboard;
+$('leaderboardClose').onclick = () => $('leaderboardModal').classList.add('hidden');
+$('leaderboardModal').onclick = (e) => { if (e.target.id === 'leaderboardModal') e.target.classList.add('hidden'); };
+document.querySelectorAll('#leaderboardModal [data-mode]').forEach((b) => {
+  b.onclick = () => {
+    lbMode = b.dataset.mode;
+    document.querySelectorAll('#leaderboardModal [data-mode]').forEach((x) => x.classList.toggle('on', x === b));
+    loadLeaderboard();
+  };
+});
