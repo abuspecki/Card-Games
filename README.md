@@ -43,6 +43,26 @@ Example: `public/sounds/win.mp3` replaces the win jingle.
 - **Seats:** If the table is full of bots and a friend joins, a bot gives up its seat.
 - **No humans, no new hands:** Bots won't start new hands when no human is connected.
 
+## Coins 🪙
+
+Coins are a play-money reward currency for accounts, separate from table chips. **They can't be bought with real money or cashed out.**
+
+- **Welcome gift:** 200 coins for every new account.
+- **Daily bonus:** 100 coins, plus 25 for each day in a row, up to 250 on day 7. Missing a day resets the streak.
+- **Winning at tables:**
+  - Hold'em win: 10 coins, plus up to 40 for big pots.
+  - Blackjack win: 5 coins, plus up to 20.
+  - Escaping in Durak: 15 coins.
+
+  Table winnings are capped at 500 coins per day.
+- **Free refill:** under 50 coins, claim 100 coins once every 4 hours.
+- **High roller tables:** each game's second table. You need 500 coins to sit down. Stakes are 5× higher and coin rewards are doubled.
+- **Shop:**
+  - card backs and table felt colours, shown on your own screen;
+  - name badges, which everyone at the table sees.
+
+Wallet updates lock the wallet row, so a bonus or purchase can never be paid or charged twice.
+
 ## Odds window and hand rankings
 
 - **📊 Odds** (key **O**) shows:

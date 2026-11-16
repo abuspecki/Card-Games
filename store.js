@@ -52,6 +52,57 @@ function postgresStore(url) {
         net BIGINT NOT NULL DEFAULT 0,
         biggest_pot INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (user_id, mode))`);
+      await q(`CREATE TABLE IF NOT EXISTS wallets (
+        user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        coins INTEGER NOT NULL DEFAULT 0,
+        last_daily TEXT,
+        streak INTEGER NOT NULL DEFAULT 0,
+        last_refill BIGINT NOT NULL DEFAULT 0,
+        earned_day TEXT,
+        earned_today INTEGER NOT NULL DEFAULT 0)`);
+      await q(`CREATE TABLE IF NOT EXISTS user_items (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        item_id TEXT NOT NULL,
+        PRIMARY KEY (user_id, item_id))`);
+      await q(`CREATE TABLE IF NOT EXISTS equipped (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        slot TEXT NOT NULL,
+        item_id TEXT NOT NULL,
+        PRIMARY KEY (user_id, slot))`);
+    },
+    // Run fn(wallet) with the wallet row locked, so two requests can't both
+    // claim the same bonus or spend the same coins. fn returns
+    // { update: {field: value}, addItem, result }.
+    async updateWallet(userId, welcome, fn) {
+      const c = await pool.connect();
+      try {
+        await c.query('BEGIN');
+        await c.query('INSERT INTO wallets (user_id, coins) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userId, welcome]);
+        const r = await c.query('SELECT coins, last_daily, streak, last_refill::float8 AS last_refill, earned_day, earned_today FROM wallets WHERE user_id = $1 FOR UPDATE', [userId]);
+        const owned = await c.query('SELECT item_id FROM user_items WHERE user_id = $1', [userId]);
+        const out = fn(r.rows[0], owned.rows.map((x) => x.item_id)) || {};
+        if (out.update && Object.keys(out.update).length) {
+          const keys = Object.keys(out.update);
+          await c.query(`UPDATE wallets SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')} WHERE user_id = $1`, [userId, ...keys.map((k) => out.update[k])]);
+        }
+        if (out.addItem) await c.query('INSERT INTO user_items (user_id, item_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userId, out.addItem]);
+        await c.query('COMMIT');
+        return out.result;
+      } catch (e) {
+        await c.query('ROLLBACK').catch(() => {});
+        throw e;
+      } finally {
+        c.release();
+      }
+    },
+    async getItems(userId) {
+      const owned = await q('SELECT item_id FROM user_items WHERE user_id = $1', [userId]);
+      const eq = await q('SELECT slot, item_id FROM equipped WHERE user_id = $1', [userId]);
+      return { owned: owned.rows.map((r) => r.item_id), equipped: Object.fromEntries(eq.rows.map((r) => [r.slot, r.item_id])) };
+    },
+    async setEquipped(userId, slot, itemId) {
+      if (!itemId) await q('DELETE FROM equipped WHERE user_id = $1 AND slot = $2', [userId, slot]);
+      else await q('INSERT INTO equipped (user_id, slot, item_id) VALUES ($1, $2, $3) ON CONFLICT (user_id, slot) DO UPDATE SET item_id = EXCLUDED.item_id', [userId, slot, itemId]);
     },
     async createUser(username, pass) {
       const r = await q(
@@ -91,7 +142,7 @@ function postgresStore(url) {
 
 // ---------- JSON file backend (local development) ----------
 function fileStore(file) {
-  let db = { nextId: 1, users: [], sessions: {}, stats: {} };
+  let db = { nextId: 1, users: [], sessions: {}, stats: {}, wallets: {}, items: {}, equipped: {} };
   let saveTimer = null;
   const save = () => {
     clearTimeout(saveTimer);
@@ -106,6 +157,29 @@ function fileStore(file) {
     kind: 'file',
     async init() {
       try { db = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* new database */ }
+      db.wallets = db.wallets || {};
+      db.items = db.items || {};
+      db.equipped = db.equipped || {};
+    },
+    async updateWallet(userId, welcome, fn) {
+      const w = db.wallets[userId] || (db.wallets[userId] = { coins: welcome, last_daily: null, streak: 0, last_refill: 0, earned_day: null, earned_today: 0 });
+      const out = fn({ ...w }, (db.items[userId] || []).slice()) || {};
+      if (out.update) Object.assign(w, out.update);
+      if (out.addItem) {
+        const list = db.items[userId] || (db.items[userId] = []);
+        if (!list.includes(out.addItem)) list.push(out.addItem);
+      }
+      save();
+      return out.result;
+    },
+    async getItems(userId) {
+      return { owned: (db.items[userId] || []).slice(), equipped: { ...(db.equipped[userId] || {}) } };
+    },
+    async setEquipped(userId, slot, itemId) {
+      const e = db.equipped[userId] || (db.equipped[userId] = {});
+      if (itemId) e[slot] = itemId;
+      else e[slot] = undefined;
+      save();
     },
     async createUser(username, pass) {
       if (db.users.some((u) => u.username.toLowerCase() === username.toLowerCase())) return null;

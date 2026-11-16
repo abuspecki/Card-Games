@@ -309,3 +309,66 @@ button.gold:disabled { background: #555; color: #bbb; }
 .profile .tab { font-size: 13px; padding: 8px 6px; white-space: nowrap; }
 .table-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 1100px) { .table-grid { grid-template-columns: 1fr; } }
+
+/* ================= Coins ================= */
+.wallet { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; padding-top: 14px; border-top: 1px solid #2e4a3a; }
+.wallet .balance { font-size: 15px; color: #c9d6cd; }
+.wallet .balance b { font-size: 28px; color: #f3d98f; font-family: Georgia, serif; }
+.wallet .coin { font-size: 24px; }
+.daily { background: #0a160f; border: 1px solid #2e4a3a; border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.daily-head { display: flex; justify-content: space-between; align-items: center; color: #fff; font-size: 14px; }
+.streak-dots { display: flex; gap: 5px; }
+.streak-dots .sd { flex: 1; height: 24px; border-radius: 6px; display: grid; place-items: center; font-size: 11px; font-weight: 700;
+  background: #13261b; color: #5f7767; border: 1px solid #2e4a3a; }
+.streak-dots .sd.done { background: linear-gradient(180deg, #f6d77e, #d9a93d); color: #2a1d05; border-color: transparent; }
+.streak-dots .sd.next { border: 1px dashed #e8be5c; color: #f3d98f; }
+.daily button, .wallet > button { width: 100%; }
+.coin-chip { background: #2a2210; border: 1px solid #e8be5c88; color: #f3d98f; border-radius: 999px; padding: 4px 12px; font-size: 14px; cursor: pointer; }
+.coin-chip:hover { background: #3a2f15; }
+.coin-pop { position: fixed; top: 70px; left: 50%; transform: translate(-50%, -20px); opacity: 0; pointer-events: none; z-index: 50;
+  background: linear-gradient(180deg, #f6d77e, #d9a93d); color: #2a1d05; border-radius: 14px; padding: 10px 20px; text-align: center;
+  box-shadow: 0 10px 30px #000a; display: flex; flex-direction: column; }
+.coin-pop b { font-size: 24px; }
+.coin-pop span { font-size: 12px; font-weight: 600; }
+.coin-pop.show { animation: coinpop 2.4s ease-out forwards; }
+@keyframes coinpop { 0% { opacity: 0; transform: translate(-50%, -20px) scale(.8); } 12% { opacity: 1; transform: translate(-50%, 0) scale(1.05); }
+  20% { transform: translate(-50%, 0) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -30px); } }
+.plate .badge { margin-right: 4px; }
+
+/* High roller table cards */
+.table-card.high-roller { border-color: #e8be5c99; background: linear-gradient(180deg, #2a2210, #120e06); }
+.table-card.high-roller .tc-felt { background: radial-gradient(ellipse at center, #5b1824, #2d0a12); border-color: #6b4a14; }
+.table-card.high-roller .tc-extra { color: #e8be5c; }
+
+/* Shop */
+.shop-box { width: min(760px, 95vw); }
+.shop-box .odds-head { gap: 12px; }
+.shop-balance { margin-left: auto; color: #f3d98f; font-size: 18px; }
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 8px; }
+.shop-item { background: #161b22; border: 1px solid #2c3746; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; align-items: center; text-align: center; }
+.shop-item.equipped { border-color: #6ef09a; box-shadow: 0 0 0 1px #6ef09a inset; }
+.shop-item .si-name { font-weight: 700; }
+.shop-item .si-price { color: #f3d98f; font-size: 13px; }
+.shop-item.owned .si-price { color: #6ef09a; }
+.shop-item button { width: 100%; }
+.shop-preview { height: 76px; display: flex; align-items: center; justify-content: center; gap: 4px; }
+.shop-preview .card { width: 44px; height: 64px; animation: none; }
+.shop-preview .card + .card { margin-left: -20px; transform: rotate(8deg); }
+.mini-felt { width: 110px; height: 60px; border-radius: 999px; border: 5px solid #3b2414;
+  background: radial-gradient(ellipse at center, var(--felt), var(--felt-dark)); }
+.big-badge { font-size: 36px; }
+.badge-name { font-weight: 700; }
+
+/* Card back designs (also used on the table when equipped) */
+.card.back[data-back="royal"], body[data-cardback="royal"] .card.back:not([data-back]) { background: repeating-linear-gradient(45deg, #1d3f8f 0 6px, #2952b8 6px 12px); }
+.card.back[data-back="midnight"], body[data-cardback="midnight"] .card.back:not([data-back]) { background: radial-gradient(circle at 50% 50%, #e8be5c 0 3px, transparent 4px) 0 0 / 12px 12px, #111; border-color: #e8be5c; }
+.card.back[data-back="emerald"], body[data-cardback="emerald"] .card.back:not([data-back]) { background: repeating-linear-gradient(-45deg, #0d6b3f 0 5px, #14965a 5px 10px); }
+.card.back[data-back="flames"], body[data-cardback="flames"] .card.back:not([data-back]) { background: linear-gradient(0deg, #ff5a1f, #ffb52e 55%, #7a0d0d); }
+.card.back[data-back="classic"] { background: repeating-linear-gradient(45deg, #8b1e2d 0 6px, #a3283a 6px 12px); }
+
+/* Felt colors */
+.mini-felt[data-felt="classic"] { --felt: #0f6b3e; --felt-dark: #0a4a2b; }
+.mini-felt[data-felt="blue"], body[data-felt="blue"] .table { --felt: #145a8c; --felt-dark: #0b3656; }
+.mini-felt[data-felt="purple"], body[data-felt="purple"] .table { --felt: #5b2a86; --felt-dark: #351650; }
+.mini-felt[data-felt="crimson"], body[data-felt="crimson"] .table { --felt: #8c1f2c; --felt-dark: #540f18; }
+.mini-felt[data-felt="black"], body[data-felt="black"] .table { --felt: #2b2b2b; --felt-dark: #0d0d0d; }

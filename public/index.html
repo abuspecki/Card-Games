@@ -34,6 +34,17 @@
           </div>
           <button id="logoutBtn" class="ghost small">Log out</button>
         </div>
+        <div id="walletBox" class="wallet hidden">
+          <div class="balance"><span class="coin">🪙</span> <b id="coinBalance">0</b> <span class="muted-small">coins</span></div>
+          <div class="daily">
+            <div class="daily-head"><b>🎁 Daily bonus</b><span id="streakText" class="muted-small"></span></div>
+            <div id="streakDots" class="streak-dots"></div>
+            <button id="dailyBtn" class="gold">Claim</button>
+          </div>
+          <button id="refillBtn" class="ghost hidden">🆘 Free refill</button>
+          <div id="earnedToday" class="muted-small"></div>
+          <button id="shopBtn" class="ghost">🛍️ Shop</button>
+        </div>
         <div id="accountOut" class="account-box">
           <div class="tabs">
             <button id="tabLogin" class="tab on">Log in</button>
@@ -70,6 +81,7 @@
       <div class="room-info"><button id="leaveBtn" class="small">← Lobby</button> <b id="roomLabel"></b> <button id="copyLink" class="small">Copy invite link</button></div>
       <div id="variantLabel" class="variant"></div>
       <div class="header-right">
+        <span id="coinChip" class="coin-chip hidden" title="Your coins">🪙 <b id="coinChipVal">0</b></span>
         <button id="oddsToggle" class="small" title="Show/hide your win chances (O)">📊 Odds</button>
         <button id="rankingsBtn" class="small" title="List of winning hands (H)">🏆 Hand rankings</button>
         <button id="leaderboardBtn" class="small" title="Leaderboard (L)">🥇 Leaderboard</button>
@@ -189,6 +201,20 @@
         <tbody id="lbBody"></tbody></table>
     </div>
   </div>
+
+  <div id="shopModal" class="modal hidden">
+    <div class="modal-box shop-box">
+      <div class="odds-head"><h2>🛍️ Shop</h2><span class="shop-balance">🪙 <b id="shopBalance">0</b></span><button id="shopClose" class="small">✕</button></div>
+      <div class="tabs" id="shopTabs">
+        <button data-slot="cardback" class="tab on">Card backs</button>
+        <button data-slot="felt" class="tab">Table felt</button>
+        <button data-slot="badge" class="tab">Name badges</button>
+      </div>
+      <p class="sub" id="shopNote"></p>
+      <div id="shopGrid" class="shop-grid"></div>
+    </div>
+  </div>
+  <div id="coinPop" class="coin-pop"></div>
 
   <script src="sound.js"></script>
   <script src="client.js"></script>

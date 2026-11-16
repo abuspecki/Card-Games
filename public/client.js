@@ -5,6 +5,9 @@ const SUIT = { s: '♠', h: '♥', d: '♦', c: '♣' };
 const POS = [[50, 102], [14, 90], [-4, 50], [14, 8], [50, -4], [86, 8], [104, 50], [86, 90]];
 
 let ws = null;
+let wallet = null;      // coin wallet (accounts only)
+let shopItems = null;   // shop catalog, loaded on demand
+let shopSlot = 'cardback';
 let S = null; // latest state message
 let myTurnBefore = false;
 let raiseTouched = false;
@@ -25,6 +28,7 @@ function showAccount() {
   $('accountIn').classList.toggle('hidden', !account);
   $('accountOut').classList.toggle('hidden', !!account);
   if (account) { $('accountName').textContent = account; $('avatar').textContent = account[0].toUpperCase(); }
+  if (typeof loadWallet === 'function') loadWallet();
 }
 
 function setAuthMode(mode) {
@@ -56,6 +60,7 @@ $('logoutBtn').onclick = async () => {
   localStorage.removeItem('poker.session');
   session = null;
   account = null;
+  wallet = null;
   showAccount();
 };
 
@@ -89,8 +94,9 @@ async function loadTables() {
     const info = GAME_INFO[t.game];
     const seated = t.humans + t.bots;
     const full = seated >= t.capacity && t.bots === 0;
+    const locked = t.highRoller && (!account || !wallet || wallet.coins < t.minCoins);
     const card = document.createElement('div');
-    card.className = `table-card game-${t.game}`;
+    card.className = `table-card game-${t.game}${t.highRoller ? ' high-roller' : ''}`;
     card.innerHTML = `
       <div class="tc-head"><span class="tc-icon">${info.icon}</span>
         <div><div class="tc-title"></div><div class="tc-blurb">${info.blurb}</div></div>
@@ -98,7 +104,7 @@ async function loadTables() {
       <div class="tc-felt"><div class="tc-seats"></div></div>
       <div class="tc-foot"><span class="tc-count">${t.humans} player${t.humans === 1 ? '' : 's'}${t.bots ? ` · ${t.bots} bot${t.bots === 1 ? '' : 's'}` : ''} · ${seated}/${t.capacity} seats</span>
         <button class="gold">${full ? 'Full' : 'Join table'}</button></div>
-      <div class="tc-extra">${info.extra}</div>`;
+      <div class="tc-extra">${t.highRoller ? `👑 High roller · ${t.stakes ? `${t.stakes} · ${t.stack.toLocaleString()} chips · ` : ''}needs ${t.minCoins} 🪙 · double coin rewards` : info.extra}</div>`;
     card.querySelector('.tc-title').textContent = t.name;
     const seatsEl = card.querySelector('.tc-seats');
     for (let k = 0; k < t.capacity; k++) {
@@ -111,6 +117,7 @@ async function loadTables() {
     }
     const btn = card.querySelector('button');
     btn.disabled = full;
+    if (locked && !full) { btn.textContent = `🔒 ${t.minCoins} 🪙`; btn.title = account ? 'Collect more coins to unlock' : 'Log in to play here'; }
     btn.onclick = () => join(t.id);
     grid.appendChild(card);
   }
@@ -162,6 +169,8 @@ function handle(m) {
     $('game').classList.remove('hidden');
   } else if (m.t === 'error') {
     if (!S) $('lobbyError').textContent = m.msg; else toast(m.msg);
+  } else if (m.t === 'coins') {
+    onCoins(m);
   } else if (m.t === 'sfx') {
     Sound.play(m.name);
   } else if (m.t === 'state') {
@@ -234,6 +243,7 @@ function render() {
     plate.innerHTML = `<div class="nm"></div><div class="ch">${sub}</div>`;
     plate.querySelector('.nm').textContent = s.name;
     if (s.isBot) plate.querySelector('.nm').insertAdjacentHTML('afterbegin', '<span class="bot" title="Computer player">🤖</span>');
+    if (s.badge) { const bd = document.createElement('span'); bd.className = 'badge'; bd.textContent = s.badge; plate.querySelector('.nm').prepend(bd); }
     const role = g === 'durak' && isPlaying(st) ? (i === st.attacker ? '⚔️' : i === st.defender ? '🛡️' : '') : '';
     if (role) plate.insertAdjacentHTML('afterbegin', `<div class="role" title="${role === '⚔️' ? 'Attacker' : 'Defender'}">${role}</div>`);
     if (g === 'holdem' && i === st.button && st.stage !== 'waiting') {
@@ -905,3 +915,179 @@ $('rankingsBtn').onclick = () => {
 $('rankingsClose').onclick = () => $('rankingsModal').classList.add('hidden');
 $('rankingsModal').onclick = (e) => { if (e.target.id === 'rankingsModal') e.target.classList.add('hidden'); };
 $('oddsToggle').classList.toggle('on', oddsOpen);
+
+
+// ---------- coins ----------
+const fmt = (n) => Number(n || 0).toLocaleString();
+
+async function loadWallet() {
+  if (!account) { wallet = null; renderWallet(); return; }
+  const r = await api('/api/wallet').catch(() => null);
+  if (r && r.ok) { wallet = r.data; renderWallet(); }
+}
+
+function untilText(t) {
+  const mins = Math.max(1, Math.ceil((t - Date.now()) / 60000));
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h ? `${h}h ${m}m` : `${m}m`;
+}
+
+function renderWallet() {
+  $('walletBox').classList.toggle('hidden', !wallet);
+  $('coinChip').classList.toggle('hidden', !wallet);
+  applyCosmetics();
+  if (!wallet) return;
+  $('coinBalance').textContent = fmt(wallet.coins);
+  $('coinChipVal').textContent = fmt(wallet.coins);
+  $('shopBalance').textContent = fmt(wallet.coins);
+  const d = wallet.daily;
+  const dots = $('streakDots');
+  dots.innerHTML = '';
+  const inRow = d.ready ? d.streak : d.streak; // days already collected in a row
+  for (let k = 1; k <= 7; k++) {
+    const dot = document.createElement('span');
+    dot.className = 'sd' + (k <= inRow ? ' done' : '') + (d.ready && k === Math.min(inRow + 1, 7) ? ' next' : '');
+    dot.textContent = k;
+    dots.appendChild(dot);
+  }
+  $('streakText').textContent = inRow ? `🔥 ${inRow} day${inRow === 1 ? '' : 's'} in a row` : '';
+  $('dailyBtn').disabled = !d.ready;
+  $('dailyBtn').textContent = d.ready ? `Claim ${d.amount} 🪙` : `Next bonus in ${untilText(d.nextAt)} (${d.amount} 🪙)`;
+  const rf = wallet.refill;
+  const showRefill = wallet.coins < rf.below;
+  $('refillBtn').classList.toggle('hidden', !showRefill);
+  $('refillBtn').disabled = !rf.ready;
+  $('refillBtn').textContent = rf.ready ? `🆘 Free refill: +${rf.amount} 🪙` : `🆘 Next free refill in ${untilText(rf.nextAt)}`;
+  $('earnedToday').textContent = `Won at tables today: ${fmt(wallet.earnedToday)} / ${fmt(wallet.tableCap)} 🪙`;
+}
+
+async function walletAction(path, body) {
+  const r = await api(path, body || {});
+  if (!r.ok) { toastAnywhere(r.data.error || 'Something went wrong'); return null; }
+  wallet = r.data.wallet;
+  renderWallet();
+  renderShop();
+  return r.data;
+}
+
+$('dailyBtn').onclick = async () => {
+  const r = await walletAction('/api/wallet/daily');
+  if (r) { coinPop(r.amount, r.streak > 1 ? `Day ${r.streak} streak!` : 'Daily bonus'); Sound.play('win'); }
+};
+$('refillBtn').onclick = async () => {
+  const r = await walletAction('/api/wallet/refill');
+  if (r) { coinPop(r.amount, 'Refill'); Sound.play('chips'); }
+};
+
+// A coin reward from the table.
+function onCoins(m) {
+  if (wallet) { wallet.coins = m.coins; wallet.earnedToday = Math.min(wallet.tableCap, wallet.earnedToday + m.amount); renderWallet(); }
+  if (m.amount > 0) { coinPop(m.amount, m.capped ? 'Daily table limit reached' : 'Hand won'); Sound.play('chips'); }
+}
+
+$('coinPop').addEventListener('animationend', () => $('coinPop').classList.remove('show'));
+
+function coinPop(amount, label) {
+  const el = $('coinPop');
+  el.innerHTML = `<b>+${fmt(amount)} 🪙</b><span></span>`;
+  el.querySelector('span').textContent = label;
+  el.classList.remove('show');
+  void el.offsetWidth; // restart the animation
+  el.classList.add('show');
+}
+
+function toastAnywhere(text) {
+  if (!$('game').classList.contains('hidden')) return toast(text);
+  $('lobbyError').textContent = text;
+  setTimeout(() => { if ($('lobbyError').textContent === text) $('lobbyError').textContent = ''; }, 4000);
+}
+
+// ---------- shop ----------
+async function openShop() {
+  if (!account) { toastAnywhere('Log in to use the shop'); return; }
+  if (!shopItems) { const r = await api('/api/shop').catch(() => null); if (r && r.ok) shopItems = r.data.items; }
+  await loadWallet();
+  $('shopModal').classList.remove('hidden');
+  renderShop();
+}
+$('shopBtn').onclick = openShop;
+$('coinChip').onclick = openShop;
+$('shopClose').onclick = () => $('shopModal').classList.add('hidden');
+$('shopModal').onclick = (e) => { if (e.target.id === 'shopModal') e.target.classList.add('hidden'); };
+document.querySelectorAll('#shopTabs [data-slot]').forEach((b) => {
+  b.onclick = () => {
+    shopSlot = b.dataset.slot;
+    document.querySelectorAll('#shopTabs [data-slot]').forEach((x) => x.classList.toggle('on', x === b));
+    renderShop();
+  };
+});
+
+function shopPreview(item) {
+  const box = document.createElement('div');
+  box.className = 'shop-preview';
+  if (item.slot === 'cardback') box.innerHTML = `<div class="card back" data-back="${item.preview}"></div><div class="card back" data-back="${item.preview}"></div>`;
+  else if (item.slot === 'felt') box.innerHTML = `<div class="mini-felt" data-felt="${item.preview}"></div>`;
+  else box.innerHTML = `<span class="big-badge">${item.preview}</span><span class="badge-name">${account || 'You'}</span>`;
+  return box;
+}
+
+function renderShop() {
+  if ($('shopModal').classList.contains('hidden') || !shopItems || !wallet) return;
+  $('shopNote').textContent = {
+    cardback: 'Changes the back of every face-down card — on your screen.',
+    felt: 'Changes the color of the table — on your screen.',
+    badge: 'Shows next to your name at the table — everyone sees it!',
+  }[shopSlot];
+  const grid = $('shopGrid');
+  grid.innerHTML = '';
+  const equippedId = wallet.equipped[shopSlot];
+  // The free default item
+  const def = document.createElement('div');
+  def.className = 'shop-item' + (!equippedId ? ' equipped' : '');
+  def.appendChild(shopPreview({ slot: shopSlot, preview: shopSlot === 'badge' ? '—' : 'classic' }));
+  def.insertAdjacentHTML('beforeend', `<div class="si-name">${shopSlot === 'badge' ? 'No badge' : 'Classic'}</div><div class="si-price">Free</div>`);
+  const db = document.createElement('button');
+  db.className = 'small'; db.textContent = !equippedId ? 'Equipped' : 'Use'; db.disabled = !equippedId;
+  db.onclick = () => walletAction('/api/shop/equip', { slot: shopSlot, item: null });
+  def.appendChild(db);
+  grid.appendChild(def);
+  for (const item of shopItems.filter((i) => i.slot === shopSlot)) {
+    const owned = wallet.owned.includes(item.id);
+    const on = equippedId === item.id;
+    const el = document.createElement('div');
+    el.className = 'shop-item' + (on ? ' equipped' : '') + (owned ? ' owned' : '');
+    el.appendChild(shopPreview(item));
+    el.insertAdjacentHTML('beforeend', `<div class="si-name"></div><div class="si-price">${owned ? 'Owned ✓' : `🪙 ${fmt(item.price)}`}</div>`);
+    el.querySelector('.si-name').textContent = item.name;
+    const b = document.createElement('button');
+    if (on) { b.textContent = 'Equipped'; b.disabled = true; b.className = 'small'; }
+    else if (owned) { b.textContent = 'Equip'; b.className = 'small'; b.onclick = () => walletAction('/api/shop/equip', { slot: item.slot, item: item.id }); }
+    else {
+      const short = item.price - wallet.coins;
+      b.className = 'gold small';
+      b.textContent = short > 0 ? `Need ${fmt(short)} more` : 'Buy';
+      b.disabled = short > 0;
+      b.onclick = async () => {
+        if (!confirm(`Buy "${item.name}" for ${item.price} coins?`)) return;
+        const r = await walletAction('/api/shop/buy', { item: item.id });
+        if (r) { Sound.play('win'); await walletAction('/api/shop/equip', { slot: item.slot, item: item.id }); }
+      };
+    }
+    el.appendChild(b);
+    grid.appendChild(el);
+  }
+}
+
+// Card back and felt you've equipped apply to your own screen.
+function applyCosmetics() {
+  const eq = (wallet && wallet.equipped) || {};
+  const item = (id) => shopItems && shopItems.find((i) => i.id === id);
+  const back = eq.cardback && item(eq.cardback);
+  const felt = eq.felt && item(eq.felt);
+  document.body.dataset.cardback = back ? back.preview : '';
+  document.body.dataset.felt = felt ? felt.preview : '';
+  if ((eq.cardback || eq.felt) && !shopItems) api('/api/shop').then((r) => { if (r.ok) { shopItems = r.data.items; applyCosmetics(); } });
+}
+
+// Keep the wallet fresh in the lobby (timers, coins won elsewhere).
+setInterval(() => { if (account && $('game').classList.contains('hidden')) loadWallet(); }, 30000);

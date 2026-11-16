@@ -483,7 +483,7 @@ class Table {
       chat: (this.chat || []).slice(-50),
       seats: this.seats.map((s, i) => s && {
         name: s.name, chips: s.chips, bet: s.bet, folded: s.folded, allIn: s.allIn,
-        inHand: s.inHand, connected: s.connected, lastAction: s.lastAction, isBot: s.isBot, hasAccount: !!s.accountId,
+        inHand: s.inHand, connected: s.connected, lastAction: s.lastAction, isBot: s.isBot, hasAccount: !!s.accountId, badge: s.badge || null,
         cardCount: s.hole.length,
         hole: i === me || (showAll && s.inHand && !s.folded) ? s.hole : null,
         handName: (i === me || showAll) && s.inHand && !s.folded && this.board.length >= 3

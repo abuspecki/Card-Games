@@ -17,9 +17,11 @@ const GAMES = {
 };
 const GAME_NAMES = Object.fromEntries(Object.entries(GAMES).map(([k, g]) => [k, g.name]));
 const { openStore, hashPassword, checkPassword, MODES } = require('./store');
+const { makeCoins, rewardFor, CATALOG, HIGH_ROLLER_MIN } = require('./coins');
 
 let store = null;       // set at startup by openStore()
 let databaseError = null; // why Postgres couldn't be used, if it couldn't
+let coins = null;         // reward coins (set up once the store is open)
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, 'public');
@@ -98,6 +100,25 @@ async function handleApi(req, res, url) {
     const m = MODES.includes(mode) ? mode : 'friends';
     return json(res, 200, { mode: m, persistent: store.kind === 'postgres', databaseError, rows: await store.leaderboard(m) });
   }
+  // ----- coins & shop -----
+  if (req.method === 'GET' && url === '/api/shop') return json(res, 200, { items: CATALOG, highRollerMin: HIGH_ROLLER_MIN });
+  if (url.startsWith('/api/wallet') || url.startsWith('/api/shop/')) {
+    const user = bearer(req) && await store.getUserBySession(bearer(req));
+    if (!user) return json(res, 401, { error: 'Log in to collect coins' });
+    if (req.method === 'GET' && url === '/api/wallet') return json(res, 200, await coins.getStatus(user.id));
+    if (req.method !== 'POST') return json(res, 404, { error: 'Not found' });
+    const body = await readBody(req);
+    let r;
+    if (url === '/api/wallet/daily') r = await coins.claimDaily(user.id);
+    else if (url === '/api/wallet/refill') r = await coins.claimRefill(user.id);
+    else if (url === '/api/shop/buy') r = await coins.buy(user.id, String(body.item || ''));
+    else if (url === '/api/shop/equip') {
+      r = await coins.equip(user.id, String(body.slot || ''), body.item ? String(body.item) : null);
+      if (r.ok && body.slot === 'badge') refreshBadge(user.id);
+    } else return json(res, 404, { error: 'Not found' });
+    if (r.error) return json(res, 400, r);
+    return json(res, 200, { ...r, wallet: await coins.getStatus(user.id) });
+  }
   if (req.method === 'GET' && url === '/api/tables') {
     return json(res, 200, { tables: [...rooms.values()].map(tableSummary) });
   }
@@ -141,11 +162,11 @@ const server = http.createServer((req, res) => {
 // The lobby: two permanent tables per game. Anyone can join; there is no host.
 const TABLES = [
   { id: 'HOLDEM-1', name: "Hold'em · Table 1", game: 'holdem', capacity: 8 },
-  { id: 'HOLDEM-2', name: "Hold'em · Table 2", game: 'holdem', capacity: 8 },
+  { id: 'HOLDEM-2', name: "Hold'em · High Roller", game: 'holdem', capacity: 8, highRoller: true, settings: { smallBlind: 25, bigBlind: 50, startingStack: 5000 } },
   { id: 'BLACKJACK-1', name: 'Blackjack · Table 1', game: 'blackjack', capacity: 7 },
-  { id: 'BLACKJACK-2', name: 'Blackjack · Table 2', game: 'blackjack', capacity: 7 },
+  { id: 'BLACKJACK-2', name: 'Blackjack · High Roller', game: 'blackjack', capacity: 7, highRoller: true, settings: { bigBlind: 50, startingStack: 5000 } },
   { id: 'DURAK-1', name: 'Durak · Table 1', game: 'durak', capacity: 6 },
-  { id: 'DURAK-2', name: 'Durak · Table 2', game: 'durak', capacity: 6 },
+  { id: 'DURAK-2', name: 'Durak · High Roller', game: 'durak', capacity: 6, highRoller: true },
 ];
 const AUTO_START_DELAY = 3000;          // deal this long after enough players sit down
 const AWAY_LIMIT = 3 * 60 * 1000;       // disconnected players lose their seat after this
@@ -153,7 +174,7 @@ const AWAY_LIMIT = 3 * 60 * 1000;       // disconnected players lose their seat 
 const rooms = new Map(); // id -> { code, name, game, capacity, table, clients, timers }
 
 for (const def of TABLES) {
-  const room = { ...def, code: def.id, table: GAMES[def.game].make({}), clients: new Map(), nextTimer: null, turnTimer: null, startTimer: null };
+  const room = { ...def, code: def.id, table: GAMES[def.game].make(def.settings || {}), clients: new Map(), nextTimer: null, turnTimer: null, startTimer: null };
   wireTable(room);
   rooms.set(def.id, room);
 }
@@ -161,7 +182,7 @@ for (const def of TABLES) {
 function wireTable(room) {
   room.table.onEvent = (kind) => {
     broadcast(room, { t: 'sfx', name: kind });
-    if (kind === 'win') recordResults(room.table);
+    if (kind === 'win') recordResults(room);
   };
 }
 
@@ -176,6 +197,11 @@ function tableSummary(room) {
     bots: seats.filter((s) => s.isBot).length,
     players: seats.map((s) => ({ name: s.name, bot: s.isBot })),
     playing: room.table.isPlaying(),
+    highRoller: !!room.highRoller,
+    minCoins: room.highRoller ? HIGH_ROLLER_MIN : 0,
+    stakes: room.game === 'holdem' ? `Blinds ${room.table.settings.smallBlind} / ${room.table.settings.bigBlind}`
+      : room.game === 'blackjack' ? `Min bet ${room.table.settings.bigBlind}` : null,
+    stack: room.table.settings.startingStack,
   };
 }
 
@@ -187,7 +213,7 @@ function pushState(room) {
   try {
     const t = room.table;
     for (const [pid, ws] of room.clients) {
-      send(ws, { t: 'state', room: room.code, tableName: room.name, state: t.view(pid) });
+      send(ws, { t: 'state', room: room.code, tableName: room.name, highRoller: !!room.highRoller, state: t.view(pid) });
     }
     scheduleTimers(room);
   } catch (e) {
@@ -246,10 +272,28 @@ function scheduleTimers(room) {
 }
 
 // Save each account's result for the hand (or Durak game) that just ended.
-function recordResults(t) {
+function recordResults(room) {
+  const t = room.table;
   for (const r of t.resultsForRecord()) {
     store.recordHand(r.accountId, r.mode, r.net, r.won, r.pot).catch((e) => console.error('record error', e));
+    const amount = rewardFor(r, room.highRoller);
+    if (!amount || !coins) continue;
+    coins.earn(r.accountId, amount).then((res) => {
+      const seat = room.table.seats.find((s) => s && s.accountId === r.accountId);
+      const ws = seat && room.clients.get(seat.id);
+      if (ws) send(ws, { t: 'coins', amount: res.amount, coins: res.coins, capped: !!res.capped });
+    }).catch((e) => console.error('coin error', e));
   }
+}
+
+// After someone equips a badge, show it at any table they're sitting at.
+function refreshBadge(userId) {
+  coins.badgeOf(userId).then((badge) => {
+    for (const room of rooms.values()) {
+      const seat = room.table.seats.find((s) => s && s.accountId === userId);
+      if (seat) { seat.badge = badge; pushState(room); }
+    }
+  }).catch(() => {});
 }
 
 // Free seats of people who have been disconnected for a while (between hands only),
@@ -352,6 +396,11 @@ wss.on('connection', (ws) => {
         table.seats[table.seatOf(pid)].connected = true;
         table.seats[table.seatOf(pid)].awayAt = null;
       } else {
+        if (room.highRoller) {
+          if (!user) return send(ws, { t: 'error', msg: `👑 High roller tables are for accounts with ${HIGH_ROLLER_MIN}+ coins — log in or create an account` });
+          const bal = await coins.balance(user.id);
+          if (bal < HIGH_ROLLER_MIN) return send(ws, { t: 'error', msg: `👑 You need ${HIGH_ROLLER_MIN} coins for the high roller table (you have ${bal}). Collect your daily bonus or win at Table 1!` });
+        }
         pid = crypto.randomUUID();
         if (seatedCount(table) >= room.capacity) removeBot(room); // make room for a human
         if (seatedCount(table) >= room.capacity || table.sit({ id: pid, name, accountId: user ? user.id : null }) === -1) {
@@ -359,6 +408,7 @@ wss.on('connection', (ws) => {
           return send(ws, { t: 'error', msg: 'This table is full — try the other one' });
         }
         table.addLog(`${name} joined`);
+        if (user) coins.badgeOf(user.id).then((b) => { const st = table.seats[table.seatOf(pid)]; if (b && st) { st.badge = b; pushState(room); } }).catch(() => {});
       }
       room.clients.set(pid, ws);
       send(ws, { t: 'joined', room: room.code, token: pid });
@@ -433,6 +483,6 @@ process.on('unhandledRejection', (e) => console.error('unhandled rejection', e))
 
 // Always start the game, even if the database is unavailable.
 openStore()
-  .then((r) => { store = r.store; databaseError = r.error; })
+  .then((r) => { store = r.store; databaseError = r.error; coins = makeCoins(store); })
   .catch((e) => { console.error('Storage error:', e.message); })
   .finally(() => server.listen(PORT, () => console.log(`Poker server running on http://localhost:${PORT} (accounts: ${store ? store.kind : 'none'})`)));

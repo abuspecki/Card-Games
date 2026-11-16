@@ -84,7 +84,7 @@ class BaseTable {
   baseSeatView(s) {
     return {
       name: s.name, chips: s.chips, isBot: s.isBot, connected: s.connected, inHand: s.inHand,
-      lastAction: s.lastAction, hasAccount: !!s.accountId, folded: false, allIn: false, bet: 0,
+      lastAction: s.lastAction, hasAccount: !!s.accountId, badge: s.badge || null, folded: false, allIn: false, bet: 0,
     };
   }
 }
