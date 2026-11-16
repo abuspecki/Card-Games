@@ -15,17 +15,18 @@ const params = new URLSearchParams(location.search);
 if (params.get('room')) $('roomCode').value = params.get('room');
 
 $('createBtn').onclick = () => join('');
+$('practiceBtn').onclick = () => join('', Number($('botCount').value));
 $('joinBtn').onclick = () => join($('roomCode').value.trim());
 $('roomCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('joinBtn').click(); });
 
-function join(code) {
+function join(code, bots = 0) {
   const name = $('name').value.trim();
   if (!name) { $('lobbyError').textContent = 'Enter your name first'; return; }
   localStorage.setItem('poker.name', name);
   Sound.unlock();
   connect(() => {
     const token = code ? localStorage.getItem('poker.token.' + code.toUpperCase()) : null;
-    send({ t: 'join', room: code, name, token });
+    send({ t: 'join', room: code, name, token, bots });
   });
 }
 
@@ -100,7 +101,7 @@ function render() {
   let msg = '';
   if (st.stage === 'waiting') {
     const n = st.seats.filter((s) => s && s.chips > 0).length;
-    msg = n < 2 ? `Waiting for players… share room code ${S.room}` : (S.isHost ? 'Press Deal to start' : 'Waiting for the host to deal');
+    msg = n < 2 ? (S.isHost ? `Share room code ${S.room} or add a bot to play` : 'Waiting for players…') : (S.isHost ? 'Press Deal to start' : 'Waiting for the host to deal');
   } else if (st.stage === 'showdown' && st.results) {
     msg = st.results.winners.map((w) => `${st.seats[w.seat]?.name ?? 'Player'} wins ${w.amount}${w.hand ? ' with ' + w.hand : ''}`).join(' · ');
   } else if (st.toAct !== -1 && st.seats[st.toAct]) {
@@ -140,6 +141,7 @@ function render() {
     plate.className = 'plate';
     plate.innerHTML = `<div class="nm"></div><div class="ch">${s.chips}${s.allIn ? ' · ALL-IN' : ''}</div>`;
     plate.querySelector('.nm').textContent = s.name;
+    if (s.isBot) plate.querySelector('.nm').insertAdjacentHTML('afterbegin', '<span class="bot" title="Computer player">🤖</span>');
     if (i === st.button && st.stage !== 'waiting') {
       const d = document.createElement('div'); d.className = 'dealer'; d.textContent = 'D'; plate.style.position = 'relative'; plate.appendChild(d);
     }
@@ -193,6 +195,8 @@ function renderHost(st) {
   if (active !== $('bigBlind')) $('bigBlind').value = st.settings.bigBlind;
   if (active !== $('stack')) $('stack').value = st.settings.startingStack;
   const playing = ['preflop', 'flop', 'turn', 'river'].includes(st.stage);
+  $('addBotBtn').disabled = st.seats.every(Boolean);
+  $('removeBotBtn').disabled = !st.seats.some((s) => s && s.isBot);
   $('startBtn').disabled = playing || st.seats.filter((s) => s && s.chips > 0).length < 2;
   $('startBtn').textContent = st.stage === 'showdown' ? 'Deal now' : 'Deal';
 }
@@ -202,6 +206,8 @@ $('rotate').onchange = (e) => send({ t: 'settings', rotate: e.target.checked });
 $('bigBlind').onchange = (e) => send({ t: 'settings', bigBlind: e.target.value });
 $('stack').onchange = (e) => send({ t: 'settings', startingStack: e.target.value });
 $('startBtn').onclick = () => send({ t: 'start' });
+$('addBotBtn').onclick = () => send({ t: 'addBot' });
+$('removeBotBtn').onclick = () => send({ t: 'removeBot' });
 
 function renderActions(st) {
   const lim = st.limits;

@@ -30,6 +30,14 @@ To use your own sound files instead, drop them into `public/sounds/` named after
 
 Example: `public/sounds/win.mp3` replaces the win jingle.
 
+## Playing against bots
+
+- **Practice vs bots:** On the start screen, pick how many bots you want and click **🤖 Practice vs bots**. The table fills with bots and the first hand is dealt right away.
+- **Bots in a room with friends:** The host can use **Add bot** and **Remove bot** in the host controls at any time.
+- **How bots play:** Each bot estimates its chance of winning by simulating the rest of the hand thousands of times. Bots only see their own cards and the board. Every bot gets a random style (tight, normal or wild), so they play differently.
+- **Seats:** If the table is full of bots and a friend joins, a bot gives up its seat.
+- **No humans, no new hands:** Bots won't start new hands when no human is connected.
+
 ## Controls
 
 - Keyboard shortcuts: **F** to fold, **C** to check or call, **R** to raise.

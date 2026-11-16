@@ -5,11 +5,13 @@ const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const { Table, VARIANTS } = require('./poker');
+const bots = require('./bots');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, 'public');
 const NEXT_HAND_DELAY = 6000;
 const DISCONNECTED_TURN_TIMEOUT = 8000;
+const BOT_THINK_MS = [700, 1800];
 const TYPES = {
   '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.json': 'application/json',
@@ -70,17 +72,30 @@ function scheduleTimers(room) {
   if (t.stage === 'showdown' && !room.nextTimer) {
     room.nextTimer = setTimeout(() => {
       room.nextTimer = null;
-      if (t.stage === 'showdown' && t.canStart()) t.startHand();
+      if (t.stage === 'showdown' && hasHuman(room)) { rebuyBots(t); if (t.canStart()) t.startHand(); }
       else if (t.stage === 'showdown') t.stage = 'waiting';
       pushState(room);
     }, NEXT_HAND_DELAY);
   }
-  // Auto-fold disconnected players whose turn it is.
+  // Bots act after a short "thinking" pause; disconnected humans auto-fold.
   clearTimeout(room.turnTimer);
   room.turnTimer = null;
   if (t.isPlaying() && t.toAct !== -1) {
     const p = t.seats[t.toAct];
-    if (p && !p.connected) {
+    if (p && p.isBot) {
+      const seat = t.toAct;
+      const hand = t.handNo;
+      const wait = BOT_THINK_MS[0] + Math.random() * (BOT_THINK_MS[1] - BOT_THINK_MS[0]);
+      room.turnTimer = setTimeout(() => {
+        room.turnTimer = null;
+        if (t.toAct !== seat || t.handNo !== hand || !t.isPlaying()) return;
+        let d;
+        try { d = bots.decide(t, seat); } catch (e) { console.error('bot error', e); d = { action: t.limits(seat).toCall > 0 ? 'fold' : 'check' }; }
+        const r = t.act(p.id, d.action, d.amount);
+        if (r.error) t.act(p.id, t.limits(seat).toCall > 0 ? 'fold' : 'check');
+        pushState(room);
+      }, wait);
+    } else if (p && !p.connected) {
       room.turnTimer = setTimeout(() => {
         const lim = t.limits(t.toAct);
         t.act(p.id, lim.toCall > 0 ? 'fold' : 'check');
@@ -88,6 +103,37 @@ function scheduleTimers(room) {
       }, DISCONNECTED_TURN_TIMEOUT);
     }
   }
+}
+
+function hasHuman(room) {
+  return room.table.seats.some((s) => s && !s.isBot && s.connected);
+}
+
+function rebuyBots(t) {
+  for (const s of t.seats) {
+    if (s && s.isBot && s.chips === 0) { s.chips = t.settings.startingStack; t.addLog(`${s.name} rebuys for ${s.chips}`); }
+  }
+}
+
+function addBot(room) {
+  const t = room.table;
+  const name = bots.pickBotName(t);
+  const idx = t.sit({ id: 'bot-' + crypto.randomUUID(), name, isBot: true, botStyle: bots.randomStyle() });
+  if (idx === -1) return false;
+  t.addLog(`🤖 ${name} sat down`);
+  return true;
+}
+
+function removeBot(room) {
+  const t = room.table;
+  // Prefer a bot that isn't in the current hand.
+  const botSeats = t.seats.map((s, i) => (s && s.isBot ? i : -1)).filter((i) => i !== -1);
+  if (!botSeats.length) return false;
+  const idle = botSeats.find((i) => !(t.isPlaying() && t.seats[i].inHand && !t.seats[i].folded));
+  const i = idle !== undefined ? idle : botSeats[botSeats.length - 1];
+  t.addLog(`🤖 ${t.seats[i].name} left`);
+  t.leave(t.seats[i].id);
+  return true;
 }
 
 function addChat(room, from, text) {
@@ -119,12 +165,19 @@ wss.on('connection', (ws) => {
         table.seats[table.seatOf(pid)].connected = true;
       } else {
         pid = crypto.randomUUID();
+        if (table.seats.every(Boolean)) removeBot(room); // make room for a human
         if (table.sit({ id: pid, name }) === -1) { room = null; return send(ws, { t: 'error', msg: 'Table is full (8 players)' }); }
         table.addLog(`${name} joined`);
       }
       room.clients.set(pid, ws);
       if (!room.host || table.seatOf(room.host) === -1) room.host = pid;
       send(ws, { t: 'joined', room: room.code, token: pid });
+      // "Practice vs bots": fill the table and deal right away.
+      const nBots = Math.max(0, Math.min(7, Math.floor(Number(m.bots) || 0)));
+      if (!code && nBots) {
+        for (let i = 0; i < nBots; i++) addBot(room);
+        table.startHand();
+      }
       pushState(room);
       return;
     }
@@ -142,7 +195,8 @@ wss.on('connection', (ws) => {
       }
       case 'start':
         if (!isHost) return send(ws, { t: 'error', msg: 'Only the host can start' });
-        if (!t.startHand()) return send(ws, { t: 'error', msg: 'Need at least 2 players with chips' });
+        rebuyBots(t);
+        if (!t.startHand()) return send(ws, { t: 'error', msg: 'Need at least 2 players with chips — add a bot?' });
         break;
       case 'settings': {
         if (!isHost) return;
@@ -155,6 +209,14 @@ wss.on('connection', (ws) => {
         if (!t.isPlaying()) t.variant = s.variant;
         break;
       }
+      case 'addBot':
+        if (!isHost) return;
+        if (!addBot(room)) return send(ws, { t: 'error', msg: 'Table is full' });
+        break;
+      case 'removeBot':
+        if (!isHost) return;
+        if (!removeBot(room)) return send(ws, { t: 'error', msg: 'No bots at the table' });
+        break;
       case 'rebuy':
         if (me && me.chips === 0 && !(me.inHand && t.isPlaying())) {
           me.chips = t.settings.startingStack;

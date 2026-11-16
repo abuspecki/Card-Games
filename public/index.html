@@ -14,6 +14,13 @@
       <p class="sub">Hold'em · Omaha · 5-Card Omaha — play with friends</p>
       <label>Your name <input id="name" maxlength="16" placeholder="e.g. Sam" /></label>
       <button id="createBtn" class="big">Create a room</button>
+      <div class="row practice">
+        <button id="practiceBtn">🤖 Practice vs bots</button>
+        <select id="botCount" title="Number of bots">
+          <option value="1">1 bot</option><option value="2">2 bots</option><option value="3" selected>3 bots</option>
+          <option value="4">4 bots</option><option value="5">5 bots</option>
+        </select>
+      </div>
       <div class="or">or join a friend</div>
       <div class="row">
         <input id="roomCode" maxlength="5" placeholder="ROOM CODE" />
@@ -56,6 +63,10 @@
           <label class="check"><input type="checkbox" id="rotate" /> Rotate game each hand</label>
           <label>Big blind <input id="bigBlind" type="number" min="2" /></label>
           <label>Starting stack <input id="stack" type="number" min="100" /></label>
+          <div class="row">
+            <button id="addBotBtn" class="small">🤖 Add bot</button>
+            <button id="removeBotBtn" class="small">Remove bot</button>
+          </div>
           <button id="startBtn" class="big">Deal</button>
         </div>
         <div class="panel log-panel">
