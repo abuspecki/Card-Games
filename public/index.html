@@ -11,7 +11,7 @@
   <div id="lobby" class="screen">
     <div class="lobby-card">
       <h1>♠ Poker Night ♥</h1>
-      <p class="sub">Hold'em · Omaha · 5-Card Omaha — play with friends</p>
+      <p class="sub">Texas Hold'em · Blackjack · Durak — play with friends</p>
       <!-- Account -->
       <div id="accountIn" class="account hidden">
         Signed in as <b id="accountName"></b>
@@ -34,6 +34,9 @@
       <button id="createBtn" class="big">Create a room</button>
       <div class="row practice">
         <button id="practiceBtn">🤖 Practice vs bots</button>
+        <select id="practiceGame" title="Game">
+          <option value="holdem">Hold'em</option><option value="blackjack">Blackjack</option><option value="durak">Durak</option>
+        </select>
         <select id="botCount" title="Number of bots">
           <option value="1">1 bot</option><option value="2">2 bots</option><option value="3" selected>3 bots</option>
           <option value="4">4 bots</option><option value="5">5 bots</option>
@@ -87,9 +90,8 @@
           <label>Game
             <select id="variantSelect"></select>
           </label>
-          <label class="check"><input type="checkbox" id="rotate" /> Rotate game each hand</label>
           <label class="check"><input type="checkbox" id="showOdds" /> Allow odds window</label>
-          <label>Big blind <input id="bigBlind" type="number" min="2" /></label>
+          <label><span id="bigBlindLabel">Big blind</span> <input id="bigBlind" type="number" min="2" /></label>
           <label>Starting stack <input id="stack" type="number" min="100" /></label>
           <div class="row">
             <button id="addBotBtn" class="small">🤖 Add bot</button>
@@ -114,6 +116,7 @@
     </main>
 
     <footer id="actions" class="actions hidden">
+      <div id="pokerActions" class="game-actions">
       <button id="foldBtn" class="act fold">Fold</button>
       <button id="callBtn" class="act call">Check</button>
       <div class="raise-box">
@@ -129,6 +132,33 @@
         </div>
       </div>
       <button id="raiseBtn" class="act raise">Raise</button>
+      </div>
+
+      <div id="bjActions" class="game-actions hidden">
+        <div id="bjBet" class="row">
+          <span class="muted-label">Your bet</span>
+          <input id="bjBetInput" type="number" />
+          <button data-bjbet="min" class="small">Min</button>
+          <button data-bjbet="x2" class="small">×2</button>
+          <button data-bjbet="x5" class="small">×5</button>
+          <button id="bjBetBtn" class="act raise">Place bet</button>
+        </div>
+        <div id="bjPlay" class="row">
+          <button id="bjHit" class="act call">Hit</button>
+          <button id="bjStand" class="act fold">Stand</button>
+          <button id="bjDouble" class="act raise">Double</button>
+          <button id="bjSplit" class="act raise">Split</button>
+        </div>
+      </div>
+
+      <div id="durakActions" class="game-actions hidden">
+        <div id="durakPrompt" class="durak-prompt"></div>
+        <div id="durakHand" class="durak-hand"></div>
+        <div class="row">
+          <button id="durakTake" class="act fold">Take cards</button>
+          <button id="durakPass" class="act call">Pass</button>
+        </div>
+      </div>
     </footer>
     <div id="toast" class="toast"></div>
 
@@ -146,8 +176,10 @@
     <div class="modal-box">
       <div class="odds-head"><h2>🥇 Leaderboard</h2><button id="leaderboardClose" class="small">✕</button></div>
       <div class="tabs">
-        <button data-mode="friends" class="tab on">With friends</button>
-        <button data-mode="bots" class="tab">Vs bots</button>
+        <button data-mode="friends" class="tab on">Poker · friends</button>
+        <button data-mode="bots" class="tab">Poker · bots</button>
+        <button data-mode="blackjack" class="tab">Blackjack</button>
+        <button data-mode="durak" class="tab">Durak</button>
       </div>
       <p class="sub" id="lbNote"></p>
       <table class="lb"><thead><tr><th>#</th><th>Player</th><th>Chips won</th><th>Hands</th><th>Won</th><th>Biggest pot</th></tr></thead>

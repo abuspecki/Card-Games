@@ -1,8 +1,13 @@
 # Poker Night
 
-Play poker with friends in the browser, using play money only.
+Play card games with friends in the browser, using play money only.
 
-**Games:** Texas Hold'em (No Limit), Omaha (Pot Limit), 5-Card Omaha (Pot Limit), or rotate between them each hand.
+**Games:** the host can switch between hands.
+- **Texas Hold'em** (no limit)
+- **Blackjack:** everyone plays against the dealer. Blackjack pays 3:2 and the dealer stands on 17. You can double, or split once.
+- **Durak:** the classic "throw-in" (podkidnoy) version with 36 cards, 2–6 players and a trump suit. The last player holding cards is the durak.
+
+Bots can play all three. **📖 How to play** explains the rules of each game in the game itself.
 
 ## Run it
 

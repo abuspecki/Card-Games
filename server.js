@@ -4,8 +4,18 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
-const { Table, VARIANTS } = require('./poker');
+const { Table } = require('./poker');
 const bots = require('./bots');
+const { Blackjack } = require('./games/blackjack');
+const { Durak } = require('./games/durak');
+
+// Games the host can pick. Poker uses the Hold'em table.
+const GAMES = {
+  holdem: { name: "Texas Hold'em", make: (settings) => new Table({ ...settings, variant: 'holdem', rotate: false }) },
+  blackjack: { name: 'Blackjack', make: (settings) => new Blackjack(settings) },
+  durak: { name: 'Durak', make: (settings) => new Durak(settings) },
+};
+const GAME_NAMES = Object.fromEntries(Object.entries(GAMES).map(([k, g]) => [k, g.name]));
 const { openStore, hashPassword, checkPassword, MODES } = require('./store');
 
 let store = null;       // set at startup by openStore()
@@ -137,13 +147,41 @@ function makeCode() {
 
 function createRoom() {
   const code = makeCode();
-  const room = { code, table: new Table(), clients: new Map(), host: null, nextTimer: null, turnTimer: null };
+  const room = { code, table: null, clients: new Map(), host: null, nextTimer: null, turnTimer: null };
+  room.table = GAMES.holdem.make({});
+  wireTable(room);
+  rooms.set(code, room);
+  return room;
+}
+
+function wireTable(room) {
   room.table.onEvent = (kind) => {
     broadcast(room, { t: 'sfx', name: kind });
     if (kind === 'win') recordResults(room.table);
   };
-  rooms.set(code, room);
-  return room;
+}
+
+// Swap the room to another game, keeping everyone in their seats with their chips.
+function switchGame(room, game) {
+  const old = room.table;
+  if (!GAMES[game] || old.game === game) return null;
+  if (old.isPlaying()) return 'Finish the current hand before switching games';
+  const { startingStack, smallBlind, bigBlind, showOdds } = old.settings;
+  const t = GAMES[game].make({ startingStack, smallBlind, bigBlind, showOdds });
+  old.seats.forEach((s, i) => {
+    if (s) t.sitAt(i, { id: s.id, name: s.name, chips: s.chips, isBot: s.isBot, botStyle: s.botStyle, accountId: s.accountId, connected: s.connected });
+  });
+  t.log = old.log || [];
+  t.chat = old.chat || [];
+  t.chatSeq = old.chatSeq || 0;
+  t.handNo = old.handNo;
+  t.button = old.button;
+  t.addLog(`🎲 The game is now ${GAMES[game].name}`);
+  clearTimeout(room.nextTimer);
+  room.nextTimer = null;
+  room.table = t;
+  wireTable(room);
+  return null;
 }
 
 function send(ws, msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
@@ -151,11 +189,15 @@ function send(ws, msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m
 function broadcast(room, msg) { for (const ws of room.clients.values()) send(ws, msg); }
 
 function pushState(room) {
-  const t = room.table;
-  for (const [pid, ws] of room.clients) {
-    send(ws, { t: 'state', room: room.code, host: room.host, isHost: pid === room.host, state: t.view(pid) });
+  try {
+    const t = room.table;
+    for (const [pid, ws] of room.clients) {
+      send(ws, { t: 'state', room: room.code, host: room.host, isHost: pid === room.host, games: GAME_NAMES, state: t.view(pid) });
+    }
+    scheduleTimers(room);
+  } catch (e) {
+    console.error('pushState error', e);
   }
-  scheduleTimers(room);
 }
 
 function scheduleTimers(room) {
@@ -164,10 +206,11 @@ function scheduleTimers(room) {
   if (t.stage === 'showdown' && !room.nextTimer) {
     room.nextTimer = setTimeout(() => {
       room.nextTimer = null;
+      if (room.table !== t) return; // game was switched
       if (t.stage === 'showdown' && hasHuman(room)) { rebuyBots(t); if (t.canStart()) t.startHand(); }
       else if (t.stage === 'showdown') t.stage = 'waiting';
       pushState(room);
-    }, NEXT_HAND_DELAY);
+    }, t.game === 'durak' ? NEXT_HAND_DELAY + 2000 : NEXT_HAND_DELAY);
   }
   // Bots act after a short "thinking" pause; disconnected humans auto-fold.
   clearTimeout(room.turnTimer);
@@ -180,35 +223,29 @@ function scheduleTimers(room) {
       const wait = BOT_THINK_MS[0] + Math.random() * (BOT_THINK_MS[1] - BOT_THINK_MS[0]);
       room.turnTimer = setTimeout(() => {
         room.turnTimer = null;
-        if (t.toAct !== seat || t.handNo !== hand || !t.isPlaying()) return;
+        if (room.table !== t || t.toAct !== seat || t.handNo !== hand || !t.isPlaying()) return;
         let d;
-        try { d = bots.decide(t, seat); } catch (e) { console.error('bot error', e); d = { action: t.limits(seat).toCall > 0 ? 'fold' : 'check' }; }
+        try { d = t.botAction ? t.botAction(seat) : bots.decide(t, seat); } catch (e) { console.error('bot error', e); d = t.defaultAction(seat); }
         const r = t.act(p.id, d.action, d.amount);
-        if (r.error) t.act(p.id, t.limits(seat).toCall > 0 ? 'fold' : 'check');
+        if (r.error) { const f = t.defaultAction(seat); t.act(p.id, f.action, f.amount); }
         pushState(room);
       }, wait);
     } else if (p && !p.connected) {
       room.turnTimer = setTimeout(() => {
-        const lim = t.limits(t.toAct);
-        t.act(p.id, lim.toCall > 0 ? 'fold' : 'check');
+        if (room.table !== t || !t.isPlaying() || t.toAct === -1) return;
+        const d = t.defaultAction(t.toAct);
+        t.act(t.seats[t.toAct].id, d.action, d.amount);
         pushState(room);
       }, DISCONNECTED_TURN_TIMEOUT);
     }
   }
 }
 
-// Save each account's result for the hand that just ended.
-// Hands with 2+ humans count for the "friends" leaderboard, others for "bots".
+// Save each account's result for the hand (or Durak game) that just ended.
 function recordResults(t) {
-  const humans = t.seats.filter((s) => s && s.inHand && !s.isBot).length;
-  const mode = humans >= 2 ? 'friends' : 'bots';
-  const winners = new Map((t.results ? t.results.winners : []).map((w) => [w.seat, w.amount]));
-  t.seats.forEach((s, i) => {
-    if (!s || !s.accountId || !s.inHand) return;
-    const net = s.chips - s.startChips;
-    store.recordHand(s.accountId, mode, net, winners.has(i), winners.get(i) || 0)
-      .catch((e) => console.error('record error', e));
-  });
+  for (const r of t.resultsForRecord()) {
+    store.recordHand(r.accountId, r.mode, r.net, r.won, r.pot).catch((e) => console.error('record error', e));
+  }
 }
 
 function hasHuman(room) {
@@ -253,6 +290,16 @@ wss.on('connection', (ws) => {
   let pid = null;
 
   ws.on('message', async (raw) => {
+    try {
+      await handleMessage(raw);
+    } catch (e) {
+      // Never let one bad message or bug take the whole server down.
+      console.error('message error', e);
+      send(ws, { t: 'error', msg: 'Something went wrong — please try again' });
+    }
+  });
+
+  async function handleMessage(raw) {
     let m;
     try { m = JSON.parse(raw); } catch { return; }
 
@@ -284,10 +331,12 @@ wss.on('connection', (ws) => {
       if (!room.host || table.seatOf(room.host) === -1) room.host = pid;
       send(ws, { t: 'joined', room: room.code, token: pid });
       // "Practice vs bots": fill the table and deal right away.
-      const nBots = Math.max(0, Math.min(7, Math.floor(Number(m.bots) || 0)));
+      if (!code && GAMES[m.game]) switchGame(room, m.game);
+      const maxBots = room.table.game === 'durak' ? 5 : 7;
+      const nBots = Math.max(0, Math.min(maxBots, Math.floor(Number(m.bots) || 0)));
       if (!code && nBots) {
         for (let i = 0; i < nBots; i++) addBot(room);
-        table.startHand();
+        room.table.startHand();
       }
       pushState(room);
       return;
@@ -311,14 +360,15 @@ wss.on('connection', (ws) => {
         break;
       case 'settings': {
         if (!isHost) return;
-        const s = t.settings;
-        if (VARIANTS[m.variant]) s.variant = m.variant;
-        if (typeof m.rotate === 'boolean') s.rotate = m.rotate;
+        if (m.game) {
+          const err = switchGame(room, m.game);
+          if (err) return send(ws, { t: 'error', msg: err });
+        }
+        const s = room.table.settings;
         if (typeof m.showOdds === 'boolean') s.showOdds = m.showOdds;
         const num = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.floor(Number(v))));
         if (m.startingStack) s.startingStack = num(m.startingStack, 100, 1000000);
         if (m.bigBlind) { s.bigBlind = num(m.bigBlind, 2, 100000); s.smallBlind = Math.floor(s.bigBlind / 2); }
-        if (!t.isPlaying()) t.variant = s.variant;
         break;
       }
       case 'addBot':
@@ -342,21 +392,23 @@ wss.on('connection', (ws) => {
           broadcast(room, { t: 'sfx', name: 'chat' });
         }
         break;
-      case 'leave':
-        if (me && me.accountId && me.inHand && t.isPlaying()) {
-          store.recordHand(me.accountId, t.seats.filter((s) => s && s.inHand && !s.isBot).length >= 2 ? 'friends' : 'bots',
-            me.chips - me.startChips, false, 0).catch((e) => console.error('record error', e));
+      case 'leave': {
+        // Leaving mid-hand still counts. (Durak records it when the game ends.)
+        const rec = t.leaveRecord ? t.leaveRecord(t.seatOf(pid)) : null;
+        if (rec) {
+          store.recordHand(rec.accountId, rec.mode, rec.net, rec.won, rec.pot).catch((e) => console.error('record error', e));
+          me.accountId = null; // already recorded; don't count this hand twice
         }
-        if (me) me.accountId = null; // already recorded; don't count this hand twice
         t.leave(pid);
         room.clients.delete(pid);
         pid = null;
         break;
+      }
       default:
         return;
     }
     pushState(room);
-  });
+  }
 
   ws.on('close', () => {
     if (!room || !pid) return;
@@ -376,6 +428,11 @@ wss.on('connection', (ws) => {
     pushState(room);
   });
 });
+
+// Last line of defence: log unexpected errors (e.g. inside a bot timer) instead of
+// shutting down every room on the server.
+process.on('uncaughtException', (e) => console.error('uncaught error', e));
+process.on('unhandledRejection', (e) => console.error('unhandled rejection', e));
 
 // Always start the game, even if the database is unavailable.
 openStore()

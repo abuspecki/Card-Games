@@ -4,7 +4,7 @@
   "description": "Play poker with friends in the browser",
   "main": "index.js",
   "scripts": {
-    "test": "node test/engine.test.js && node test/bots.test.js",
+    "test": "node test/engine.test.js && node test/games.test.js && node test/bots.test.js",
     "start": "node server.js"
   },
   "keywords": [],

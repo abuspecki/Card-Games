@@ -131,6 +131,7 @@ class Table {
       showOdds: true,
       ...opts,
     };
+    this.game = 'holdem';
     this.button = -1;
     this.handNo = 0;
     this.resetHand();
@@ -175,6 +176,38 @@ class Table {
   }
 
   seatOf(id) { return this.seats.findIndex((s) => s && s.id === id); }
+
+  // Put a player into a specific seat (used when the room switches games).
+  sitAt(idx, player) {
+    const saved = this.seats;
+    this.seats = new Array(this.maxSeats).fill(null);
+    this.sit(player); // builds the seat object at index 0
+    const seat = this.seats[0];
+    this.seats = saved;
+    this.seats[idx] = seat;
+    if (player.chips !== undefined) seat.chips = player.chips;
+    if (player.connected !== undefined) seat.connected = player.connected;
+  }
+
+  // What a disconnected player does automatically.
+  defaultAction(i) { return { action: this.limits(i).toCall > 0 ? 'fold' : 'check' }; }
+
+  // Results to save for accounts. 2+ humans count as "friends", else "bots".
+  resultsForRecord() {
+    const humans = this.seats.filter((s) => s && s.inHand && !s.isBot).length;
+    const mode = humans >= 2 ? 'friends' : 'bots';
+    const winners = new Map((this.results ? this.results.winners : []).map((w) => [w.seat, w.amount]));
+    return this.seats.map((s, i) => (s && s.accountId && s.inHand
+      ? { accountId: s.accountId, mode, net: s.chips - s.startChips, won: winners.has(i), pot: winners.get(i) || 0 } : null)).filter(Boolean);
+  }
+
+  // Leaving mid-hand still counts as a loss of what was put in.
+  leaveRecord(i) {
+    const s = this.seats[i];
+    if (!s || !s.accountId || !s.inHand || !this.isPlaying()) return null;
+    const humans = this.seats.filter((x) => x && x.inHand && !x.isBot).length;
+    return { accountId: s.accountId, mode: humans >= 2 ? 'friends' : 'bots', net: s.chips - s.startChips, won: false, pot: 0 };
+  }
 
   leave(id) {
     const i = this.seatOf(id);
@@ -431,6 +464,7 @@ class Table {
     const showAll = this.stage === 'showdown' && this.results && this.results.shown;
     const me = this.seatOf(viewerId);
     return {
+      game: 'holdem',
       stage: this.stage,
       variant: this.variant,
       variantName: VARIANTS[this.variant].name,

@@ -194,3 +194,49 @@ aside { overflow-y: auto; }
   border: 8px solid transparent; border-top-color: #fff; }
 .bubble.fade { opacity: 0; transition: opacity .5s; }
 @keyframes pop { from { transform: translateX(-50%) scale(.6); opacity: 0; } }
+
+/* ---------- shared bits for the new games ---------- */
+.game-actions { display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.muted-label { color: var(--muted); font-size: 14px; }
+#bjBetInput { width: 110px; }
+.seat.out .plate { opacity: .6; }
+.seat.loser .plate { border-color: #e0606f; box-shadow: 0 0 18px #e0606f; }
+.plate { position: relative; }
+.plate .role { position: absolute; top: -12px; left: -12px; font-size: 20px; filter: drop-shadow(0 1px 2px #000); }
+.hole .more { color: #fff; font-size: 13px; align-self: center; margin-left: 4px; }
+.red-suit { color: #ff8a98; }
+.rules { margin: 6px 0 0; padding-left: 22px; line-height: 1.55; font-size: 14px; }
+.rules li { margin-bottom: 6px; }
+
+/* ---------- blackjack ---------- */
+.bj-dealer .bj-cards { display: flex; gap: 6px; }
+.bj-hands { gap: 8px !important; align-items: flex-end; }
+.bj-hand { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 2px; border-radius: 8px; }
+.bj-hand.active { outline: 2px solid var(--gold); }
+.bj-cards { display: flex; }
+.bj-hand .bj-cards .card { margin-left: -16px; }
+.bj-hand .bj-cards .card:first-child { margin-left: 0; }
+.bj-total { font-size: 12px; font-weight: 700; background: #000a; color: #fff; border-radius: 6px; padding: 1px 7px; white-space: nowrap; }
+.bj-total.win, .bj-total.blackjack { background: #2f7a45; }
+.bj-total.lose { background: #8a3240; }
+.bj-total.push { background: #555; }
+
+/* ---------- durak ---------- */
+.durak-board { gap: 26px; align-items: center; min-height: 100px; margin-bottom: 18px; }
+.durak-deck { position: relative; width: 96px; height: 90px; }
+.durak-deck .card { position: absolute; }
+.durak-deck .trump-card { transform: rotate(90deg); left: 22px; top: 12px; }
+.durak-deck .deck-back { left: 0; top: 4px; }
+.durak-deck .deck-count { position: absolute; bottom: -20px; left: 0; width: 100%; text-align: center; font-size: 12px; color: #fff; text-shadow: 0 1px 2px #000; white-space: nowrap; }
+.durak-table { display: flex; gap: 14px; flex-wrap: wrap; max-width: 420px; justify-content: center; }
+.durak-pair { position: relative; width: 74px; height: 100px; }
+.durak-pair .card { position: absolute; left: 0; top: 0; }
+.durak-pair .card.defense { left: 16px; top: 18px; transform: rotate(8deg); box-shadow: 0 3px 8px #000a; }
+.durak-prompt { width: 100%; text-align: center; color: var(--gold); font-weight: 600; }
+.durak-hand { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; max-width: 900px; }
+.durak-hand .card { cursor: default; transition: transform .12s; }
+.durak-hand .card.playable { cursor: pointer; box-shadow: 0 0 0 3px var(--gold), 0 4px 10px #0008; }
+.durak-hand .card.playable:hover { transform: translateY(-8px); }
+.durak-hand .card.dim { opacity: .45; }
+.durak-hand .card.is-trump::after { content: '★'; position: absolute; top: 3px; right: 5px; font-size: 11px; color: var(--gold); }
+#actions:has(#durakActions:not(.hidden)) { flex-direction: column; gap: 8px; }

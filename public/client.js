@@ -73,18 +73,18 @@ const params = new URLSearchParams(location.search);
 if (params.get('room')) $('roomCode').value = params.get('room');
 
 $('createBtn').onclick = () => join('');
-$('practiceBtn').onclick = () => join('', Number($('botCount').value));
+$('practiceBtn').onclick = () => join('', Number($('botCount').value), $('practiceGame').value);
 $('joinBtn').onclick = () => join($('roomCode').value.trim());
 $('roomCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('joinBtn').click(); });
 
-function join(code, bots = 0) {
+function join(code, bots = 0, game = 'holdem') {
   const name = account || $('name').value.trim();
   if (!name) { $('lobbyError').textContent = 'Log in, or enter a guest name first'; return; }
   if (!account) localStorage.setItem('poker.name', name);
   Sound.unlock();
   connect(() => {
     const token = code ? localStorage.getItem('poker.token.' + code.toUpperCase()) : null;
-    send({ t: 'join', room: code, name, token, bots, session });
+    send({ t: 'join', room: code, name, token, bots, game, session });
   });
 }
 
@@ -134,39 +134,26 @@ function cardEl(c, cls = '') {
   return d;
 }
 
+const PLAYING = { holdem: ['preflop', 'flop', 'turn', 'river'], blackjack: ['betting', 'playing'], durak: ['playing'] };
+const isPlaying = (st) => (PLAYING[st.game || 'holdem'] || []).includes(st.stage);
+
 function render() {
   const st = S.state;
+  const g = st.game || 'holdem';
+  document.body.dataset.game = g;
   renderChat(st); // first, so new messages get bubbles on this draw
   $('roomLabel').textContent = S.room;
-  $('variantLabel').textContent = st.variantName + (st.stage === 'waiting' ? '' : ` · Hand #${st.handNo}`);
+  $('variantLabel').textContent = st.variantName + (st.stage === 'waiting' ? '' : ` · ${g === 'durak' ? 'Game' : 'Hand'} #${st.handNo}`);
   const winCards = new Set();
   const winSeats = new Set();
   if (st.stage === 'showdown' && st.results) {
     for (const w of st.results.winners) { winSeats.add(w.seat); (w.cards || []).forEach((c) => winCards.add(c)); }
   }
 
-  // Board
-  const board = $('board');
-  const shown = [...board.children].map((c) => c.dataset.card).join();
-  if (shown !== st.board.join() || board.dataset.hand !== String(st.handNo)) {
-    board.innerHTML = '';
-    st.board.forEach((c) => board.appendChild(cardEl(c)));
-    board.dataset.hand = st.handNo;
-  }
-  [...board.children].forEach((el) => el.classList.toggle('win', winCards.has(el.dataset.card)));
-  $('pot').textContent = st.pot ? `Pot: ${st.pot}` : '';
-
-  // Center message
-  let msg = '';
-  if (st.stage === 'waiting') {
-    const n = st.seats.filter((s) => s && s.chips > 0).length;
-    msg = n < 2 ? (S.isHost ? `Share room code ${S.room} or add a bot to play` : 'Waiting for players…') : (S.isHost ? 'Press Deal to start' : 'Waiting for the host to deal');
-  } else if (st.stage === 'showdown' && st.results) {
-    msg = st.results.winners.map((w) => `${st.seats[w.seat]?.name ?? 'Player'} wins ${w.amount}${w.hand ? ' with ' + w.hand : ''}`).join(' · ');
-  } else if (st.toAct !== -1 && st.seats[st.toAct]) {
-    msg = st.toAct === st.mySeat ? 'Your turn' : `${st.seats[st.toAct].name} is thinking…`;
-  }
-  $('message').textContent = msg;
+  if (g === 'holdem') renderPokerCenter(st, winCards);
+  else if (g === 'blackjack') renderBlackjackCenter(st);
+  else renderDurakCenter(st);
+  $('message').textContent = centerMessage(st);
 
   // Seats
   const seatsEl = $('seats');
@@ -184,24 +171,25 @@ function render() {
     }
     const el = document.createElement('div');
     const isMe = i === st.mySeat;
+    const durakLoser = g === 'durak' && st.stage === 'showdown' && st.durak === i;
     el.className = 'seat' + (isMe ? ' me' : '') + (i === st.toAct ? ' turn' : '')
-      + (s.folded && st.stage !== 'waiting' ? ' folded' : '') + (!s.connected ? ' away' : '') + (winSeats.has(i) ? ' winner' : '');
+      + (s.folded && st.stage !== 'waiting' ? ' folded' : '') + (s.out ? ' out' : '') + (!s.connected ? ' away' : '')
+      + (winSeats.has(i) && !durakLoser ? ' winner' : '') + (durakLoser ? ' loser' : '');
     el.style.left = pos[0] + '%'; el.style.top = pos[1] + '%';
 
-    const hole = document.createElement('div');
-    hole.className = 'hole';
-    if (s.inHand && (!s.folded || isMe) && st.stage !== 'waiting') {
-      const cards = s.hole || new Array(s.cardCount).fill(null);
-      cards.forEach((c) => hole.appendChild(cardEl(c, (isMe ? '' : 'small') + (winCards.has(c) ? ' win' : ''))));
-    }
-    el.appendChild(hole);
+    el.appendChild(seatCards(st, s, i, isMe, winCards));
 
     const plate = document.createElement('div');
     plate.className = 'plate';
-    plate.innerHTML = `<div class="nm"></div><div class="ch">${s.chips}${s.allIn ? ' · ALL-IN' : ''}</div>`;
+    const sub = g === 'durak'
+      ? (st.stage === 'waiting' || !s.inHand ? (s.inHand === false && st.stage !== 'waiting' ? 'watching' : '') : `${s.cardCount} card${s.cardCount === 1 ? '' : 's'}`)
+      : `${s.chips}${s.allIn ? ' · ALL-IN' : ''}`;
+    plate.innerHTML = `<div class="nm"></div><div class="ch">${sub}</div>`;
     plate.querySelector('.nm').textContent = s.name;
     if (s.isBot) plate.querySelector('.nm').insertAdjacentHTML('afterbegin', '<span class="bot" title="Computer player">🤖</span>');
-    if (i === st.button && st.stage !== 'waiting') {
+    const role = g === 'durak' && isPlaying(st) ? (i === st.attacker ? '⚔️' : i === st.defender ? '🛡️' : '') : '';
+    if (role) plate.insertAdjacentHTML('afterbegin', `<div class="role" title="${role === '⚔️' ? 'Attacker' : 'Defender'}">${role}</div>`);
+    if (g === 'holdem' && i === st.button && st.stage !== 'waiting') {
       const d = document.createElement('div'); d.className = 'dealer'; d.textContent = 'D'; plate.style.position = 'relative'; plate.appendChild(d);
     }
     el.appendChild(plate);
@@ -215,10 +203,11 @@ function render() {
     if (!s.lastAction) tag.style.visibility = 'hidden';
     el.appendChild(tag);
 
-    if (s.bet > 0) {
+    const betAmt = s.bet;
+    if (betAmt > 0 && g === 'holdem') {
       const b = document.createElement('div');
       b.className = 'bet';
-      b.textContent = s.bet;
+      b.textContent = betAmt;
       // Place the bet toward the center of the table.
       const dx = 50 - pos[0], dy = 50 - pos[1];
       b.style.left = `calc(50% + ${dx * 1.4}px)`;
@@ -229,7 +218,7 @@ function render() {
     addBubble(el, i);
     seatsEl.appendChild(el);
 
-    if (isMe && s.chips === 0 && !(s.inHand && ['preflop', 'flop', 'turn', 'river'].includes(st.stage))) {
+    if (isMe && g !== 'durak' && s.chips < (g === 'blackjack' ? st.minBet : 1) && !(s.inHand && isPlaying(st))) {
       const rb = document.createElement('button');
       rb.className = 'small'; rb.textContent = 'Rebuy';
       rb.onclick = () => send({ t: 'rebuy' });
@@ -244,28 +233,177 @@ function render() {
   renderLog(st);
 }
 
-function renderHost(st) {
-  $('hostPanel').classList.toggle('hidden', !S.isHost);
-  if (!S.isHost) return;
-  const sel = $('variantSelect');
-  if (sel.options.length === 0) {
-    for (const [k, v] of Object.entries(st.variants)) sel.add(new Option(v, k));
+// Cards shown at a seat.
+function seatCards(st, s, i, isMe, winCards) {
+  const g = st.game || 'holdem';
+  const box = document.createElement('div');
+  box.className = 'hole';
+  if (st.stage === 'waiting' || !s.inHand) return box;
+  if (g === 'holdem') {
+    if (!s.folded || isMe) {
+      const cards = s.hole || new Array(s.cardCount).fill(null);
+      cards.forEach((c) => box.appendChild(cardEl(c, (isMe ? '' : 'small') + (winCards.has(c) ? ' win' : ''))));
+    }
+  } else if (g === 'blackjack') {
+    box.classList.add('bj-hands');
+    (s.hands || []).forEach((h, k) => {
+      const hand = document.createElement('div');
+      const active = i === st.toAct && k === s.handIdx;
+      hand.className = 'bj-hand' + (active && s.hands.length > 1 ? ' active' : '');
+      const cards = document.createElement('div');
+      cards.className = 'bj-cards';
+      h.cards.forEach((c) => cards.appendChild(cardEl(c, 'small')));
+      hand.appendChild(cards);
+      const label = document.createElement('div');
+      label.className = 'bj-total' + (h.result ? ' ' + h.result : h.bust ? ' lose' : '');
+      label.textContent = h.blackjack ? 'Blackjack!' : h.bust ? `Bust (${h.total})` : `${h.soft && h.total < 21 ? 'Soft ' : ''}${h.total}`;
+      if (h.result && !h.blackjack) label.textContent += ` · ${{ win: 'Win', lose: 'Lose', push: 'Push', blackjack: 'Blackjack' }[h.result]}`;
+      hand.appendChild(label);
+      box.appendChild(hand);
+    });
+  } else if (!isMe && !s.out) {
+    // Durak: other players' cards face down (your own hand is shown below the table).
+    const n = s.cardCount || 0;
+    for (let k = 0; k < Math.min(n, 6); k++) box.appendChild(cardEl(null, 'small'));
+    if (n > 6) box.insertAdjacentHTML('beforeend', `<span class="more">+${n - 6}</span>`);
   }
-  const active = document.activeElement;
-  if (active !== sel) sel.value = st.settings.variant;
-  $('rotate').checked = st.settings.rotate;
-  $('showOdds').checked = st.settings.showOdds;
-  if (active !== $('bigBlind')) $('bigBlind').value = st.settings.bigBlind;
-  if (active !== $('stack')) $('stack').value = st.settings.startingStack;
-  const playing = ['preflop', 'flop', 'turn', 'river'].includes(st.stage);
-  $('addBotBtn').disabled = st.seats.every(Boolean);
-  $('removeBotBtn').disabled = !st.seats.some((s) => s && s.isBot);
-  $('startBtn').disabled = playing || st.seats.filter((s) => s && s.chips > 0).length < 2;
-  $('startBtn').textContent = st.stage === 'showdown' ? 'Deal now' : 'Deal';
+  return box;
 }
 
-$('variantSelect').onchange = (e) => send({ t: 'settings', variant: e.target.value });
-$('rotate').onchange = (e) => send({ t: 'settings', rotate: e.target.checked });
+function renderPokerCenter(st, winCards) {
+  const board = $('board');
+  board.className = 'board';
+  const shown = [...board.children].map((c) => c.dataset.card).join();
+  if (shown !== st.board.join() || board.dataset.hand !== 'p' + st.handNo) {
+    board.innerHTML = '';
+    st.board.forEach((c) => board.appendChild(cardEl(c)));
+    board.dataset.hand = 'p' + st.handNo;
+  }
+  [...board.children].forEach((el) => el.classList.toggle('win', winCards.has(el.dataset.card)));
+  $('pot').textContent = st.pot ? `Pot: ${st.pot}` : '';
+}
+
+function renderBlackjackCenter(st) {
+  const board = $('board');
+  board.className = 'board bj-dealer';
+  board.dataset.hand = '';
+  board.innerHTML = '';
+  if (st.dealer && st.dealer.cards.length) {
+    const cards = document.createElement('div');
+    cards.className = 'bj-cards';
+    st.dealer.cards.forEach((c) => cards.appendChild(cardEl(c)));
+    board.appendChild(cards);
+  }
+  const d = st.dealer || {};
+  $('pot').textContent = d.cards && d.cards.length
+    ? `Dealer: ${d.total}${d.total > 21 ? ' — bust!' : ''}${st.results && st.results.dealerBJ ? ' — Blackjack!' : ''}`
+    : `Blackjack pays 3:2 · Dealer stands on 17 · Min bet ${st.minBet}`;
+}
+
+function renderDurakCenter(st) {
+  const board = $('board');
+  board.className = 'board durak-board';
+  board.dataset.hand = '';
+  board.innerHTML = '';
+  if (isPlaying(st)) {
+    // Deck with the trump card underneath.
+    const deck = document.createElement('div');
+    deck.className = 'durak-deck';
+    if (st.trumpCard) deck.appendChild(cardEl(st.trumpCard, 'trump-card'));
+    if (st.deckCount > 1) deck.appendChild(cardEl(null, 'deck-back'));
+    deck.insertAdjacentHTML('beforeend', `<div class="deck-count">${st.deckCount ? st.deckCount + ' left' : 'Deck empty'}</div>`);
+    board.appendChild(deck);
+    const table = document.createElement('div');
+    table.className = 'durak-table';
+    for (const p of st.table) {
+      const pair = document.createElement('div');
+      pair.className = 'durak-pair';
+      pair.appendChild(cardEl(p.a));
+      if (p.d) pair.appendChild(cardEl(p.d, 'defense'));
+      table.appendChild(pair);
+    }
+    board.appendChild(table);
+  }
+  const suit = st.trump ? `${SUIT[st.trump]} ${{ s: 'Spades', h: 'Hearts', d: 'Diamonds', c: 'Clubs' }[st.trump]}` : '';
+  $('pot').innerHTML = '';
+  if (isPlaying(st)) {
+    const span = document.createElement('span');
+    span.className = st.trump === 'h' || st.trump === 'd' ? 'red-suit' : '';
+    span.textContent = `Trumps: ${suit}`;
+    $('pot').appendChild(span);
+  } else if (st.stage === 'waiting') {
+    $('pot').textContent = '36 cards · 2–6 players · don\'t be the last one holding cards!';
+  }
+}
+
+function centerMessage(st) {
+  const g = st.game || 'holdem';
+  const name = (i) => (st.seats[i] ? st.seats[i].name : 'Player');
+  if (st.stage === 'waiting') {
+    const need = g === 'blackjack' ? 1 : 2;
+    const n = st.seats.filter((s) => s && (g === 'durak' || s.chips > 0)).length;
+    if (n < need) return S.isHost ? `Share room code ${S.room} or add a bot to play` : 'Waiting for players…';
+    return S.isHost ? (g === 'durak' ? 'Press Start game' : 'Press Deal to start') : 'Waiting for the host to start';
+  }
+  if (st.stage === 'showdown' && st.results) {
+    if (g === 'durak') return st.durak === -1 || st.durak === undefined ? 'Draw — nobody is the durak!' : `${name(st.durak)} is the durak! 🃏`;
+    if (g === 'blackjack') {
+      const w = st.results.winners;
+      return w.length ? w.map((x) => `${name(x.seat)} wins ${x.amount}`).join(' · ') : 'The house wins this round';
+    }
+    return st.results.winners.map((w) => `${name(w.seat)} wins ${w.amount}${w.hand ? ' with ' + w.hand : ''}`).join(' · ');
+  }
+  if (st.toAct === -1 || !st.seats[st.toAct]) return '';
+  const mine = st.toAct === st.mySeat;
+  if (g === 'blackjack') {
+    if (st.stage === 'betting') return mine ? 'Place your bet' : `${name(st.toAct)} is betting…`;
+    return mine ? 'Your turn — hit or stand?' : `${name(st.toAct)} is playing…`;
+  }
+  if (g === 'durak') {
+    const who = mine ? 'You' : name(st.toAct);
+    if (st.phase === 'attack') return mine ? 'Your attack — play any card' : `${who} is attacking…`;
+    if (st.phase === 'defend') return mine ? 'Defend — beat the card or take' : `${who} is defending…`;
+    if (st.phase === 'takeThrow') return mine ? `${name(st.defender)} is taking — add more cards?` : `${who} may add cards…`;
+    return mine ? 'Throw in a card with the same rank, or pass' : `${who} may throw in…`;
+  }
+  return mine ? 'Your turn' : `${name(st.toAct)} is thinking…`;
+}
+
+function updateHelpButton(st) {
+  const g = st.game || 'holdem';
+  $('rankingsBtn').textContent = g === 'holdem' ? '🏆 Hand rankings' : '📖 How to play';
+}
+
+function renderHost(st) {
+  updateHelpButton(st);
+  $('hostPanel').classList.toggle('hidden', !S.isHost);
+  if (!S.isHost) return;
+  const g = st.game || 'holdem';
+  const sel = $('variantSelect');
+  if (sel.options.length === 0 && S.games) {
+    for (const [k, v] of Object.entries(S.games)) sel.add(new Option(v, k));
+  }
+  const active = document.activeElement;
+  if (active !== sel) sel.value = g;
+  sel.disabled = isPlaying(st);
+  sel.title = isPlaying(st) ? 'You can switch games between hands' : '';
+  $('showOdds').checked = st.settings.showOdds;
+  $('showOdds').closest('label').classList.toggle('hidden', g === 'durak');
+  $('bigBlindLabel').textContent = g === 'blackjack' ? 'Minimum bet' : 'Big blind';
+  $('bigBlind').closest('label').classList.toggle('hidden', g === 'durak');
+  $('stack').closest('label').classList.toggle('hidden', g === 'durak');
+  if (active !== $('bigBlind')) $('bigBlind').value = st.settings.bigBlind;
+  if (active !== $('stack')) $('stack').value = st.settings.startingStack;
+  $('addBotBtn').disabled = st.seats.every(Boolean);
+  $('removeBotBtn').disabled = !st.seats.some((s) => s && s.isBot);
+  const ready = g === 'blackjack' ? st.seats.some((s) => s && s.chips >= st.minBet)
+    : g === 'durak' ? st.seats.filter(Boolean).length >= 2
+      : st.seats.filter((s) => s && s.chips > 0).length >= 2;
+  $('startBtn').disabled = isPlaying(st) || !ready;
+  $('startBtn').textContent = g === 'durak' ? (st.stage === 'showdown' ? 'New game now' : 'Start game') : (st.stage === 'showdown' ? 'Deal now' : 'Deal');
+}
+
+$('variantSelect').onchange = (e) => send({ t: 'settings', game: e.target.value });
 $('showOdds').onchange = (e) => send({ t: 'settings', showOdds: e.target.checked });
 $('bigBlind').onchange = (e) => send({ t: 'settings', bigBlind: e.target.value });
 $('stack').onchange = (e) => send({ t: 'settings', startingStack: e.target.value });
@@ -274,12 +412,18 @@ $('addBotBtn').onclick = () => send({ t: 'addBot' });
 $('removeBotBtn').onclick = () => send({ t: 'removeBot' });
 
 function renderActions(st) {
+  const g = st.game || 'holdem';
   const lim = st.limits;
   const myTurn = !!lim;
   if (myTurn && !myTurnBefore) { Sound.play('turn'); raiseTouched = false; }
   myTurnBefore = myTurn;
+  $('pokerActions').classList.toggle('hidden', g !== 'holdem');
+  $('bjActions').classList.toggle('hidden', g !== 'blackjack');
+  $('durakActions').classList.toggle('hidden', g !== 'durak');
+  if (g === 'durak') return renderDurakActions(st);
   $('actions').classList.toggle('hidden', !myTurn);
   if (!myTurn) return;
+  if (g === 'blackjack') return renderBlackjackActions(st);
   const me = st.seats[st.mySeat];
   $('foldBtn').classList.toggle('hidden', lim.toCall === 0);
   $('callBtn').textContent = lim.toCall === 0 ? 'Check' : (lim.toCall >= me.chips ? `All-in ${lim.toCall}` : `Call ${lim.toCall}`);
@@ -294,6 +438,66 @@ function renderActions(st) {
   if (!raiseTouched) setRaise(lim.minTo);
   updateRaiseLabel();
 }
+
+// ---------- blackjack controls ----------
+let lastBjBet = null;
+function renderBlackjackActions(st) {
+  const lim = st.limits;
+  $('bjBet').classList.toggle('hidden', lim.phase !== 'bet');
+  $('bjPlay').classList.toggle('hidden', lim.phase !== 'play');
+  if (lim.phase === 'bet') {
+    const input = $('bjBetInput');
+    input.min = lim.minBet; input.max = lim.maxBet;
+    if (document.activeElement !== input) input.value = Math.min(lim.maxBet, Math.max(lim.minBet, lastBjBet || lim.minBet));
+  } else {
+    $('bjDouble').classList.toggle('hidden', !lim.canDouble);
+    $('bjSplit').classList.toggle('hidden', !lim.canSplit);
+  }
+}
+document.querySelectorAll('[data-bjbet]').forEach((b) => {
+  b.onclick = () => {
+    const lim = S.state.limits;
+    const v = { min: lim.minBet, x2: lim.minBet * 2, x5: lim.minBet * 5 }[b.dataset.bjbet];
+    $('bjBetInput').value = Math.min(lim.maxBet, v);
+  };
+});
+$('bjBetBtn').onclick = () => { lastBjBet = Number($('bjBetInput').value); send({ t: 'action', action: 'bet', amount: lastBjBet }); };
+$('bjHit').onclick = () => send({ t: 'action', action: 'hit' });
+$('bjStand').onclick = () => send({ t: 'action', action: 'stand' });
+$('bjDouble').onclick = () => send({ t: 'action', action: 'double' });
+$('bjSplit').onclick = () => send({ t: 'action', action: 'split' });
+
+// ---------- durak controls: your hand is always shown while you play ----------
+function renderDurakActions(st) {
+  const me = st.mySeat !== -1 ? st.seats[st.mySeat] : null;
+  const inGame = me && me.inHand && me.hole && isPlaying(st);
+  $('actions').classList.toggle('hidden', !inGame);
+  if (!inGame) return;
+  const mv = st.moves; // only set when it's your turn
+  const playable = new Set(mv ? mv.cards : []);
+  const hand = $('durakHand');
+  hand.innerHTML = '';
+  if (!me.hole.length) hand.innerHTML = '<span class="muted-label">No cards — you\'re out! 🎉</span>';
+  for (const c of me.hole) {
+    const el = cardEl(c, (playable.has(c) ? 'playable' : mv ? 'dim' : '') + (c[1] === st.trump ? ' is-trump' : ''));
+    if (playable.has(c)) el.onclick = () => send({ t: 'action', action: 'play', amount: c });
+    hand.appendChild(el);
+  }
+  $('durakTake').classList.toggle('hidden', !(mv && mv.canTake));
+  $('durakPass').classList.toggle('hidden', !(mv && mv.canPass));
+  $('durakPass').textContent = mv && mv.phase === 'takeThrow' ? 'Done adding' : 'Pass';
+  let prompt = '';
+  if (!mv) prompt = st.defender === st.mySeat ? 'You are defending 🛡️ — wait for the attack' : 'Your hand';
+  else if (mv.phase === 'attack') prompt = '⚔️ Your attack: click any card to play it';
+  else if (mv.phase === 'defend') prompt = mv.cards.length ? `🛡️ Beat the ${prettyCard(mv.target)}: click a glowing card, or take the cards` : `🛡️ You can't beat the ${prettyCard(mv.target)} — take the cards`;
+  else if (mv.phase === 'takeThrow') prompt = 'They are taking! Add more cards with the same rank, or click Done';
+  else prompt = 'Throw in a card with a rank already on the table, or Pass';
+  $('durakPrompt').textContent = prompt;
+}
+$('durakTake').onclick = () => send({ t: 'action', action: 'take' });
+$('durakPass').onclick = () => send({ t: 'action', action: 'pass' });
+
+function prettyCard(c) { return c ? `${c[0] === 'T' ? '10' : c[0]}${SUIT[c[1]]}` : ''; }
 
 function setRaise(v) {
   const lim = S.state.limits;
@@ -334,7 +538,7 @@ document.addEventListener('keydown', (e) => {
   if (k === 'l') $('leaderboardBtn').click();
   if (k === 'h') $('rankingsBtn').click();
   if (k === 'o') $('oddsToggle').click();
-  if (!S.state.limits) return;
+  if (!S.state.limits || (S.state.game || 'holdem') !== 'holdem') return;
   if (k === 'f' && !$('foldBtn').classList.contains('hidden')) $('foldBtn').click();
   if (k === 'c') $('callBtn').click();
   if (k === 'r' && !$('raiseBtn').classList.contains('hidden')) $('raiseBtn').click();
@@ -478,8 +682,59 @@ function setOddsOpen(open) {
 $('oddsToggle').onclick = () => setOddsOpen(!oddsOpen);
 $('oddsClose').onclick = () => setOddsOpen(!oddsOpen);
 
+// Blackjack helper: bust chance and the basic-strategy move (infinite-deck estimate).
+const BJ_VAL = (c) => (c[0] === 'A' ? 11 : 'TJQK'.includes(c[0]) ? 10 : Number(c[0]));
+function bjTotal(cards) {
+  let t = 0, aces = 0;
+  for (const c of cards) { t += BJ_VAL(c); if (c[0] === 'A') aces++; }
+  while (t > 21 && aces) { t -= 10; aces--; }
+  return { total: t, soft: aces > 0 };
+}
+function bjBestMove(cards, up, lim) {
+  const { total, soft } = bjTotal(cards);
+  const u = BJ_VAL(up), v0 = BJ_VAL(cards[0]);
+  if (lim.canSplit) {
+    if (v0 === 11 || v0 === 8) return 'Split';
+    if ([2, 3, 6, 7].includes(v0) && u <= 7) return 'Split';
+    if (v0 === 9 && u <= 9 && u !== 7) return 'Split';
+  }
+  if (lim.canDouble) {
+    if (!soft && (total === 11 || (total === 10 && u <= 9) || (total === 9 && u >= 3 && u <= 6))) return 'Double';
+    if (soft && total >= 15 && total <= 18 && u >= 4 && u <= 6) return 'Double';
+  }
+  if (soft) return total >= 19 || (total === 18 && u < 9) ? 'Stand' : 'Hit';
+  if (total >= 17) return 'Stand';
+  if (total >= 13) return u <= 6 ? 'Stand' : 'Hit';
+  if (total === 12) return u >= 4 && u <= 6 ? 'Stand' : 'Hit';
+  return 'Hit';
+}
+function renderBlackjackOdds(st, body) {
+  const me = st.seats[st.mySeat];
+  const lim = st.limits;
+  if (!lim || lim.phase !== 'play' || !me.hands || !me.hands[lim.handIdx]) {
+    body.innerHTML = `<div class="muted">${st.stage === 'betting' ? 'Tips appear once the cards are dealt.' : 'Tips appear on your turn.'}</div>`;
+    return;
+  }
+  const cards = me.hands[lim.handIdx].cards;
+  const { total, soft } = bjTotal(cards);
+  // Chance the next card busts you: count card values that push a hard total over 21.
+  let bust = 0;
+  if (!soft) for (const v of [2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10, 1]) if (total + v > 21) bust++;
+  const bustPct = Math.round((bust / 13) * 100);
+  const up = st.dealer.cards[0];
+  const move = bjBestMove(cards, up, lim);
+  const color = bustPct >= 60 ? '#e0606f' : bustPct >= 30 ? '#f4c95d' : '#4fd17d';
+  body.innerHTML = `<div class="muted">You have <b style="color:#9fe3b5">${soft ? 'soft ' : ''}${total}</b>, the dealer shows <b>${prettyCard(up)}</b></div>
+    <div class="big" style="color:${color}">${bustPct}%</div>
+    <div class="meter"><div style="width:${bustPct}%;background:${color}"></div></div>
+    <div class="muted">chance to bust if you hit</div>
+    <div class="verdict good">💡 Best move: <b>${move}</b></div>
+    <div class="muted" style="font-size:11px">Based on "basic strategy", the mathematically best way to play each hand.</div>`;
+}
+
 function renderOdds(st) {
-  const allowed = st.settings.showOdds;
+  const g = st.game || 'holdem';
+  const allowed = st.settings.showOdds && g !== 'durak';
   $('oddsToggle').classList.toggle('hidden', !allowed);
   const panel = $('oddsPanel');
   const me = st.mySeat !== -1 ? st.seats[st.mySeat] : null;
@@ -489,6 +744,10 @@ function renderOdds(st) {
   $('oddsClose').textContent = oddsOpen ? 'Hide' : 'Show';
   if (panel.classList.contains('hidden') || !oddsOpen) return;
   const body = $('oddsBody');
+  if (g === 'blackjack') {
+    if (st.mySeat === -1 || !st.seats[st.mySeat].inHand) { body.innerHTML = '<div class="muted">You are not in this hand.</div>'; return; }
+    return renderBlackjackOdds(st, body);
+  }
   if (!inHand) {
     body.innerHTML = `<div class="muted">${me && me.folded && me.inHand ? 'You folded this hand.' : 'You are not in this hand.'}</div>`;
     return;
@@ -555,8 +814,43 @@ const RANKINGS = [
   { name: 'High Card', cat: 0, cards: 'Ad Qs 9c 6h 3d', use: 1, desc: 'Nothing else. Your highest card plays.' },
 ];
 
+const RULES = {
+  blackjack: {
+    title: '📖 How to play Blackjack',
+    html: `<ol class="rules">
+      <li><b>Goal:</b> get closer to <b>21</b> than the dealer without going over. You only play against the dealer, not the other players.</li>
+      <li><b>Card values:</b> 2–10 count their number, J/Q/K count 10, an Ace counts 11 or 1 (whichever is better).</li>
+      <li><b>Bet</b>, then you and the dealer get 2 cards. One dealer card stays face down.</li>
+      <li><b>Hit</b> = take another card. <b>Stand</b> = stop. Over 21 = <b>bust</b>, you lose.</li>
+      <li><b>Double</b> = double your bet, take exactly one more card. <b>Split</b> = two cards of the same value become two hands.</li>
+      <li>The dealer must hit until reaching <b>17</b> or more.</li>
+      <li><b>Win</b> pays 1:1. <b>Blackjack</b> (Ace + 10-value card as your first two cards) pays <b>3:2</b>. A tie (<b>push</b>) returns your bet.</li>
+    </ol>`,
+  },
+  durak: {
+    title: '📖 How to play Durak',
+    html: `<ol class="rules">
+      <li><b>Goal:</b> get rid of all your cards. The last player still holding cards is the <b>durak</b> (the fool) and loses.</li>
+      <li>36 cards (6 up to Ace). Everyone gets 6. The card under the deck sets the <b>trump suit</b>.</li>
+      <li>⚔️ The <b>attacker</b> plays a card at the 🛡️ <b>defender</b> (the next player).</li>
+      <li>The defender beats it with a <b>higher card of the same suit</b>, or with <b>any trump</b> (if the attack card is not a trump).</li>
+      <li>After each defense, the attacker and then the others may <b>throw in</b> more cards with a <b>rank already on the table</b>. Max 6 cards per round.</li>
+      <li>If every card is beaten and nobody adds more, the cards are discarded (<b>bito</b>) and the defender attacks next.</li>
+      <li>If the defender can't or won't beat a card, they <b>take</b> all the cards on the table. Others may still add cards first. The defender then skips attacking.</li>
+      <li>After each round everyone draws back up to 6 (attacker first, defender last). Once the deck is empty, players who run out of cards are safe.</li>
+      <li><b>Tip:</b> on your turn, the cards you can play glow. Click one to play it.</li>
+    </ol>`,
+  },
+};
+
 function renderRankings(st) {
   if ($('rankingsModal').classList.contains('hidden')) return;
+  const g = (st && st.game) || 'holdem';
+  const box = $('rankingsModal');
+  box.querySelector('h2').textContent = RULES[g] ? RULES[g].title : '🏆 Winning hands';
+  box.querySelector('.sub').classList.toggle('hidden', !!RULES[g]);
+  $('rankingsNote').classList.toggle('hidden', !!RULES[g]);
+  if (RULES[g]) { $('rankingsList').innerHTML = RULES[g].html; return; }
   const list = $('rankingsList');
   const me = st && st.mySeat !== -1 ? st.seats[st.mySeat] : null;
   const current = me && me.handName && !me.folded ? me.handName : null;
@@ -597,9 +891,17 @@ setHostCollapsed(localStorage.getItem('poker.hostCollapsed') === '1');
 // ---------- leaderboard ----------
 let lbMode = 'friends';
 async function loadLeaderboard() {
-  $('lbNote').textContent = lbMode === 'friends'
-    ? 'Hands with at least 2 people. Ranked by total chips won (losses count, rebuys don\'t hide them).'
-    : 'Hands where you were the only person at the table, playing against bots.';
+  const NOTES = {
+    friends: 'Poker hands with at least 2 people. Ranked by total chips won (losses count, rebuys don\'t hide them).',
+    bots: 'Poker hands where you were the only person at the table, playing against bots.',
+    blackjack: 'Blackjack hands against the dealer. Ranked by total chips won.',
+    durak: 'Durak games: +1 point for escaping, −1 for being the durak.',
+  };
+  $('lbNote').textContent = NOTES[lbMode];
+  const heads = lbMode === 'durak'
+    ? ['#', 'Player', 'Points', 'Games', 'Escaped', 'Times durak']
+    : ['#', 'Player', 'Chips won', 'Hands', 'Won', lbMode === 'blackjack' ? 'Biggest win' : 'Biggest pot'];
+  document.querySelector('#leaderboardModal thead tr').innerHTML = heads.map((h) => `<th>${h}</th>`).join('');
   $('lbBody').innerHTML = '<tr><td colspan="6" class="empty">Loading…</td></tr>';
   const r = await api('/api/leaderboard?mode=' + lbMode).catch(() => ({ ok: false }));
   if (!r.ok) { $('lbBody').innerHTML = '<tr><td colspan="6" class="empty">Could not load the leaderboard.</td></tr>'; return; }
@@ -621,8 +923,9 @@ async function loadLeaderboard() {
     if (account && row.username.toLowerCase() === account.toLowerCase()) tr.className = 'me';
     const medal = ['🥇', '🥈', '🥉'][i] || i + 1;
     const net = Number(row.net);
+    const last = lbMode === 'durak' ? row.hands - row.wins : Number(row.biggest_pot || 0).toLocaleString();
     tr.innerHTML = `<td>${medal}</td><td></td><td class="${net >= 0 ? 'pos' : 'neg'}">${net > 0 ? '+' : ''}${net.toLocaleString()}</td>
-      <td>${row.hands}</td><td>${Math.round((row.wins / row.hands) * 100)}%</td><td>${Number(row.biggest_pot || 0).toLocaleString()}</td>`;
+      <td>${row.hands}</td><td>${Math.round((row.wins / row.hands) * 100)}%</td><td>${last}</td>`;
     tr.children[1].textContent = row.username;
     $('lbBody').appendChild(tr);
   });

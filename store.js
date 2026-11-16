@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const MODES = ['friends', 'bots'];
+const MODES = ['friends', 'bots', 'blackjack', 'durak'];
 
 // ---------- password hashing (scrypt, built into Node) ----------
 function hashPassword(password) {
