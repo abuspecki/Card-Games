@@ -6,9 +6,10 @@ const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const { Table, VARIANTS } = require('./poker');
 const bots = require('./bots');
-const { createStore, hashPassword, checkPassword, MODES } = require('./store');
+const { openStore, hashPassword, checkPassword, MODES } = require('./store');
 
-const store = createStore();
+let store = null;       // set at startup by openStore()
+let databaseError = null; // why Postgres couldn't be used, if it couldn't
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, 'public');
@@ -85,7 +86,13 @@ async function handleApi(req, res, url) {
   if (req.method === 'GET' && url === '/api/leaderboard') {
     const mode = new URL(req.url, 'http://x').searchParams.get('mode');
     const m = MODES.includes(mode) ? mode : 'friends';
-    return json(res, 200, { mode: m, persistent: store.kind === 'postgres', rows: await store.leaderboard(m) });
+    return json(res, 200, { mode: m, persistent: store.kind === 'postgres', databaseError, rows: await store.leaderboard(m) });
+  }
+  if (req.method === 'GET' && url === '/api/status') {
+    return json(res, 200, {
+      database: store.kind === 'postgres' ? 'connected' : (process.env.DATABASE_URL ? 'failed' : 'not configured'),
+      databaseError,
+    });
   }
   return json(res, 404, { error: 'Not found' });
 }
@@ -367,6 +374,8 @@ wss.on('connection', (ws) => {
   });
 });
 
-store.init()
-  .then(() => server.listen(PORT, () => console.log(`Poker server running on http://localhost:${PORT} (accounts: ${store.kind})`)))
-  .catch((e) => { console.error('Could not open the database:', e.message); process.exit(1); });
+// Always start the game, even if the database is unavailable.
+openStore()
+  .then((r) => { store = r.store; databaseError = r.error; })
+  .catch((e) => { console.error('Storage error:', e.message); })
+  .finally(() => server.listen(PORT, () => console.log(`Poker server running on http://localhost:${PORT} (accounts: ${store ? store.kind : 'none'})`)));

@@ -541,7 +541,12 @@ async function loadLeaderboard() {
   const r = await api('/api/leaderboard?mode=' + lbMode).catch(() => ({ ok: false }));
   if (!r.ok) { $('lbBody').innerHTML = '<tr><td colspan="6" class="empty">Could not load the leaderboard.</td></tr>'; return; }
   if (!r.data.persistent) {
-    $('lbNote').innerHTML += '<br><b style="color:#f4c95d">⚠ Test mode: no database is connected, so accounts and scores are deleted whenever the server restarts.</b>';
+    const warn = document.createElement('b');
+    warn.style.color = '#f4c95d';
+    warn.textContent = r.data.databaseError
+      ? `⚠ Test mode: the database connection failed (${r.data.databaseError}). Accounts and scores are deleted whenever the server restarts.`
+      : '⚠ Test mode: no database is connected, so accounts and scores are deleted whenever the server restarts.';
+    $('lbNote').append(document.createElement('br'), warn);
   }
   if (!r.data.rows.length) {
     $('lbBody').innerHTML = '<tr><td colspan="6" class="empty">No results yet. Create an account and play a hand!</td></tr>';

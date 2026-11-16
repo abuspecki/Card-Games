@@ -144,10 +144,39 @@ function fileStore(file) {
   };
 }
 
-function createStore() {
-  return process.env.DATABASE_URL
-    ? postgresStore(process.env.DATABASE_URL)
-    : fileStore(process.env.DATA_FILE || path.join(__dirname, 'data', 'db.json'));
+const localFile = () => fileStore(process.env.DATA_FILE || path.join(__dirname, 'data', 'db.json'));
+
+// Remove anything that could reveal credentials from an error message.
+function safeError(e) {
+  return String((e && (e.code ? `${e.code}: ${e.message}` : e.message)) || e)
+    .replace(/postgres(ql)?:\/\/\S+/gi, '[connection string]')
+    .replace(/npg_[A-Za-z0-9]+/g, '[secret]')
+    .slice(0, 300);
 }
 
-module.exports = { createStore, hashPassword, checkPassword, MODES };
+// Open the database. If Postgres can't be reached, keep the game running on
+// the local file instead of crashing, and remember why for the status check.
+async function openStore() {
+  // Accept a pasted snippet like  psql 'postgresql://…'  or  DATABASE_URL="postgresql://…"
+  const raw = (process.env.DATABASE_URL || '').trim();
+  const match = raw.match(/postgres(?:ql)?:\/\/[^\s'"`]+/i);
+  const url = match ? match[0] : raw;
+  if (!url) {
+    const s = localFile();
+    await s.init();
+    return { store: s, error: null };
+  }
+  try {
+    const s = postgresStore(url);
+    await s.init();
+    return { store: s, error: null };
+  } catch (e) {
+    const error = safeError(e);
+    console.error('Could not open the database, running in test mode instead:', error);
+    const s = localFile();
+    await s.init();
+    return { store: s, error };
+  }
+}
+
+module.exports = { openStore, hashPassword, checkPassword, MODES, safeError };
