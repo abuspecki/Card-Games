@@ -18,6 +18,13 @@ const TYPES = {
 
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0]);
+  // List custom sound files so the client only loads ones that exist.
+  if (url === '/sounds/list.json') {
+    let list = [];
+    try { list = fs.readdirSync(path.join(PUBLIC, 'sounds')).filter((f) => /\.(mp3|wav|ogg)$/.test(f)); } catch {}
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify(list));
+  }
   const file = path.normalize(path.join(PUBLIC, url === '/' ? 'index.html' : url));
   if (!file.startsWith(PUBLIC)) { res.writeHead(403); return res.end(); }
   fs.readFile(file, (err, data) => {

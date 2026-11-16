@@ -7,24 +7,22 @@
 
 const Sound = (() => {
   const NAMES = ['deal', 'fold', 'check', 'chips', 'allin', 'street', 'win', 'turn', 'chat'];
-  const EXTS = ['mp3', 'wav', 'ogg'];
   let ctx = null;
   let master = null;
   let volume = Number(localStorage.getItem('poker.volume') ?? 0.6);
   let muted = localStorage.getItem('poker.muted') === '1';
   const files = {}; // name -> Audio element, if a custom file exists
 
-  // Look for custom sound files.
-  for (const name of NAMES) {
-    (async () => {
-      for (const ext of EXTS) {
-        try {
-          const res = await fetch(`sounds/${name}.${ext}`, { method: 'HEAD' });
-          if (res.ok) { files[name] = new Audio(`sounds/${name}.${ext}`); return; }
-        } catch { /* ignore */ }
+  // Load any custom sound files listed by the server.
+  fetch('sounds/list.json')
+    .then((r) => (r.ok ? r.json() : []))
+    .then((list) => {
+      for (const file of list) {
+        const name = file.replace(/\.[^.]+$/, '');
+        if (NAMES.includes(name)) files[name] = new Audio(`sounds/${file}`);
       }
-    })();
-  }
+    })
+    .catch(() => {});
 
   function ensure() {
     if (!ctx) {
