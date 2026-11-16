@@ -1,0 +1,191 @@
+// Poker server: serves the browser client and runs game rooms over WebSockets.
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const { WebSocketServer } = require('ws');
+const { Table, VARIANTS } = require('./poker');
+
+const PORT = process.env.PORT || 3000;
+const PUBLIC = path.join(__dirname, 'public');
+const NEXT_HAND_DELAY = 6000;
+const DISCONNECTED_TURN_TIMEOUT = 8000;
+const TYPES = {
+  '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
+  '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.json': 'application/json',
+  '.png': 'image/png', '.svg': 'image/svg+xml',
+};
+
+const server = http.createServer((req, res) => {
+  const url = decodeURIComponent(req.url.split('?')[0]);
+  const file = path.normalize(path.join(PUBLIC, url === '/' ? 'index.html' : url));
+  if (!file.startsWith(PUBLIC)) { res.writeHead(403); return res.end(); }
+  fs.readFile(file, (err, data) => {
+    if (err) { res.writeHead(404); return res.end('Not found'); }
+    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' });
+    res.end(data);
+  });
+});
+
+const rooms = new Map(); // code -> { table, clients: Map(playerId -> ws), host, timers }
+
+function makeCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let c;
+  do { c = Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join(''); }
+  while (rooms.has(c));
+  return c;
+}
+
+function createRoom() {
+  const code = makeCode();
+  const room = { code, table: new Table(), clients: new Map(), host: null, nextTimer: null, turnTimer: null };
+  room.table.onEvent = (kind) => broadcast(room, { t: 'sfx', name: kind });
+  rooms.set(code, room);
+  return room;
+}
+
+function send(ws, msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
+
+function broadcast(room, msg) { for (const ws of room.clients.values()) send(ws, msg); }
+
+function pushState(room) {
+  const t = room.table;
+  for (const [pid, ws] of room.clients) {
+    send(ws, { t: 'state', room: room.code, host: room.host, isHost: pid === room.host, state: t.view(pid) });
+  }
+  scheduleTimers(room);
+}
+
+function scheduleTimers(room) {
+  const t = room.table;
+  // Auto-deal next hand after a showdown.
+  if (t.stage === 'showdown' && !room.nextTimer) {
+    room.nextTimer = setTimeout(() => {
+      room.nextTimer = null;
+      if (t.stage === 'showdown' && t.canStart()) t.startHand();
+      else if (t.stage === 'showdown') t.stage = 'waiting';
+      pushState(room);
+    }, NEXT_HAND_DELAY);
+  }
+  // Auto-fold disconnected players whose turn it is.
+  clearTimeout(room.turnTimer);
+  room.turnTimer = null;
+  if (t.isPlaying() && t.toAct !== -1) {
+    const p = t.seats[t.toAct];
+    if (p && !p.connected) {
+      room.turnTimer = setTimeout(() => {
+        const lim = t.limits(t.toAct);
+        t.act(p.id, lim.toCall > 0 ? 'fold' : 'check');
+        pushState(room);
+      }, DISCONNECTED_TURN_TIMEOUT);
+    }
+  }
+}
+
+function addChat(room, from, text) {
+  room.table.addLog({ chat: true, from, text: String(text).slice(0, 200) });
+}
+
+const wss = new WebSocketServer({ server });
+
+wss.on('connection', (ws) => {
+  let room = null;
+  let pid = null;
+
+  ws.on('message', (raw) => {
+    let m;
+    try { m = JSON.parse(raw); } catch { return; }
+
+    if (m.t === 'join') {
+      const name = String(m.name || 'Player').trim().slice(0, 16) || 'Player';
+      let code = String(m.room || '').toUpperCase().trim();
+      if (!code) room = createRoom();
+      else room = rooms.get(code);
+      if (!room) return send(ws, { t: 'error', msg: `Room ${code} not found` });
+      const table = room.table;
+      // Rejoin with a saved token if this player already has a seat.
+      if (m.token && table.seatOf(m.token) !== -1) {
+        pid = m.token;
+        const old = room.clients.get(pid);
+        if (old && old !== ws) old.close();
+        table.seats[table.seatOf(pid)].connected = true;
+      } else {
+        pid = crypto.randomUUID();
+        if (table.sit({ id: pid, name }) === -1) { room = null; return send(ws, { t: 'error', msg: 'Table is full (8 players)' }); }
+        table.addLog(`${name} joined`);
+      }
+      room.clients.set(pid, ws);
+      if (!room.host || table.seatOf(room.host) === -1) room.host = pid;
+      send(ws, { t: 'joined', room: room.code, token: pid });
+      pushState(room);
+      return;
+    }
+
+    if (!room || !pid) return;
+    const t = room.table;
+    const isHost = pid === room.host;
+    const me = t.seats[t.seatOf(pid)];
+
+    switch (m.t) {
+      case 'action': {
+        const r = t.act(pid, m.action, m.amount);
+        if (r.error) send(ws, { t: 'error', msg: r.error });
+        break;
+      }
+      case 'start':
+        if (!isHost) return send(ws, { t: 'error', msg: 'Only the host can start' });
+        if (!t.startHand()) return send(ws, { t: 'error', msg: 'Need at least 2 players with chips' });
+        break;
+      case 'settings': {
+        if (!isHost) return;
+        const s = t.settings;
+        if (VARIANTS[m.variant]) s.variant = m.variant;
+        if (typeof m.rotate === 'boolean') s.rotate = m.rotate;
+        const num = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.floor(Number(v))));
+        if (m.startingStack) s.startingStack = num(m.startingStack, 100, 1000000);
+        if (m.bigBlind) { s.bigBlind = num(m.bigBlind, 2, 100000); s.smallBlind = Math.floor(s.bigBlind / 2); }
+        if (!t.isPlaying()) t.variant = s.variant;
+        break;
+      }
+      case 'rebuy':
+        if (me && me.chips === 0 && !(me.inHand && t.isPlaying())) {
+          me.chips = t.settings.startingStack;
+          t.addLog(`${me.name} rebuys for ${me.chips}`);
+          broadcast(room, { t: 'sfx', name: 'chips' });
+        }
+        break;
+      case 'chat':
+        if (me && m.text) { addChat(room, me.name, m.text); broadcast(room, { t: 'sfx', name: 'chat' }); }
+        break;
+      case 'leave':
+        t.leave(pid);
+        room.clients.delete(pid);
+        pid = null;
+        break;
+      default:
+        return;
+    }
+    pushState(room);
+  });
+
+  ws.on('close', () => {
+    if (!room || !pid) return;
+    if (room.clients.get(pid) !== ws) return; // replaced by a newer connection
+    room.clients.delete(pid);
+    const i = room.table.seatOf(pid);
+    if (i !== -1) room.table.seats[i].connected = false;
+    if (room.clients.size === 0) {
+      // Keep empty rooms briefly so refreshes can rejoin, then clean up.
+      setTimeout(() => {
+        if (room.clients.size === 0) { clearTimeout(room.nextTimer); clearTimeout(room.turnTimer); rooms.delete(room.code); }
+      }, 10 * 60 * 1000);
+    } else if (pid === room.host) {
+      const next = [...room.clients.keys()].find((id) => room.table.seatOf(id) !== -1);
+      if (next) room.host = next;
+    }
+    pushState(room);
+  });
+});
+
+server.listen(PORT, () => console.log(`Poker server running on http://localhost:${PORT}`));

@@ -1,0 +1,19 @@
+{
+  "name": "poker-night",
+  "version": "1.0.0",
+  "description": "Play poker with friends in the browser",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test/engine.test.js",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ws": "^8.23.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Poker Night</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Lobby -->
+  <div id="lobby" class="screen">
+    <div class="lobby-card">
+      <h1>♠ Poker Night ♥</h1>
+      <p class="sub">Hold'em · Omaha · 5-Card Omaha — play with friends</p>
+      <label>Your name <input id="name" maxlength="16" placeholder="e.g. Sam" /></label>
+      <button id="createBtn" class="big">Create a room</button>
+      <div class="or">or join a friend</div>
+      <div class="row">
+        <input id="roomCode" maxlength="5" placeholder="ROOM CODE" />
+        <button id="joinBtn">Join</button>
+      </div>
+      <div id="lobbyError" class="error"></div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div id="game" class="screen hidden">
+    <header>
+      <div class="room-info">Room <b id="roomLabel"></b> <button id="copyLink" class="small">Copy invite link</button></div>
+      <div id="variantLabel" class="variant"></div>
+      <div class="header-right">
+        <button id="muteBtn" class="small" title="Sound on/off">🔊</button>
+        <input id="volume" type="range" min="0" max="1" step="0.05" value="0.6" title="Volume" />
+        <button id="leaveBtn" class="small">Leave</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="table-wrap">
+        <div id="table" class="table">
+          <div class="center">
+            <div id="board" class="board"></div>
+            <div id="pot" class="pot"></div>
+            <div id="message" class="message"></div>
+          </div>
+          <div id="seats"></div>
+        </div>
+      </div>
+
+      <aside>
+        <div id="hostPanel" class="panel hidden">
+          <h3>Host controls</h3>
+          <label>Game
+            <select id="variantSelect"></select>
+          </label>
+          <label class="check"><input type="checkbox" id="rotate" /> Rotate game each hand</label>
+          <label>Big blind <input id="bigBlind" type="number" min="2" /></label>
+          <label>Starting stack <input id="stack" type="number" min="100" /></label>
+          <button id="startBtn" class="big">Deal</button>
+        </div>
+        <div class="panel log-panel">
+          <h3>Table</h3>
+          <div id="log" class="log"></div>
+          <form id="chatForm" class="row">
+            <input id="chatInput" maxlength="200" placeholder="Say something…" autocomplete="off" />
+            <button>Send</button>
+          </form>
+        </div>
+      </aside>
+    </main>
+
+    <footer id="actions" class="actions hidden">
+      <button id="foldBtn" class="act fold">Fold</button>
+      <button id="callBtn" class="act call">Check</button>
+      <div class="raise-box">
+        <div class="presets">
+          <button data-preset="min" class="small">Min</button>
+          <button data-preset="half" class="small">½ Pot</button>
+          <button data-preset="pot" class="small">Pot</button>
+          <button data-preset="max" class="small">All-in</button>
+        </div>
+        <div class="row">
+          <input id="raiseSlider" type="range" />
+          <input id="raiseInput" type="number" />
+        </div>
+      </div>
+      <button id="raiseBtn" class="act raise">Raise</button>
+    </footer>
+    <div id="toast" class="toast"></div>
+  </div>
+
+  <script src="sound.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>
