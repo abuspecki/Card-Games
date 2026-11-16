@@ -178,6 +178,8 @@ function render() {
   });
 
   renderHost(st);
+  renderOdds(st);
+  renderRankings(st);
   renderActions(st);
   renderLog(st);
 }
@@ -192,6 +194,7 @@ function renderHost(st) {
   const active = document.activeElement;
   if (active !== sel) sel.value = st.settings.variant;
   $('rotate').checked = st.settings.rotate;
+  $('showOdds').checked = st.settings.showOdds;
   if (active !== $('bigBlind')) $('bigBlind').value = st.settings.bigBlind;
   if (active !== $('stack')) $('stack').value = st.settings.startingStack;
   const playing = ['preflop', 'flop', 'turn', 'river'].includes(st.stage);
@@ -203,6 +206,7 @@ function renderHost(st) {
 
 $('variantSelect').onchange = (e) => send({ t: 'settings', variant: e.target.value });
 $('rotate').onchange = (e) => send({ t: 'settings', rotate: e.target.checked });
+$('showOdds').onchange = (e) => send({ t: 'settings', showOdds: e.target.checked });
 $('bigBlind').onchange = (e) => send({ t: 'settings', bigBlind: e.target.value });
 $('stack').onchange = (e) => send({ t: 'settings', startingStack: e.target.value });
 $('startBtn').onclick = () => send({ t: 'start' });
@@ -262,10 +266,14 @@ $('foldBtn').onclick = () => send({ t: 'action', action: 'fold' });
 $('callBtn').onclick = () => send({ t: 'action', action: S.state.limits.toCall === 0 ? 'check' : 'call' });
 $('raiseBtn').onclick = () => send({ t: 'action', action: 'raise', amount: Number($('raiseInput').value) });
 
-// Keyboard shortcuts: F fold, C check/call, R raise
+// Keyboard shortcuts: F fold, C check/call, R raise, O odds, H hand rankings, Esc close
 document.addEventListener('keydown', (e) => {
-  if (!S || !S.state.limits || ['INPUT', 'SELECT'].includes(document.activeElement.tagName)) return;
+  if (!S || ['INPUT', 'SELECT'].includes(document.activeElement.tagName)) return;
   const k = e.key.toLowerCase();
+  if (k === 'escape') $('rankingsModal').classList.add('hidden');
+  if (k === 'h') $('rankingsBtn').click();
+  if (k === 'o') $('oddsToggle').click();
+  if (!S.state.limits) return;
   if (k === 'f' && !$('foldBtn').classList.contains('hidden')) $('foldBtn').click();
   if (k === 'c') $('callBtn').click();
   if (k === 'r' && !$('raiseBtn').classList.contains('hidden')) $('raiseBtn').click();
@@ -328,3 +336,134 @@ function toast(t) {
 if (params.get('room') && localStorage.getItem('poker.token.' + params.get('room').toUpperCase()) && $('name').value) {
   join(params.get('room'));
 }
+
+// ---------- odds window ----------
+const HAND_NAMES = ['High Card', 'Pair', 'Two Pair', 'Three of a Kind', 'Straight', 'Flush', 'Full House', 'Four of a Kind', 'Straight Flush'];
+let oddsOpen = localStorage.getItem('poker.odds') !== '0';
+let oddsWorker = null;
+let oddsKey = '';
+let oddsResult = null;
+let oddsReq = 0;
+
+function setOddsOpen(open) {
+  oddsOpen = open;
+  localStorage.setItem('poker.odds', open ? '1' : '0');
+  $('oddsToggle').classList.toggle('on', open);
+  if (S) renderOdds(S.state);
+}
+$('oddsToggle').onclick = () => setOddsOpen(!oddsOpen);
+$('oddsClose').onclick = () => setOddsOpen(false);
+
+function renderOdds(st) {
+  const allowed = st.settings.showOdds;
+  $('oddsToggle').classList.toggle('hidden', !allowed);
+  const panel = $('oddsPanel');
+  const me = st.mySeat !== -1 ? st.seats[st.mySeat] : null;
+  const inHand = me && me.inHand && !me.folded && me.hole && ['preflop', 'flop', 'turn', 'river', 'showdown'].includes(st.stage);
+  panel.classList.toggle('hidden', !allowed || !oddsOpen || st.stage === 'waiting');
+  if (panel.classList.contains('hidden')) return;
+  const body = $('oddsBody');
+  if (!inHand) {
+    body.innerHTML = `<div class="muted">${me && me.folded && me.inHand ? 'You folded this hand.' : 'You are not in this hand.'}</div>`;
+    return;
+  }
+  const opponents = st.seats.filter((s, i) => s && i !== st.mySeat && s.inHand && !s.folded).length;
+  if (st.stage === 'showdown') {
+    const won = st.results && st.results.winners.some((w) => w.seat === st.mySeat);
+    body.innerHTML = `<div class="big" style="color:${won ? '#4fd17d' : '#e0606f'}">${won ? 'You won!' : 'Hand over'}</div>`;
+    return;
+  }
+  const key = [st.handNo, me.hole.join(''), st.board.join(''), opponents, st.variant].join('|');
+  if (key !== oddsKey) {
+    oddsKey = key;
+    oddsResult = null;
+    if (!oddsWorker) {
+      oddsWorker = new Worker('odds-worker.js');
+      oddsWorker.onmessage = (e) => { if (e.data.id === oddsReq) { oddsResult = e.data; renderOdds(S.state); } };
+    }
+    oddsWorker.postMessage({ id: ++oddsReq, hole: me.hole, board: st.board, variant: st.variant, opponents });
+  }
+  if (!oddsResult) { body.innerHTML = '<div class="muted">Calculating…</div>'; return; }
+
+  const pct = (x) => (x * 100 < 1 && x > 0 ? '<1' : Math.round(x * 100)) + '%';
+  const win = oddsResult.win;
+  const color = win >= 0.5 ? '#4fd17d' : win >= 1 / (opponents + 1) ? '#f4c95d' : '#e0606f';
+  let html = `<div class="big" style="color:${color}">${pct(win)}</div>
+    <div class="meter"><div style="width:${win * 100}%;background:${color}"></div></div>
+    <div class="muted">chance to win vs ${opponents} player${opponents > 1 ? 's' : ''}${me.handName ? ` · you have <b style="color:#9fe3b5">${me.handName}</b>` : ''}</div>`;
+
+  // Is calling worth it? Compare win chance with the price of the call.
+  const lim = st.limits;
+  if (lim && lim.toCall > 0) {
+    const need = lim.toCall / (st.pot + lim.toCall);
+    const good = win >= need;
+    html += `<div class="verdict ${good ? 'good' : 'bad'}">Call ${lim.toCall} to win ${st.pot}: you need ${pct(need)}.<br>
+      ${good ? '✅ Calling is worth it' : '❌ Calling costs more than it\'s likely to win'}</div>`;
+  }
+
+  // What you're likely to end up with by the river.
+  if (st.stage !== 'river') {
+    const rows = oddsResult.made.map((p, cat) => ({ p, cat })).filter((r) => r.p >= 0.005).sort((a, b) => b.cat - a.cat).slice(0, 6);
+    html += '<div class="muted" style="margin-top:6px">By the river you\'ll have:</div><div class="made">';
+    for (const r of rows) {
+      const now = r.cat === oddsResult.currentCat;
+      html += `<span class="${now ? 'now' : ''}">${HAND_NAMES[r.cat]}</span><div class="bar"><div style="width:${r.p * 100}%"></div></div><span class="pct">${pct(r.p)}</span>`;
+    }
+    html += '</div>';
+  }
+  html += '<div class="muted" style="margin-top:6px;font-size:11px">Estimate vs. random hands. Nobody\'s cards are peeked.</div>';
+  body.innerHTML = html;
+}
+
+// ---------- hand rankings ----------
+const RANKINGS = [
+  { name: 'Royal Flush', cat: 8, cards: 'As Ks Qs Js Ts', desc: 'A, K, Q, J, 10, all the same suit. The best possible hand.' },
+  { name: 'Straight Flush', cat: 8, cards: '9h 8h 7h 6h 5h', desc: 'Five cards in a row, all the same suit.' },
+  { name: 'Four of a Kind', cat: 7, cards: 'Qc Qd Qh Qs 4d', use: 4, desc: 'Four cards of the same rank.' },
+  { name: 'Full House', cat: 6, cards: 'Kh Kd Ks 7c 7h', desc: 'Three of a kind plus a pair.' },
+  { name: 'Flush', cat: 5, cards: 'Ad Jd 8d 6d 2d', desc: 'Any five cards of the same suit.' },
+  { name: 'Straight', cat: 4, cards: 'Tc 9d 8h 7s 6c', desc: 'Five cards in a row, any suits. Ace can be high (A-K-Q-J-10) or low (5-4-3-2-A).' },
+  { name: 'Three of a Kind', cat: 3, cards: '8s 8h 8d Kc 3s', use: 3, desc: 'Three cards of the same rank.' },
+  { name: 'Two Pair', cat: 2, cards: 'Jh Jc 4s 4d Ac', use: 4, desc: 'Two different pairs.' },
+  { name: 'Pair', cat: 1, cards: 'Ts Th Kd 6c 2h', use: 2, desc: 'Two cards of the same rank.' },
+  { name: 'High Card', cat: 0, cards: 'Ad Qs 9c 6h 3d', use: 1, desc: 'Nothing else. Your highest card plays.' },
+];
+
+function renderRankings(st) {
+  if ($('rankingsModal').classList.contains('hidden')) return;
+  const list = $('rankingsList');
+  const me = st && st.mySeat !== -1 ? st.seats[st.mySeat] : null;
+  const current = me && me.handName && !me.folded ? me.handName : null;
+  list.innerHTML = '';
+  RANKINGS.forEach((r, i) => {
+    const row = document.createElement('div');
+    const mine = current === r.name;
+    row.className = 'rank-row' + (mine ? ' current' : '');
+    row.innerHTML = `<span class="n">${i + 1}</span><div class="cards"></div><div class="title">${r.name}${mine ? ' ← you have this' : ''}<div class="desc">${r.desc}</div></div>`;
+    const cards = row.querySelector('.cards');
+    r.cards.split(' ').forEach((c, j) => cards.appendChild(cardEl(c, r.use && j >= r.use ? 'dim' : '')));
+    list.appendChild(row);
+  });
+  const v = st ? st.variant : 'holdem';
+  $('rankingsNote').innerHTML = v === 'holdem'
+    ? "<b>Texas Hold'em:</b> make your best 5 cards from your 2 cards plus the 5 on the board, in any combination."
+    : `<b>${v === 'omaha5' ? '5-Card ' : ''}Omaha:</b> you must use <b>exactly 2</b> of your hole cards and <b>exactly 3</b> from the board. Example: four hearts on the board plus one heart in your hand is <i>not</i> a flush.`;
+}
+
+$('rankingsBtn').onclick = () => {
+  const m = $('rankingsModal');
+  m.classList.toggle('hidden');
+  renderRankings(S && S.state);
+};
+$('rankingsClose').onclick = () => $('rankingsModal').classList.add('hidden');
+$('rankingsModal').onclick = (e) => { if (e.target.id === 'rankingsModal') e.target.classList.add('hidden'); };
+$('oddsToggle').classList.toggle('on', oddsOpen);
+
+// Collapsible host controls (remembered).
+function setHostCollapsed(c) {
+  $('hostPanel').classList.toggle('collapsed', c);
+  $('hostArrow').textContent = c ? '▸' : '▾';
+  localStorage.setItem('poker.hostCollapsed', c ? '1' : '0');
+}
+$('hostToggle').onclick = () => setHostCollapsed(!$('hostPanel').classList.contains('collapsed'));
+setHostCollapsed(localStorage.getItem('poker.hostCollapsed') === '1');

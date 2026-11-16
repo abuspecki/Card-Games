@@ -38,6 +38,16 @@ Example: `public/sounds/win.mp3` replaces the win jingle.
 - **Seats:** If the table is full of bots and a friend joins, a bot gives up its seat.
 - **No humans, no new hands:** Bots won't start new hands when no human is connected.
 
+## Odds window and hand rankings
+
+- **📊 Odds** (key **O**) shows:
+  - your chance to win the hand;
+  - whether calling is worth the price;
+  - which hand you're likely to end up with by the river.
+
+  It's calculated in your own browser from only your cards and the board. The host can turn it off for everyone with **Allow odds window**.
+- **🏆 Hand rankings** (key **H**) lists every hand from best to worst with example cards, and highlights the hand you currently hold.
+
 ## Controls
 
 - Keyboard shortcuts: **F** to fold, **C** to check or call, **R** to raise.

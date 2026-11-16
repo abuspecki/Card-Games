@@ -85,6 +85,39 @@ function bestHand(hole, board, variant) {
   return best;
 }
 
+// Monte Carlo odds: deal random opponent hands and runouts many times.
+// Uses only the player's own cards and the board (never other players' cards).
+// Returns win share (ties split) and how often each final hand category is made.
+function simulateOdds(hole, board, variant, opponents, sims) {
+  const known = new Set([...hole, ...board]);
+  const rest = newDeck().filter((c) => !known.has(c));
+  const holeSize = VARIANTS[variant].hole;
+  const need = opponents * holeSize + (5 - board.length);
+  const made = new Array(9).fill(0);
+  let win = 0;
+  let tie = 0;
+  for (let n = 0; n < sims; n++) {
+    for (let i = 0; i < need; i++) {
+      const j = i + Math.floor(Math.random() * (rest.length - i));
+      [rest[i], rest[j]] = [rest[j], rest[i]];
+    }
+    let k = 5 - board.length;
+    const fullBoard = board.concat(rest.slice(0, k));
+    const mine = bestHand(hole, fullBoard, variant);
+    made[mine.cat]++;
+    let ties = 0;
+    let lost = false;
+    for (let o = 0; o < opponents; o++) {
+      const s = bestHand(rest.slice(k, k + holeSize), fullBoard, variant).score;
+      k += holeSize;
+      if (s > mine.score) { lost = true; break; }
+      if (s === mine.score) ties++;
+    }
+    if (!lost) { win += 1 / (ties + 1); if (ties) tie++; }
+  }
+  return { win: win / sims, tie: tie / sims, made: made.map((m) => m / sims) };
+}
+
 class Table {
   constructor(opts = {}) {
     this.maxSeats = 8;
@@ -95,6 +128,7 @@ class Table {
       startingStack: 1000,
       smallBlind: 5,
       bigBlind: 10,
+      showOdds: true,
       ...opts,
     };
     this.button = -1;
@@ -414,4 +448,7 @@ class Table {
   }
 }
 
-module.exports = { Table, VARIANTS, eval5, bestHand, newDeck };
+const PokerEngine = { Table, VARIANTS, CATEGORY_NAMES, eval5, bestHand, newDeck, simulateOdds };
+// Works in Node (server) and in the browser (odds window).
+if (typeof module !== 'undefined' && module.exports) module.exports = PokerEngine;
+else globalThis.PokerEngine = PokerEngine;

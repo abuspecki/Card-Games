@@ -20,6 +20,13 @@ const TYPES = {
 
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0]);
+  // Share the poker engine with the browser (used by the odds window).
+  if (url === '/engine.js') {
+    return fs.readFile(path.join(__dirname, 'poker.js'), (err, data) => {
+      res.writeHead(err ? 500 : 200, { 'Content-Type': 'text/javascript' });
+      res.end(data);
+    });
+  }
   // List custom sound files so the client only loads ones that exist.
   if (url === '/sounds/list.json') {
     let list = [];
@@ -203,6 +210,7 @@ wss.on('connection', (ws) => {
         const s = t.settings;
         if (VARIANTS[m.variant]) s.variant = m.variant;
         if (typeof m.rotate === 'boolean') s.rotate = m.rotate;
+        if (typeof m.showOdds === 'boolean') s.showOdds = m.showOdds;
         const num = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.floor(Number(v))));
         if (m.startingStack) s.startingStack = num(m.startingStack, 100, 1000000);
         if (m.bigBlind) { s.bigBlind = num(m.bigBlind, 2, 100000); s.smallBlind = Math.floor(s.bigBlind / 2); }

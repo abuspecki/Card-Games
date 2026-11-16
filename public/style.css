@@ -30,7 +30,7 @@ header { display: flex; justify-content: space-between; align-items: center; pad
 .header-right { display: flex; gap: 8px; align-items: center; }
 #volume { width: 90px; padding: 0; }
 main { flex: 1; display: flex; min-height: 0; }
-.table-wrap { flex: 1; display: grid; place-items: center; padding: 50px 70px; min-width: 0; }
+.table-wrap { position: relative; flex: 1; display: grid; place-items: center; padding: 50px 70px; min-width: 0; }
 aside { width: 280px; display: flex; flex-direction: column; gap: 10px; padding: 10px; background: #161b22; }
 .panel { background: var(--panel); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
 .panel h3 { margin: 0; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
@@ -111,3 +111,44 @@ aside { width: 280px; display: flex; flex-direction: column; gap: 10px; padding:
 
 .practice button { flex: 1; }
 .seat .plate .bot { font-size: 12px; margin-right: 2px; }
+
+/* Odds window */
+.odds { background: var(--panel); border-radius: 10px; padding: 10px 12px; font-size: 13px; flex-shrink: 0; }
+.odds-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.odds-head span { color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-size: 12px; font-weight: 700; }
+.odds-head h2 { margin: 0; font-size: 20px; }
+.odds .big { font-size: 30px; font-weight: 800; }
+.odds .meter { height: 10px; background: #2a3442; border-radius: 6px; overflow: hidden; margin: 4px 0 6px; }
+.odds .meter div { height: 100%; border-radius: 6px; transition: width .4s; }
+.odds .muted { color: var(--muted); }
+.odds .verdict { margin: 6px 0; padding: 5px 8px; border-radius: 6px; background: #1c232d; }
+.odds .verdict.good { border-left: 3px solid #4fd17d; }
+.odds .verdict.bad { border-left: 3px solid #e0606f; }
+.odds .made { margin-top: 6px; display: grid; grid-template-columns: 1fr 70px 36px; gap: 2px 6px; align-items: center; }
+.odds .made .bar { height: 6px; background: #2a3442; border-radius: 3px; overflow: hidden; }
+.odds .made .bar div { height: 100%; background: var(--gold); }
+.odds .made .pct { text-align: right; color: var(--muted); }
+.odds .made .now { color: #9fe3b5; font-weight: 700; }
+
+/* Hand rankings */
+.modal { position: fixed; inset: 0; background: #000a; display: grid; place-items: center; z-index: 20; }
+.modal-box { background: var(--panel); border-radius: 14px; padding: 18px 22px; width: min(620px, 94vw); max-height: 92vh; overflow-y: auto; box-shadow: 0 20px 60px #000c; }
+.modal .sub { color: var(--muted); font-size: 13px; margin: 4px 0 10px; }
+.rank-row { display: grid; grid-template-columns: 28px 150px 1fr; gap: 10px; align-items: center; padding: 6px 8px; border-radius: 8px; }
+.rank-row:nth-child(odd) { background: #ffffff06; }
+.rank-row.current { background: #1d3a2a; outline: 2px solid #6ef09a; }
+.rank-row .n { color: var(--muted); font-weight: 700; text-align: center; }
+.rank-row .title { font-weight: 700; }
+.rank-row .desc { font-size: 12px; color: var(--muted); font-weight: 400; }
+.rank-row .cards { display: flex; gap: 3px; }
+.rank-row .card { width: 34px; height: 48px; animation: none; }
+.rank-row .card .r { font-size: 14px; top: 3px; left: 4px; }
+.rank-row .card .s { font-size: 16px; bottom: 2px; right: 4px; }
+.rank-row .card.dim { opacity: .35; }
+@media (max-width: 900px) { .rank-row { grid-template-columns: 22px 110px 1fr; } }
+button.on { background: #3d5a2f; border-color: #5c8a45; }
+aside { overflow-y: auto; }
+.log-panel { min-height: 200px; }
+.panel-body { display: flex; flex-direction: column; gap: 8px; }
+.collapsible { cursor: pointer; user-select: none; display: flex; justify-content: space-between; }
+.panel.collapsed .panel-body { display: none; }

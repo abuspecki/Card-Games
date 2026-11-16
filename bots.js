@@ -2,7 +2,7 @@
 // A bot estimates its chance of winning by simulating random runouts against
 // random opponent hands (it only knows its own cards and the board — no
 // peeking), then compares that with the price of calling.
-const { VARIANTS, bestHand, newDeck } = require('./poker');
+const { simulateOdds } = require('./poker');
 
 const BOT_NAMES = [
   'Lucky Lou', 'River Rat', 'Chip Chomper', 'Bluffy', 'Nutty Nora',
@@ -27,36 +27,9 @@ function randomStyle() {
   return keys[Math.floor(Math.random() * keys.length)];
 }
 
-// Monte Carlo equity: share of simulated hands this hole wins (ties split).
+// Share of simulated hands this hole wins (ties split).
 function equity(hole, board, variant, opponents, sims) {
-  const known = new Set([...hole, ...board]);
-  const rest = newDeck().filter((c) => !known.has(c));
-  const holeSize = VARIANTS[variant].hole;
-  const need = opponents * holeSize + (5 - board.length);
-  let score = 0;
-  for (let n = 0; n < sims; n++) {
-    // Partial Fisher–Yates: only shuffle the cards we need.
-    for (let i = 0; i < need; i++) {
-      const j = i + Math.floor(Math.random() * (rest.length - i));
-      [rest[i], rest[j]] = [rest[j], rest[i]];
-    }
-    let k = 0;
-    const fullBoard = board.concat(rest.slice(k, k + 5 - board.length));
-    k += 5 - board.length;
-    const mine = bestHand(hole, fullBoard, variant).score;
-    let best = 0;
-    let ties = 0;
-    let lost = false;
-    for (let o = 0; o < opponents; o++) {
-      const s = bestHand(rest.slice(k, k + holeSize), fullBoard, variant).score;
-      k += holeSize;
-      if (s > mine) { lost = true; break; }
-      if (s === mine) ties++;
-      best = Math.max(best, s);
-    }
-    if (!lost) score += 1 / (ties + 1);
-  }
-  return score / sims;
+  return simulateOdds(hole, board, variant, opponents, sims).win;
 }
 
 function decide(table, seatIdx) {
