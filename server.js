@@ -98,6 +98,9 @@ async function handleApi(req, res, url) {
     const m = MODES.includes(mode) ? mode : 'friends';
     return json(res, 200, { mode: m, persistent: store.kind === 'postgres', databaseError, rows: await store.leaderboard(m) });
   }
+  if (req.method === 'GET' && url === '/api/tables') {
+    return json(res, 200, { tables: [...rooms.values()].map(tableSummary) });
+  }
   if (req.method === 'GET' && url === '/api/status') {
     return json(res, 200, {
       database: store.kind === 'postgres' ? 'connected' : (process.env.DATABASE_URL ? 'failed' : 'not configured'),
@@ -135,23 +138,24 @@ const server = http.createServer((req, res) => {
   });
 });
 
-const rooms = new Map(); // code -> { table, clients: Map(playerId -> ws), host, timers }
+// The lobby: two permanent tables per game. Anyone can join; there is no host.
+const TABLES = [
+  { id: 'HOLDEM-1', name: "Hold'em · Table 1", game: 'holdem', capacity: 8 },
+  { id: 'HOLDEM-2', name: "Hold'em · Table 2", game: 'holdem', capacity: 8 },
+  { id: 'BLACKJACK-1', name: 'Blackjack · Table 1', game: 'blackjack', capacity: 7 },
+  { id: 'BLACKJACK-2', name: 'Blackjack · Table 2', game: 'blackjack', capacity: 7 },
+  { id: 'DURAK-1', name: 'Durak · Table 1', game: 'durak', capacity: 6 },
+  { id: 'DURAK-2', name: 'Durak · Table 2', game: 'durak', capacity: 6 },
+];
+const AUTO_START_DELAY = 3000;          // deal this long after enough players sit down
+const AWAY_LIMIT = 3 * 60 * 1000;       // disconnected players lose their seat after this
 
-function makeCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let c;
-  do { c = Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join(''); }
-  while (rooms.has(c));
-  return c;
-}
+const rooms = new Map(); // id -> { code, name, game, capacity, table, clients, timers }
 
-function createRoom() {
-  const code = makeCode();
-  const room = { code, table: null, clients: new Map(), host: null, nextTimer: null, turnTimer: null };
-  room.table = GAMES.holdem.make({});
+for (const def of TABLES) {
+  const room = { ...def, code: def.id, table: GAMES[def.game].make({}), clients: new Map(), nextTimer: null, turnTimer: null, startTimer: null };
   wireTable(room);
-  rooms.set(code, room);
-  return room;
+  rooms.set(def.id, room);
 }
 
 function wireTable(room) {
@@ -161,27 +165,18 @@ function wireTable(room) {
   };
 }
 
-// Swap the room to another game, keeping everyone in their seats with their chips.
-function switchGame(room, game) {
-  const old = room.table;
-  if (!GAMES[game] || old.game === game) return null;
-  if (old.isPlaying()) return 'Finish the current hand before switching games';
-  const { startingStack, smallBlind, bigBlind, showOdds } = old.settings;
-  const t = GAMES[game].make({ startingStack, smallBlind, bigBlind, showOdds });
-  old.seats.forEach((s, i) => {
-    if (s) t.sitAt(i, { id: s.id, name: s.name, chips: s.chips, isBot: s.isBot, botStyle: s.botStyle, accountId: s.accountId, connected: s.connected });
-  });
-  t.log = old.log || [];
-  t.chat = old.chat || [];
-  t.chatSeq = old.chatSeq || 0;
-  t.handNo = old.handNo;
-  t.button = old.button;
-  t.addLog(`🎲 The game is now ${GAMES[game].name}`);
-  clearTimeout(room.nextTimer);
-  room.nextTimer = null;
-  room.table = t;
-  wireTable(room);
-  return null;
+const seatedCount = (t) => t.seats.filter(Boolean).length;
+
+// What the lobby shows for each table.
+function tableSummary(room) {
+  const seats = room.table.seats.filter(Boolean);
+  return {
+    id: room.id, name: room.name, game: room.game, capacity: room.capacity,
+    humans: seats.filter((s) => !s.isBot).length,
+    bots: seats.filter((s) => s.isBot).length,
+    players: seats.map((s) => ({ name: s.name, bot: s.isBot })),
+    playing: room.table.isPlaying(),
+  };
 }
 
 function send(ws, msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
@@ -192,7 +187,7 @@ function pushState(room) {
   try {
     const t = room.table;
     for (const [pid, ws] of room.clients) {
-      send(ws, { t: 'state', room: room.code, host: room.host, isHost: pid === room.host, games: GAME_NAMES, state: t.view(pid) });
+      send(ws, { t: 'state', room: room.code, tableName: room.name, state: t.view(pid) });
     }
     scheduleTimers(room);
   } catch (e) {
@@ -202,13 +197,22 @@ function pushState(room) {
 
 function scheduleTimers(room) {
   const t = room.table;
+  // Deal automatically once enough players are seated (no host needed).
+  if (t.stage === 'waiting' && !room.startTimer && hasHuman(room) && t.canStart()) {
+    room.startTimer = setTimeout(() => {
+      room.startTimer = null;
+      if (t.stage === 'waiting' && hasHuman(room)) { rebuyBots(t); if (t.canStart()) t.startHand(); }
+      pushState(room);
+    }, AUTO_START_DELAY);
+  }
   // Auto-deal next hand after a showdown.
   if (t.stage === 'showdown' && !room.nextTimer) {
     room.nextTimer = setTimeout(() => {
       room.nextTimer = null;
-      if (room.table !== t) return; // game was switched
-      if (t.stage === 'showdown' && hasHuman(room)) { rebuyBots(t); if (t.canStart()) t.startHand(); }
-      else if (t.stage === 'showdown') t.stage = 'waiting';
+      if (t.stage !== 'showdown') return;
+      removeAwayPlayers(room);
+      if (hasHuman(room)) { rebuyBots(t); if (t.canStart()) t.startHand(); else t.stage = 'waiting'; }
+      else t.stage = 'waiting';
       pushState(room);
     }, t.game === 'durak' ? NEXT_HAND_DELAY + 2000 : NEXT_HAND_DELAY);
   }
@@ -247,6 +251,32 @@ function recordResults(t) {
     store.recordHand(r.accountId, r.mode, r.net, r.won, r.pot).catch((e) => console.error('record error', e));
   }
 }
+
+// Free seats of people who have been disconnected for a while (between hands only),
+// and clear out the bots once no real player is left at the table.
+function removeAwayPlayers(room) {
+  const t = room.table;
+  if (t.isPlaying()) return false;
+  let changed = false;
+  for (const s of t.seats.slice()) {
+    if (s && !s.isBot && !s.connected && Date.now() - (s.awayAt || 0) > AWAY_LIMIT) {
+      t.addLog(`${s.name} left (disconnected)`);
+      t.leave(s.id);
+      changed = true;
+    }
+  }
+  if (!t.seats.some((s) => s && !s.isBot)) {
+    for (const s of t.seats.slice()) if (s && s.isBot) { t.leave(s.id); changed = true; }
+    if (changed) t.stage = 'waiting';
+  }
+  return changed;
+}
+
+setInterval(() => {
+  for (const room of rooms.values()) {
+    try { if (removeAwayPlayers(room)) pushState(room); } catch (e) { console.error('sweep error', e); }
+  }
+}, 20000);
 
 function hasHuman(room) {
   return room.table.seats.some((s) => s && !s.isBot && s.connected);
@@ -309,10 +339,9 @@ wss.on('connection', (ws) => {
         try { user = await store.getUserBySession(String(m.session)); } catch (e) { console.error('session lookup', e); }
       }
       const name = user ? user.username : String(m.name || 'Player').trim().slice(0, 16) || 'Player';
-      let code = String(m.room || '').toUpperCase().trim();
-      if (!code) room = createRoom();
-      else room = rooms.get(code);
-      if (!room) return send(ws, { t: 'error', msg: `Room ${code} not found` });
+      const code = String(m.room || '').toUpperCase().trim();
+      room = rooms.get(code);
+      if (!room) return send(ws, { t: 'error', msg: 'That table doesn\'t exist — pick one from the lobby' });
       const table = room.table;
       // Rejoin a seat: by saved seat token, or because this account already sits here.
       const accountSeat = user ? table.seats.findIndex((s) => s && s.accountId === user.id) : -1;
@@ -321,30 +350,24 @@ wss.on('connection', (ws) => {
         const old = room.clients.get(pid);
         if (old && old !== ws) old.close();
         table.seats[table.seatOf(pid)].connected = true;
+        table.seats[table.seatOf(pid)].awayAt = null;
       } else {
         pid = crypto.randomUUID();
-        if (table.seats.every(Boolean)) removeBot(room); // make room for a human
-        if (table.sit({ id: pid, name, accountId: user ? user.id : null }) === -1) { room = null; return send(ws, { t: 'error', msg: 'Table is full (8 players)' }); }
+        if (seatedCount(table) >= room.capacity) removeBot(room); // make room for a human
+        if (seatedCount(table) >= room.capacity || table.sit({ id: pid, name, accountId: user ? user.id : null }) === -1) {
+          room = null;
+          return send(ws, { t: 'error', msg: 'This table is full — try the other one' });
+        }
         table.addLog(`${name} joined`);
       }
       room.clients.set(pid, ws);
-      if (!room.host || table.seatOf(room.host) === -1) room.host = pid;
       send(ws, { t: 'joined', room: room.code, token: pid });
-      // "Practice vs bots": fill the table and deal right away.
-      if (!code && GAMES[m.game]) switchGame(room, m.game);
-      const maxBots = room.table.game === 'durak' ? 5 : 7;
-      const nBots = Math.max(0, Math.min(maxBots, Math.floor(Number(m.bots) || 0)));
-      if (!code && nBots) {
-        for (let i = 0; i < nBots; i++) addBot(room);
-        room.table.startHand();
-      }
       pushState(room);
       return;
     }
 
     if (!room || !pid) return;
     const t = room.table;
-    const isHost = pid === room.host;
     const me = t.seats[t.seatOf(pid)];
 
     switch (m.t) {
@@ -353,30 +376,12 @@ wss.on('connection', (ws) => {
         if (r.error) send(ws, { t: 'error', msg: r.error });
         break;
       }
-      case 'start':
-        if (!isHost) return send(ws, { t: 'error', msg: 'Only the host can start' });
-        rebuyBots(t);
-        if (!t.startHand()) return send(ws, { t: 'error', msg: 'Need at least 2 players with chips — add a bot?' });
-        break;
-      case 'settings': {
-        if (!isHost) return;
-        if (m.game) {
-          const err = switchGame(room, m.game);
-          if (err) return send(ws, { t: 'error', msg: err });
-        }
-        const s = room.table.settings;
-        if (typeof m.showOdds === 'boolean') s.showOdds = m.showOdds;
-        const num = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.floor(Number(v))));
-        if (m.startingStack) s.startingStack = num(m.startingStack, 100, 1000000);
-        if (m.bigBlind) { s.bigBlind = num(m.bigBlind, 2, 100000); s.smallBlind = Math.floor(s.bigBlind / 2); }
-        break;
-      }
       case 'addBot':
-        if (!isHost) return;
-        if (!addBot(room)) return send(ws, { t: 'error', msg: 'Table is full' });
+        if (!me) return;
+        if (seatedCount(t) >= room.capacity || !addBot(room)) return send(ws, { t: 'error', msg: 'The table is full' });
         break;
       case 'removeBot':
-        if (!isHost) return;
+        if (!me) return;
         if (!removeBot(room)) return send(ws, { t: 'error', msg: 'No bots at the table' });
         break;
       case 'rebuy':
@@ -402,6 +407,7 @@ wss.on('connection', (ws) => {
         t.leave(pid);
         room.clients.delete(pid);
         pid = null;
+        removeAwayPlayers(room); // last human gone? clear the bots
         break;
       }
       default:
@@ -415,16 +421,7 @@ wss.on('connection', (ws) => {
     if (room.clients.get(pid) !== ws) return; // replaced by a newer connection
     room.clients.delete(pid);
     const i = room.table.seatOf(pid);
-    if (i !== -1) room.table.seats[i].connected = false;
-    if (room.clients.size === 0) {
-      // Keep empty rooms briefly so refreshes can rejoin, then clean up.
-      setTimeout(() => {
-        if (room.clients.size === 0) { clearTimeout(room.nextTimer); clearTimeout(room.turnTimer); rooms.delete(room.code); }
-      }, 10 * 60 * 1000);
-    } else if (pid === room.host) {
-      const next = [...room.clients.keys()].find((id) => room.table.seatOf(id) !== -1);
-      if (next) room.host = next;
-    }
+    if (i !== -1) { room.table.seats[i].connected = false; room.table.seats[i].awayAt = Date.now(); }
     pushState(room);
   });
 });

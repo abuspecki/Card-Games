@@ -2,7 +2,7 @@
 
 Play card games with friends in the browser, using play money only.
 
-**Games:** the host can switch between hands.
+**Tables:** the lobby has two permanent tables per game. Anyone can join, and there's no host. Cards are dealt automatically once enough players sit down (1 for Blackjack, 2 for the others).
 - **Texas Hold'em** (no limit)
 - **Blackjack:** everyone plays against the dealer. Blackjack pays 3:2 and the dealer stands on 17. You can double, or split once.
 - **Durak:** the classic "throw-in" (podkidnoy) version with 36 cards, 2–6 players and a trump suit. The last player holding cards is the durak.
@@ -16,7 +16,7 @@ npm install
 npm start
 ```
 
-Open http://localhost:3000, create a room, and send friends the invite link.
+Open http://localhost:3000, pick a table, and send friends the invite link (or just tell them which table).
 
 ## Play with friends online
 
@@ -37,8 +37,8 @@ Example: `public/sounds/win.mp3` replaces the win jingle.
 
 ## Playing against bots
 
-- **Practice vs bots:** On the start screen, pick how many bots you want and click **🤖 Practice vs bots**. The table fills with bots and the first hand is dealt right away.
-- **Bots in a room with friends:** The host can use **Add bot** and **Remove bot** in the host controls at any time.
+- **Adding bots:** anyone seated at a table can use **Add bot** and **Remove bot**, for example to play alone or to fill a Durak game.
+- **Clean-up:** bots leave automatically once no real player is left at the table. Players who stay disconnected for 3 minutes lose their seat between hands.
 - **How bots play:** Each bot estimates its chance of winning by simulating the rest of the hand thousands of times. Bots only see their own cards and the board. Every bot gets a random style (tight, normal or wild), so they play differently.
 - **Seats:** If the table is full of bots and a friend joins, a bot gives up its seat.
 - **No humans, no new hands:** Bots won't start new hands when no human is connected.
@@ -50,7 +50,7 @@ Example: `public/sounds/win.mp3` replaces the win jingle.
   - whether calling is worth the price;
   - which hand you're likely to end up with by the river.
 
-  It's calculated in your own browser from only your cards and the board. The host can turn it off for everyone with **Allow odds window**.
+  It's calculated in your own browser from only your cards and the board.
 - **🏆 Hand rankings** (key **H**) lists every hand from best to worst with example cards, and highlights the hand you currently hold.
 
 ## Accounts and leaderboard
@@ -73,7 +73,6 @@ Example: `public/sounds/win.mp3` replaces the win jingle.
 - Keyboard shortcuts: **F** to fold, **C** to check or call, **R** to raise.
 - If you refresh the page, you keep your seat.
 - When you run out of chips, you get a free rebuy.
-- The host picks the game, blinds and starting stack.
 
 ## Tests
 

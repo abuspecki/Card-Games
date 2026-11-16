@@ -9,53 +9,65 @@
 <body>
   <!-- Lobby -->
   <div id="lobby" class="screen">
-    <div class="lobby-card">
-      <h1>♠ Poker Night ♥</h1>
-      <p class="sub">Texas Hold'em · Blackjack · Durak — play with friends</p>
-      <!-- Account -->
-      <div id="accountIn" class="account hidden">
-        Signed in as <b id="accountName"></b>
-        <button id="logoutBtn" class="small">Log out</button>
-      </div>
-      <div id="accountOut" class="account-box">
-        <div class="tabs">
-          <button id="tabLogin" class="tab on">Log in</button>
-          <button id="tabRegister" class="tab">Create account</button>
+    <header class="lobby-top">
+      <div class="brand">
+        <div class="brand-mark">♠<span>♥</span></div>
+        <div>
+          <h1>Poker Night</h1>
+          <p class="tagline">Hold'em · Blackjack · Durak — with friends</p>
         </div>
-        <form id="authForm" class="auth">
-          <input id="authUser" maxlength="16" placeholder="Username" autocomplete="username" />
-          <input id="authPass" type="password" maxlength="100" placeholder="Password" autocomplete="current-password" />
-          <button id="authBtn" type="submit">Log in</button>
-        </form>
-        <div id="authError" class="error"></div>
-        <div class="or">or play as a guest (results aren't saved)</div>
-        <label>Guest name <input id="name" maxlength="16" placeholder="e.g. Sam" /></label>
       </div>
-      <button id="createBtn" class="big">Create a room</button>
-      <div class="row practice">
-        <button id="practiceBtn">🤖 Practice vs bots</button>
-        <select id="practiceGame" title="Game">
-          <option value="holdem">Hold'em</option><option value="blackjack">Blackjack</option><option value="durak">Durak</option>
-        </select>
-        <select id="botCount" title="Number of bots">
-          <option value="1">1 bot</option><option value="2">2 bots</option><option value="3" selected>3 bots</option>
-          <option value="4">4 bots</option><option value="5">5 bots</option>
-        </select>
-      </div>
-      <div class="or">or join a friend</div>
-      <div class="row">
-        <input id="roomCode" maxlength="5" placeholder="ROOM CODE" />
-        <button id="joinBtn">Join</button>
-      </div>
-      <div id="lobbyError" class="error"></div>
-      <button id="lobbyLeaderboard" class="small">🥇 Leaderboard</button>
-    </div>
+      <nav class="lobby-nav">
+        <button id="lobbyLeaderboard" class="ghost">🥇 Leaderboard</button>
+      </nav>
+    </header>
+
+    <main class="lobby-main">
+      <!-- Profile -->
+      <section class="profile gold-card">
+        <h2>Your seat</h2>
+        <div id="accountIn" class="account hidden">
+          <div class="avatar" id="avatar"></div>
+          <div class="who">
+            <div class="muted-small">Signed in as</div>
+            <b id="accountName"></b>
+          </div>
+          <button id="logoutBtn" class="ghost small">Log out</button>
+        </div>
+        <div id="accountOut" class="account-box">
+          <div class="tabs">
+            <button id="tabLogin" class="tab on">Log in</button>
+            <button id="tabRegister" class="tab">Create account</button>
+          </div>
+          <form id="authForm" class="auth">
+            <input id="authUser" maxlength="16" placeholder="Username" autocomplete="username" />
+            <input id="authPass" type="password" maxlength="100" placeholder="Password" autocomplete="current-password" />
+            <button id="authBtn" type="submit" class="gold">Log in</button>
+          </form>
+          <div id="authError" class="error"></div>
+          <div class="divider"><span>or play as a guest</span></div>
+          <input id="name" maxlength="16" placeholder="Guest name, e.g. Sam" />
+          <p class="muted-small">Guests can play, but only accounts appear on the leaderboard.</p>
+        </div>
+      </section>
+
+      <!-- Tables -->
+      <section class="tables">
+        <div class="tables-head">
+          <h2>Choose a table</h2>
+          <span id="onlineCount" class="muted-small"></span>
+        </div>
+        <div id="lobbyError" class="error"></div>
+        <div id="tableGrid" class="table-grid"></div>
+      </section>
+    </main>
+    <footer class="lobby-foot">Play money only · Cards are dealt automatically once enough players sit down</footer>
   </div>
 
   <!-- Table -->
   <div id="game" class="screen hidden">
     <header>
-      <div class="room-info">Room <b id="roomLabel"></b> <button id="copyLink" class="small">Copy invite link</button></div>
+      <div class="room-info"><button id="leaveBtn" class="small">← Lobby</button> <b id="roomLabel"></b> <button id="copyLink" class="small">Copy invite link</button></div>
       <div id="variantLabel" class="variant"></div>
       <div class="header-right">
         <button id="oddsToggle" class="small" title="Show/hide your win chances (O)">📊 Odds</button>
@@ -63,7 +75,6 @@
         <button id="leaderboardBtn" class="small" title="Leaderboard (L)">🥇 Leaderboard</button>
         <button id="muteBtn" class="small" title="Sound on/off">🔊</button>
         <input id="volume" type="range" min="0" max="1" step="0.05" value="0.6" title="Volume" />
-        <button id="leaveBtn" class="small">Leave</button>
       </div>
     </header>
 
@@ -84,20 +95,12 @@
           <div class="odds-head"><span>📊 Your odds</span><button id="oddsClose" class="small" title="Hide or show your odds (O)">Hide</button></div>
           <div id="oddsBody"></div>
         </div>
-        <div id="hostPanel" class="panel hidden">
-          <h3 id="hostToggle" class="collapsible" title="Show/hide">Host controls <span id="hostArrow">▾</span></h3>
-          <div class="panel-body">
-          <label>Game
-            <select id="variantSelect"></select>
-          </label>
-          <label class="check"><input type="checkbox" id="showOdds" /> Allow odds window</label>
-          <label><span id="bigBlindLabel">Big blind</span> <input id="bigBlind" type="number" min="2" /></label>
-          <label>Starting stack <input id="stack" type="number" min="100" /></label>
+        <div id="tablePanel" class="panel hidden">
+          <h3>Table</h3>
+          <div id="tableInfo" class="table-info"></div>
           <div class="row">
             <button id="addBotBtn" class="small">🤖 Add bot</button>
             <button id="removeBotBtn" class="small">Remove bot</button>
-          </div>
-          <button id="startBtn" class="big">Deal</button>
           </div>
         </div>
         <div class="panel log-panel">

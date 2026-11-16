@@ -24,7 +24,7 @@ function api(path, body) {
 function showAccount() {
   $('accountIn').classList.toggle('hidden', !account);
   $('accountOut').classList.toggle('hidden', !!account);
-  if (account) $('accountName').textContent = account;
+  if (account) { $('accountName').textContent = account; $('avatar').textContent = account[0].toUpperCase(); }
 }
 
 function setAuthMode(mode) {
@@ -70,21 +70,68 @@ const accountReady = session
 // ---------- lobby ----------
 $('name').value = localStorage.getItem('poker.name') || '';
 const params = new URLSearchParams(location.search);
-if (params.get('room')) $('roomCode').value = params.get('room');
 
-$('createBtn').onclick = () => join('');
-$('practiceBtn').onclick = () => join('', Number($('botCount').value), $('practiceGame').value);
-$('joinBtn').onclick = () => join($('roomCode').value.trim());
-$('roomCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('joinBtn').click(); });
+const GAME_INFO = {
+  holdem: { icon: '♠', title: "Texas Hold'em", blurb: 'Two cards, five on the board — bluff your friends.', extra: 'Blinds 5 / 10 · 1,000 chips' },
+  blackjack: { icon: '♥', title: 'Blackjack', blurb: 'Beat the dealer to 21. Pays 3:2.', extra: 'Min bet 10 · 1,000 chips' },
+  durak: { icon: '♣', title: 'Durak', blurb: 'Attack, defend, don\'t be the fool.', extra: '2–6 players · 36 cards' },
+};
 
-function join(code, bots = 0, game = 'holdem') {
+async function loadTables() {
+  if (!$('game').classList.contains('hidden')) return; // only while in the lobby
+  let data;
+  try { data = await (await fetch('/api/tables')).json(); } catch { return; }
+  const grid = $('tableGrid');
+  grid.innerHTML = '';
+  let people = 0;
+  for (const t of data.tables) {
+    people += t.humans;
+    const info = GAME_INFO[t.game];
+    const seated = t.humans + t.bots;
+    const full = seated >= t.capacity && t.bots === 0;
+    const card = document.createElement('div');
+    card.className = `table-card game-${t.game}`;
+    card.innerHTML = `
+      <div class="tc-head"><span class="tc-icon">${info.icon}</span>
+        <div><div class="tc-title"></div><div class="tc-blurb">${info.blurb}</div></div>
+        <span class="tc-status ${t.playing ? 'live' : ''}">${t.playing ? '● Playing' : seated ? 'Waiting' : 'Empty'}</span></div>
+      <div class="tc-felt"><div class="tc-seats"></div></div>
+      <div class="tc-foot"><span class="tc-count">${t.humans} player${t.humans === 1 ? '' : 's'}${t.bots ? ` · ${t.bots} bot${t.bots === 1 ? '' : 's'}` : ''} · ${seated}/${t.capacity} seats</span>
+        <button class="gold">${full ? 'Full' : 'Join table'}</button></div>
+      <div class="tc-extra">${info.extra}</div>`;
+    card.querySelector('.tc-title').textContent = t.name;
+    const seatsEl = card.querySelector('.tc-seats');
+    for (let k = 0; k < t.capacity; k++) {
+      const p = t.players[k];
+      const dot = document.createElement('span');
+      dot.className = 'tc-seat' + (p ? (p.bot ? ' bot' : ' human') : '');
+      dot.title = p ? p.name : 'Open seat';
+      dot.textContent = p ? (p.bot ? '🤖' : p.name[0].toUpperCase()) : '';
+      seatsEl.appendChild(dot);
+    }
+    const btn = card.querySelector('button');
+    btn.disabled = full;
+    btn.onclick = () => join(t.id);
+    grid.appendChild(card);
+  }
+  $('onlineCount').textContent = people ? `${people} ${people === 1 ? 'person is' : 'people are'} playing right now` : 'Nobody is playing yet — be the first!';
+}
+loadTables();
+setInterval(loadTables, 3000);
+
+function join(code) {
   const name = account || $('name').value.trim();
-  if (!name) { $('lobbyError').textContent = 'Log in, or enter a guest name first'; return; }
+  if (!name) {
+    $('lobbyError').textContent = 'Log in, create an account, or type a guest name first';
+    $('name').focus();
+    return;
+  }
+  $('lobbyError').textContent = '';
   if (!account) localStorage.setItem('poker.name', name);
   Sound.unlock();
   connect(() => {
     const token = code ? localStorage.getItem('poker.token.' + code.toUpperCase()) : null;
-    send({ t: 'join', room: code, name, token, bots, game, session });
+    send({ t: 'join', room: code, name, token, session });
   });
 }
 
@@ -142,7 +189,7 @@ function render() {
   const g = st.game || 'holdem';
   document.body.dataset.game = g;
   renderChat(st); // first, so new messages get bubbles on this draw
-  $('roomLabel').textContent = S.room;
+  $('roomLabel').textContent = S.tableName || S.room;
   $('variantLabel').textContent = st.variantName + (st.stage === 'waiting' ? '' : ` · ${g === 'durak' ? 'Game' : 'Hand'} #${st.handNo}`);
   const winCards = new Set();
   const winSeats = new Set();
@@ -226,7 +273,7 @@ function render() {
     }
   });
 
-  renderHost(st);
+  renderTablePanel(st);
   renderOdds(st);
   renderRankings(st);
   renderActions(st);
@@ -342,8 +389,8 @@ function centerMessage(st) {
   if (st.stage === 'waiting') {
     const need = g === 'blackjack' ? 1 : 2;
     const n = st.seats.filter((s) => s && (g === 'durak' || s.chips > 0)).length;
-    if (n < need) return S.isHost ? `Share room code ${S.room} or add a bot to play` : 'Waiting for players…';
-    return S.isHost ? (g === 'durak' ? 'Press Start game' : 'Press Deal to start') : 'Waiting for the host to start';
+    if (n < need) return 'Waiting for another player… invite a friend or add a bot 🤖';
+    return 'Starting in a moment…';
   }
   if (st.stage === 'showdown' && st.results) {
     if (g === 'durak') return st.durak === -1 || st.durak === undefined ? 'Draw — nobody is the durak!' : `${name(st.durak)} is the durak! 🃏`;
@@ -374,40 +421,19 @@ function updateHelpButton(st) {
   $('rankingsBtn').textContent = g === 'holdem' ? '🏆 Hand rankings' : '📖 How to play';
 }
 
-function renderHost(st) {
+function renderTablePanel(st) {
   updateHelpButton(st);
-  $('hostPanel').classList.toggle('hidden', !S.isHost);
-  if (!S.isHost) return;
+  const seated = st.mySeat !== -1;
+  $('tablePanel').classList.toggle('hidden', !seated);
+  if (!seated) return;
   const g = st.game || 'holdem';
-  const sel = $('variantSelect');
-  if (sel.options.length === 0 && S.games) {
-    for (const [k, v] of Object.entries(S.games)) sel.add(new Option(v, k));
-  }
-  const active = document.activeElement;
-  if (active !== sel) sel.value = g;
-  sel.disabled = isPlaying(st);
-  sel.title = isPlaying(st) ? 'You can switch games between hands' : '';
-  $('showOdds').checked = st.settings.showOdds;
-  $('showOdds').closest('label').classList.toggle('hidden', g === 'durak');
-  $('bigBlindLabel').textContent = g === 'blackjack' ? 'Minimum bet' : 'Big blind';
-  $('bigBlind').closest('label').classList.toggle('hidden', g === 'durak');
-  $('stack').closest('label').classList.toggle('hidden', g === 'durak');
-  if (active !== $('bigBlind')) $('bigBlind').value = st.settings.bigBlind;
-  if (active !== $('stack')) $('stack').value = st.settings.startingStack;
-  $('addBotBtn').disabled = st.seats.every(Boolean);
+  const info = { holdem: `Blinds ${st.settings.smallBlind} / ${st.settings.bigBlind}`, blackjack: `Minimum bet ${st.minBet}`, durak: 'Up to 6 players' }[g];
+  $('tableInfo').textContent = `${info} · Cards are dealt automatically. Short on players? Add a bot.`;
+  const full = st.seats.filter(Boolean).length >= (g === 'durak' ? 6 : g === 'blackjack' ? 7 : 8);
+  $('addBotBtn').disabled = full;
   $('removeBotBtn').disabled = !st.seats.some((s) => s && s.isBot);
-  const ready = g === 'blackjack' ? st.seats.some((s) => s && s.chips >= st.minBet)
-    : g === 'durak' ? st.seats.filter(Boolean).length >= 2
-      : st.seats.filter((s) => s && s.chips > 0).length >= 2;
-  $('startBtn').disabled = isPlaying(st) || !ready;
-  $('startBtn').textContent = g === 'durak' ? (st.stage === 'showdown' ? 'New game now' : 'Start game') : (st.stage === 'showdown' ? 'Deal now' : 'Deal');
 }
 
-$('variantSelect').onchange = (e) => send({ t: 'settings', game: e.target.value });
-$('showOdds').onchange = (e) => send({ t: 'settings', showOdds: e.target.checked });
-$('bigBlind').onchange = (e) => send({ t: 'settings', bigBlind: e.target.value });
-$('stack').onchange = (e) => send({ t: 'settings', startingStack: e.target.value });
-$('startBtn').onclick = () => send({ t: 'start' });
 $('addBotBtn').onclick = () => send({ t: 'addBot' });
 $('removeBotBtn').onclick = () => send({ t: 'removeBot' });
 
@@ -637,7 +663,8 @@ $('copyLink').onclick = () => {
   navigator.clipboard.writeText(url).then(() => toast('Invite link copied!'), () => toast(url));
 };
 $('leaveBtn').onclick = () => {
-  if (!confirm('Leave the table? You will lose your seat and chips.')) return;
+  if (isPlaying(S.state) && S.state.mySeat !== -1 && S.state.seats[S.state.mySeat].inHand
+    && !confirm('Leave in the middle of a hand? You lose what you have bet (in Durak you become the durak).')) return;
   send({ t: 'leave' });
   localStorage.removeItem('poker.token.' + S.room);
   S = null;
@@ -878,70 +905,3 @@ $('rankingsBtn').onclick = () => {
 $('rankingsClose').onclick = () => $('rankingsModal').classList.add('hidden');
 $('rankingsModal').onclick = (e) => { if (e.target.id === 'rankingsModal') e.target.classList.add('hidden'); };
 $('oddsToggle').classList.toggle('on', oddsOpen);
-
-// Collapsible host controls (remembered).
-function setHostCollapsed(c) {
-  $('hostPanel').classList.toggle('collapsed', c);
-  $('hostArrow').textContent = c ? '▸' : '▾';
-  localStorage.setItem('poker.hostCollapsed', c ? '1' : '0');
-}
-$('hostToggle').onclick = () => setHostCollapsed(!$('hostPanel').classList.contains('collapsed'));
-setHostCollapsed(localStorage.getItem('poker.hostCollapsed') === '1');
-
-// ---------- leaderboard ----------
-let lbMode = 'friends';
-async function loadLeaderboard() {
-  const NOTES = {
-    friends: 'Poker hands with at least 2 people. Ranked by total chips won (losses count, rebuys don\'t hide them).',
-    bots: 'Poker hands where you were the only person at the table, playing against bots.',
-    blackjack: 'Blackjack hands against the dealer. Ranked by total chips won.',
-    durak: 'Durak games: +1 point for escaping, −1 for being the durak.',
-  };
-  $('lbNote').textContent = NOTES[lbMode];
-  const heads = lbMode === 'durak'
-    ? ['#', 'Player', 'Points', 'Games', 'Escaped', 'Times durak']
-    : ['#', 'Player', 'Chips won', 'Hands', 'Won', lbMode === 'blackjack' ? 'Biggest win' : 'Biggest pot'];
-  document.querySelector('#leaderboardModal thead tr').innerHTML = heads.map((h) => `<th>${h}</th>`).join('');
-  $('lbBody').innerHTML = '<tr><td colspan="6" class="empty">Loading…</td></tr>';
-  const r = await api('/api/leaderboard?mode=' + lbMode).catch(() => ({ ok: false }));
-  if (!r.ok) { $('lbBody').innerHTML = '<tr><td colspan="6" class="empty">Could not load the leaderboard.</td></tr>'; return; }
-  if (!r.data.persistent) {
-    const warn = document.createElement('b');
-    warn.style.color = '#f4c95d';
-    warn.textContent = r.data.databaseError
-      ? `⚠ Test mode: the database connection failed (${r.data.databaseError}). Accounts and scores are deleted whenever the server restarts.`
-      : '⚠ Test mode: no database is connected, so accounts and scores are deleted whenever the server restarts.';
-    $('lbNote').append(document.createElement('br'), warn);
-  }
-  if (!r.data.rows.length) {
-    $('lbBody').innerHTML = '<tr><td colspan="6" class="empty">No results yet. Create an account and play a hand!</td></tr>';
-    return;
-  }
-  $('lbBody').innerHTML = '';
-  r.data.rows.forEach((row, i) => {
-    const tr = document.createElement('tr');
-    if (account && row.username.toLowerCase() === account.toLowerCase()) tr.className = 'me';
-    const medal = ['🥇', '🥈', '🥉'][i] || i + 1;
-    const net = Number(row.net);
-    const last = lbMode === 'durak' ? row.hands - row.wins : Number(row.biggest_pot || 0).toLocaleString();
-    tr.innerHTML = `<td>${medal}</td><td></td><td class="${net >= 0 ? 'pos' : 'neg'}">${net > 0 ? '+' : ''}${net.toLocaleString()}</td>
-      <td>${row.hands}</td><td>${Math.round((row.wins / row.hands) * 100)}%</td><td>${last}</td>`;
-    tr.children[1].textContent = row.username;
-    $('lbBody').appendChild(tr);
-  });
-}
-function openLeaderboard() { $('leaderboardModal').classList.remove('hidden'); loadLeaderboard(); }
-$('leaderboardBtn').onclick = () => {
-  if ($('leaderboardModal').classList.contains('hidden')) openLeaderboard();
-  else $('leaderboardModal').classList.add('hidden');
-};
-$('lobbyLeaderboard').onclick = openLeaderboard;
-$('leaderboardClose').onclick = () => $('leaderboardModal').classList.add('hidden');
-$('leaderboardModal').onclick = (e) => { if (e.target.id === 'leaderboardModal') e.target.classList.add('hidden'); };
-document.querySelectorAll('#leaderboardModal [data-mode]').forEach((b) => {
-  b.onclick = () => {
-    lbMode = b.dataset.mode;
-    document.querySelectorAll('#leaderboardModal [data-mode]').forEach((x) => x.classList.toggle('on', x === b));
-    loadLeaderboard();
-  };
-});
