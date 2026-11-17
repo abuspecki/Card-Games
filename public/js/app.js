@@ -14,10 +14,10 @@
 
   const GAME_NAMES = { holdem: "Texas Hold'em", blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette' };
   const ROOM_INFO = {
-    holdem: { tag: 'The Club Room', desc: 'The classic. Read the table, play your hand and outlast the room. No-Limit, up to eight players.', cards: [['A', 'spade'], ['K', 'spade']] },
-    blackjack: { tag: 'Salon Privé', desc: 'You against the house. Hit, stand, double or split — and draw as close to twenty-one as you dare.', cards: [['A', 'heart'], ['K', 'club']] },
-    durak: { tag: 'The Winter Palace', desc: 'The Russian classic. Attack, defend, and whatever you do — don\'t be the last one holding cards.', cards: [['6', 'heart'], ['Q', 'spade']] },
-    roulette: { tag: 'The Wheel Room', desc: 'One wheel, one zero, thirty-six numbers. Everyone bets at once — then the ball decides.' },
+    holdem: { tag: 'The Club Room', desc: 'No-Limit poker · up to 8 players', cards: [['A', 'spade'], ['K', 'spade']] },
+    blackjack: { tag: 'Salon Privé', desc: 'Beat the dealer to 21', cards: [['A', 'heart'], ['K', 'club']] },
+    durak: { tag: 'The Winter Palace', desc: 'Attack, defend — don\'t be the fool', cards: [['6', 'heart'], ['Q', 'spade']] },
+    roulette: { tag: 'The Wheel Room', desc: 'Red, black or your lucky number' },
   };
 
   // ---------------- state ----------------
@@ -405,7 +405,7 @@
         list.appendChild(row);
       }
     }
-    $('onlineLine').textContent = people ? `${people} ${people === 1 ? 'guest is' : 'guests are'} at the tables right now` : 'The tables are quiet — be the first to sit down.';
+    $('onlineLine').innerHTML = people ? `<i class="live-dot"></i>${people} playing now` : '<i class="live-dot"></i>Tables open — be the first';
   }
   setInterval(() => { if (!$('hub').classList.contains('hidden') && document.visibilityState === 'visible') loadTables(); }, 4000);
 

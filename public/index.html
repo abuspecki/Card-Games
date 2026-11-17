@@ -10,7 +10,7 @@
   <script src="js/theme.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:wght@700&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Italiana&family=Playfair+Display:wght@700&family=Prata&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:wght@700&family=Cinzel:wght@500;600;700;800&family=Montserrat:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Italiana&family=Playfair+Display:wght@700&family=Prata&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/hub.css">
   <link rel="stylesheet" href="css/holdem.css">
@@ -18,6 +18,7 @@
   <link rel="stylesheet" href="css/durak.css">
   <link rel="stylesheet" href="css/roulette.css">
   <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/vegas.css">
 </head>
 <body class="hub">
 
@@ -26,21 +27,20 @@
     <header class="nav">
       <a class="brand" href="#top" aria-label="CardGames home">
         <span class="crest">CG</span>
-        <span class="wordmark">CardGames<small>EST. MMXXVI</small></span>
+        <span class="wordmark">CardGames</span>
       </a>
       <nav class="links" aria-label="Main">
-        <a href="#rooms">The Rooms</a>
-        <a href="#" data-open="leaderboard">Leaderboard</a>
-        <a href="#" data-open="bank">The Bank</a>
-        <a href="#" data-open="shop">The Shop</a>
+        <a href="#rooms">Games</a>
+        <a href="#" data-open="shop">Shop</a>
+        <a href="#" data-open="bank">Bank</a>
+        <a href="#" data-open="leaderboard">Ranks</a>
         <a href="#" data-open="friends">Friends</a>
-        <a href="#" data-open="feedback">Feedback</a>
       </nav>
       <div class="actions">
         <button class="theme-toggle" data-theme-toggle aria-label="Switch between light and dark mode" title="Light / dark mode"><span class="ti-sun">☀</span><span class="ti-moon">☾</span></button>
         <div id="navGuest" class="nav-guest">
           <a class="signin" href="#" data-open="signin">Sign in</a>
-          <a class="btn btn-navy" href="#" data-open="register"><span class="long">Become a Member</span><span class="short">Join</span></a>
+          <a class="btn btn-navy" href="#" data-open="register"><span class="long">Join free</span><span class="short">Join</span></a>
         </div>
         <button id="navMember" class="nav-member hidden" data-open="lounge" aria-label="Open your lounge">
           <span class="nm-balances"><span><i class="ico-chip"></i><b id="navChips">0</b></span><span><i class="ico-coin"></i><b id="navCoins">0</b></span></span>
@@ -52,10 +52,10 @@
     </header>
     <div class="mobile-menu hidden" id="mobileMenu">
       <a href="#" data-open="signin" class="signin-link guest-only">Sign in</a>
-      <a href="#rooms">The Rooms</a>
-      <a href="#" data-open="leaderboard">Leaderboard</a>
-      <a href="#" data-open="bank">The Bank</a>
-      <a href="#" data-open="shop">The Shop</a>
+      <a href="#rooms">Games</a>
+      <a href="#" data-open="shop">Shop</a>
+      <a href="#" data-open="bank">Bank</a>
+      <a href="#" data-open="leaderboard">Ranks</a>
       <a href="#" data-open="friends">Friends</a>
       <a href="#" data-open="howto">How to play</a>
       <a href="#" data-open="feedback">Feedback</a>
@@ -68,59 +68,44 @@
     <section class="member-bar hidden" id="memberBar" aria-label="Your evening"></section>
 
     <section class="hero" id="top">
-      <p class="eyebrow">A private card room &nbsp;·&nbsp; Est. MMXXVI</p>
-      <h1>The finest tables,<br>open to <em>every guest.</em></h1>
-      <p class="lede">Texas Hold'em, Blackjack, Durak and Roulette — four distinguished rooms, each with its own table, its own manners, and a seat reserved for you.</p>
-      <div class="ornament" aria-hidden="true"><span></span><i></i><span></span></div>
-      <div class="cta-row">
-        <a class="btn btn-navy" href="#rooms">Choose Your Table</a>
-        <a class="btn btn-outline" href="#rules">Read the House Rules</a>
+      <div class="hero-fx" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="marquee">
+        <div class="bulbs" aria-hidden="true"></div>
+        <p class="eyebrow">★ Live card room ★</p>
+        <h1><span class="shine">CardGames</span></h1>
+        <p class="lede">Poker · Blackjack · Durak · Roulette</p>
       </div>
+      <div class="cta-row">
+        <a class="btn btn-gold" href="#rooms">Play now</a>
+        <button class="btn btn-ghost" data-open="howto">How to play</button>
+      </div>
+      <p class="online-pill" id="onlineLine">&nbsp;</p>
       <div class="trio" id="trio" aria-hidden="true"></div>
     </section>
 
     <section class="rooms" id="rooms">
       <header class="section-head">
-        <p class="eyebrow">The Rooms</p>
-        <h2>Four rooms. Four traditions.</h2>
-        <p class="section-sub" id="onlineLine">&nbsp;</p>
+        <h2>Pick your game</h2>
       </header>
       <p class="lobby-error" id="lobbyError" role="alert"></p>
       <div class="room-grid" id="roomGrid"></div>
     </section>
 
-    <section class="rules" id="rules">
-      <header class="section-head">
-        <p class="eyebrow">The House Rules</p>
-        <h2>Manners make the game.</h2>
-      </header>
-      <div class="rule-grid">
-        <div class="rule"><span class="num">I.</span><h3>A Fair Deal</h3><p>Every hand is dealt by the house from a freshly shuffled deck. What you see on the felt is what fate intended — nobody, not even a bot, sees your cards.</p></div>
-        <div class="rule"><span class="num">II.</span><h3>Chips &amp; Coins</h3><p>Chips are play money: members start with 5,000 and are topped up to 1,000 once a day if they run low. Coins are rewards: 1 for every 100 chips you win, spent in the Shop. Play money only — always.</p></div>
-        <div class="rule"><span class="num">III.</span><h3>Good Company</h3><p>Add friends, see who is at the tables and invite them to your seat. Short of company? Anyone at a table may invite a bot.</p></div>
-      </div>
-      <div class="cta-row rules-cta">
-        <button class="btn btn-outline" data-open="howto">How to play each game</button>
-        <button class="btn btn-outline" data-open="feedback">Send us feedback</button>
-      </div>
+    <section class="perks" id="rules">
+      <div class="perk"><b>♠ Fair deal</b><span>Shuffled by the house, every hand</span></div>
+      <div class="perk"><b>◉ Play money</b><span>Chips to play, coins as rewards</span></div>
+      <div class="perk"><b>♥ Friends &amp; bots</b><span>Invite friends or fill seats with bots</span></div>
     </section>
 
     <footer class="footer">
-      <div class="footer-top">
-        <div class="footer-brand">
-          <a class="brand" href="#top"><span class="crest">CG</span><span class="wordmark">CardGames</span></a>
-          <p>A private card room for the discerning player.</p>
-        </div>
-        <div class="footer-cols">
-          <div><h4>The Rooms</h4><a href="#rooms">Texas Hold'em</a><a href="#rooms">Blackjack</a><a href="#rooms">Durak</a></div>
-          <div><h4>The House</h4><a href="#rules">House Rules</a><a href="#" data-open="howto">How to play</a><a href="#" data-open="leaderboard">Leaderboard</a></div>
-          <div><h4>Correspondence</h4><a href="#" data-open="feedback">Feedback &amp; bugs</a><a href="/admin" class="owner-only hidden">Owner dashboard</a></div>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <span>© MMXXVI CardGames. Play money only — play responsibly.</span>
-        <em>Texas Hold'em &nbsp;·&nbsp; Blackjack &nbsp;·&nbsp; Durak</em>
-      </div>
+      <a class="brand" href="#top"><span class="crest">CG</span><span class="wordmark">CardGames</span></a>
+      <nav class="footer-links">
+        <a href="#" data-open="howto">How to play</a>
+        <a href="#" data-open="leaderboard">Ranks</a>
+        <a href="#" data-open="feedback">Feedback</a>
+        <a href="/admin" class="owner-only hidden">Owner dashboard</a>
+      </nav>
+      <small>Play money only — play responsibly. © 2026</small>
     </footer>
   </div>
 

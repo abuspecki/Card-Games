@@ -9,7 +9,7 @@
   const media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
   const listeners = [];
 
-  const mode = () => localStorage.getItem(KEY) || 'system';
+  const mode = () => localStorage.getItem(KEY) || 'dark';  // the casino look is dark by default
   const resolve = (m) => (m === 'system' ? (media && media.matches ? 'dark' : 'light') : m);
 
   function apply() {
