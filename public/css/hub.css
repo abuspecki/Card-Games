@@ -188,6 +188,11 @@ body.hub { background: var(--ivory); color: var(--ink); }
 .room-roulette .mini-wheel::after { content: ''; position: absolute; left: 50%; top: 9%; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #9A9A9A); }
 .room-roulette:hover .mini-wheel { transform: rotate(200deg); }
 
+.room-flamingo { --acc: #FFD1E6; --fg: #FFF2F8; background: radial-gradient(circle at 50% 35%, #FF7FB5, #D6407F 60%, #8E0F44); border: 2px solid #E8C468; }
+.room-flamingo h3 { font-family: 'Cormorant Garamond', serif; font-style: italic; }
+.room-flamingo .room-btn { background: linear-gradient(180deg, #FFE3F0, #FFB3D4); color: #5A0A30; }
+.room-flamingo .fan .fcard { left: 50%; top: 12px; margin-left: -43px; }
+
 /* ---------- House rules ---------- */
 .rules { background: var(--sand); padding: 96px var(--pad); display: flex; flex-direction: column; gap: 48px; }
 .rule-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; }

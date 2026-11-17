@@ -1,0 +1,101 @@
+/* =========================================================
+   Flamingo — "The Flamingo Lounge"
+   Pink cards with a gold edge; colours: cherry, violet, sun, teal.
+   ========================================================= */
+body.flamingo { --pink: #FF5FA2; --pink-d: #C2185B; --pink-l: #FFD1E6; --gilt: #E8C468; background: #1A0712; color: #FFEAF3; }
+.flamingo .stage { background: radial-gradient(ellipse at 50% 45%, #5A1838, #2E0A1D 60%, #1A0712); }
+.flamingo .stage > div { position: absolute; }
+.flamingo .table > div { position: absolute; }
+.flamingo .rail { inset: 0; border-radius: 50%; background: linear-gradient(180deg, #E8C468, #8A6414 50%, #5A410C); box-shadow: 0 30px 60px rgba(0,0,0,.6); }
+.flamingo .felt { inset: 16px; border-radius: 50%; background: radial-gradient(ellipse at 50% 45%, #FF8CBF, #E0518F 55%, #A3245E); box-shadow: inset 0 8px 40px rgba(90, 10, 45, .6); }
+.flamingo .ring { inset: 44px; border-radius: 50%; border: 1px dashed rgba(255, 236, 246, .45); }
+.flamingo .watermark { left: 0; right: 0; text-align: center; top: 46%; font: italic 700 72px 'Cormorant Garamond', serif; color: rgba(255, 240, 248, .16); letter-spacing: .04em; pointer-events: none; }
+.flamingo .layer { position: absolute; inset: 0; }
+.flamingo .layer > * { position: absolute; }
+
+/* ---------- the pink cards ---------- */
+.fcard { --w: 96px; width: var(--w); height: calc(var(--w) * 1.45); border-radius: calc(var(--w) * .1); position: absolute;
+  background: linear-gradient(160deg, #FFB3D4, #FF6FAA 55%, #E64A8E); border: calc(var(--w) * .035) solid #FFF4F9;
+  box-shadow: 0 0 0 1px #E8C468, 0 6px 14px rgba(60, 0, 30, .45); overflow: hidden; user-select: none; transition: transform .15s, box-shadow .15s; }
+.fcard .fc-oval { position: absolute; left: 50%; top: 50%; width: 78%; height: 58%; transform: translate(-50%, -50%) rotate(-28deg); border-radius: 50%;
+  background: #FFF7FB; display: grid; place-items: center; box-shadow: inset 0 0 0 calc(var(--w) * .03) var(--fc, #C2185B); overflow: hidden; }
+.fcard .fc-oval b { transform: rotate(28deg); font: 800 calc(var(--w) * .42)/1 'Montserrat', 'Cinzel', sans-serif; color: var(--fc, #C2185B); text-shadow: 1px 1px 0 rgba(0,0,0,.12); }
+.fcard .fc-corner { position: absolute; font: 800 calc(var(--w) * .17)/1 'Montserrat', sans-serif; color: #FFF4F9; text-shadow: 0 1px 2px rgba(80, 0, 40, .5); }
+.fcard .fc-corner.tl { left: 8%; top: 5%; }
+.fcard .fc-corner.br { right: 8%; bottom: 5%; transform: rotate(180deg); }
+.fcard.col-c { --fc: #D7263D; } .fcard.col-v { --fc: #6A3FB5; } .fcard.col-s { --fc: #E6A100; } .fcard.col-t { --fc: #0E9E8E; }
+.fcard.col-x { --fc: #8E0F44; background: linear-gradient(160deg, #D6407F, #A3245E 55%, #6E0B36); border-color: #FFF4F9; }
+.fcard.col-x .fc-oval { background: #FFF7FB; box-shadow: inset 0 0 0 calc(var(--w) * .035) #E8C468; }
+.fcard .q { position: absolute; width: 50%; height: 50%; }
+.fcard .q.c { left: 0; top: 0; background: #D7263D; } .fcard .q.v { right: 0; top: 0; background: #6A3FB5; }
+.fcard .q.s { left: 0; bottom: 0; background: #E6A100; } .fcard .q.t { right: 0; bottom: 0; background: #0E9E8E; }
+.fcard.col-x .fc-oval b { position: relative; z-index: 1; color: #FFF; text-shadow: 0 2px 6px rgba(0,0,0,.6); }
+.fcard.back { background: repeating-linear-gradient(45deg, #FF6FAA 0 10px, #FF85B8 10px 20px); border-color: #FFF4F9; }
+.fcard.back::before { content: ''; position: absolute; inset: 10%; border-radius: 50%; border: calc(var(--w) * .03) solid #E8C468; background: radial-gradient(circle, #C2185B, #8E0F44); }
+.fcard.back .fb-mono { position: absolute; inset: 0; display: grid; place-items: center; font: italic 700 calc(var(--w) * .42)/1 'Cormorant Garamond', serif; color: #F6D98A; }
+.flamingo .hand-card { cursor: default; }
+.flamingo .hand-card.playable { cursor: pointer; box-shadow: 0 0 0 2px #FFF4F9, 0 0 18px rgba(255, 210, 235, .95), 0 8px 18px rgba(0,0,0,.45); }
+.flamingo .hand-card.unplayable { filter: saturate(.55) brightness(.75); }
+.flamingo .hand-card.selected { box-shadow: 0 0 0 3px #E8C468, 0 0 30px rgba(232, 196, 104, .95); }
+.flamingo .hand-card.just-drawn { outline: 2px dashed #E8C468; outline-offset: 3px; }
+.flamingo .top-card { box-shadow: 0 0 0 1px #E8C468, 0 10px 30px rgba(0,0,0,.5); }
+.flamingo .deck-hit { background: transparent; border-radius: 10px; cursor: pointer; }
+.flamingo .deck-hit:disabled { cursor: default; }
+.flamingo .deck-hit:not(:disabled):hover { box-shadow: 0 0 0 3px #FFF4F9, 0 0 24px rgba(255, 200, 230, .8); }
+
+/* ---------- table furniture ---------- */
+.flamingo .dir-ring { border-radius: 50%; border: 2px dashed rgba(255, 244, 249, .55); pointer-events: none; }
+.flamingo .dir-ring.cw { animation: f-spin 14s linear infinite; } .flamingo .dir-ring.ccw { animation: f-spin 14s linear infinite reverse; }
+.flamingo .dir-ring.col-c { border-color: rgba(215, 38, 61, .8); } .flamingo .dir-ring.col-v { border-color: rgba(106, 63, 181, .85); }
+.flamingo .dir-ring.col-s { border-color: rgba(230, 161, 0, .9); } .flamingo .dir-ring.col-t { border-color: rgba(14, 158, 142, .9); }
+@keyframes f-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.flamingo .pile-label { padding: 2px 10px; border-radius: 999px; background: rgba(46, 10, 29, .75); font-size: 13px; white-space: nowrap; }
+.flamingo .pile-label.now { font-weight: 700; color: #fff; }
+.flamingo .pile-label.col-c { background: #D7263D; } .flamingo .pile-label.col-v { background: #6A3FB5; }
+.flamingo .pile-label.col-s { background: #B47E00; } .flamingo .pile-label.col-t { background: #0B7D70; }
+.flamingo .count { padding: 1px 8px; border-radius: 999px; background: rgba(46, 10, 29, .8); font: 700 13px 'Montserrat', sans-serif; transform: translateX(-50%); }
+.flamingo .plate { display: flex; align-items: center; gap: 8px; padding: 5px 14px 5px 5px; border-radius: 999px; background: rgba(46, 10, 29, .85); border: 1px solid rgba(255, 179, 212, .5); white-space: nowrap; }
+.flamingo .plate .avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: #8E0F44; overflow: hidden; font-size: 13px; }
+.flamingo .plate .col { display: flex; flex-direction: column; line-height: 1.15; }
+.flamingo .plate .name { font-size: 15px; }
+.flamingo .plate .role { font-size: 12px; font-style: italic; color: #FFB3D4; }
+.flamingo .plate.active { border-color: #E8C468; box-shadow: 0 0 0 2px #E8C468, 0 0 20px rgba(232, 196, 104, .6); }
+.flamingo .plate.last .role { color: #F6D98A; font-weight: 700; font-style: normal; }
+.flamingo .plate.winner { border-color: #E8C468; box-shadow: 0 0 0 3px #E8C468, 0 0 30px rgba(232, 196, 104, .8); }
+.flamingo .hint { padding: 7px 18px; border-radius: 999px; background: rgba(46, 10, 29, .85); border: 1px solid rgba(255, 179, 212, .45); font-style: italic; font-size: 16px; white-space: nowrap; }
+
+/* ---------- controls ---------- */
+.flamingo .controls { background: linear-gradient(0deg, #1A0712, rgba(26, 7, 18, .94)); border-top: 1px solid rgba(255, 179, 212, .3); }
+.f-bar { width: min(900px, 100%); display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px 18px; }
+.f-color { display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(255, 179, 212, .4); }
+.f-color small { font-size: 10px; letter-spacing: .25em; color: #FFB3D4; }
+.f-color .dot { width: 16px; height: 16px; border-radius: 50%; }
+.f-color .dot.col-c { background: #D7263D; } .f-color .dot.col-v { background: #6A3FB5; } .f-color .dot.col-s { background: #E6A100; } .f-color .dot.col-t { background: #0E9E8E; }
+.f-color em { font-style: normal; font-weight: 600; }
+.f-color .dir { font-size: 18px; color: #F6D98A; }
+.f-hint { font-style: italic; font-size: 14px; opacity: .85; text-align: center; }
+.f-buttons { display: flex; gap: 10px; align-items: center; }
+.f-buttons button { padding: 13px 22px; border-radius: 999px; font-weight: 700; min-height: 46px; white-space: nowrap; }
+.f-play { background: linear-gradient(180deg, #FFB3D4, #FF5FA2); color: #3A0620; }
+.f-play:disabled { opacity: .45; }
+.f-draw { border: 1px solid #FFB3D4; color: #FFEAF3; }
+.f-pick { display: flex; gap: 8px; }
+.f-pick .pick { color: #fff; padding: 12px 16px; }
+.f-pick .pick.col-c { background: #D7263D; } .f-pick .pick.col-v { background: #6A3FB5; } .f-pick .pick.col-s { background: #E6A100; color: #2A1A00; } .f-pick .pick.col-t { background: #0E9E8E; }
+.f-bar.my-turn .f-play:not(:disabled) { box-shadow: 0 0 20px rgba(255, 150, 200, .7); }
+body.flamingo .tbar { background: rgba(26, 7, 18, .92); border-bottom: 1px solid rgba(255, 179, 212, .3); color: #FFB3D4; }
+
+/* ---------- phones ---------- */
+body.portrait.flamingo .plate { padding: 3px 10px 3px 3px; gap: 6px; }
+body.portrait.flamingo .plate .avatar { width: 28px; height: 28px; font-size: 12px; }
+body.portrait.flamingo .plate .name { font-size: 12px; max-width: 80px; overflow: hidden; text-overflow: ellipsis; }
+body.portrait.flamingo .plate .role { font-size: 10px; }
+body.portrait.flamingo .hint { font-size: 12px; white-space: normal; text-align: center; max-width: 340px; }
+body.portrait.flamingo .pile-label { font-size: 10px; }
+@media (max-width: 760px) {
+  .f-bar { grid-template-columns: 1fr; gap: 6px; justify-items: center; }
+  .f-hint { display: none; }
+  .f-buttons { width: 100%; }
+  .f-buttons > button { flex: 1; padding: 12px 8px; }
+  .f-pick { flex: 1; } .f-pick .pick { flex: 1; padding: 12px 4px; font-size: 13px; }
+}

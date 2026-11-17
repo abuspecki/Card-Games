@@ -12,12 +12,13 @@
   const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
   window.TableUI = window.TableUI || {};
 
-  const GAME_NAMES = { holdem: "Texas Hold'em", blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette' };
+  const GAME_NAMES = { holdem: "Texas Hold'em", blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette', flamingo: 'Flamingo' };
   const ROOM_INFO = {
     holdem: { tag: 'The Club Room', desc: 'No-Limit poker · up to 8 players', cards: [['A', 'spade'], ['K', 'spade']] },
     blackjack: { tag: 'Salon Privé', desc: 'Beat the dealer to 21', cards: [['A', 'heart'], ['K', 'club']] },
     durak: { tag: 'The Winter Palace', desc: 'Attack, defend — don\'t be the fool', cards: [['6', 'heart'], ['Q', 'spade']] },
     roulette: { tag: 'The Wheel Room', desc: 'Red, black or your lucky number' },
+    flamingo: { tag: 'The Flamingo Lounge', desc: 'Match colour or number · up to 6' },
   };
 
   // ---------------- state ----------------
@@ -338,13 +339,17 @@
   function buildRooms() {
     const grid = $('roomGrid');
     grid.replaceChildren();
-    for (const game of ['holdem', 'blackjack', 'durak', 'roulette']) {
+    for (const game of ['holdem', 'blackjack', 'durak', 'roulette', 'flamingo']) {
       const info = ROOM_INFO[game];
       const art = h('article', `room room-${game}`);
       const vis = h('div', 'visual');
       if (game === 'blackjack') vis.appendChild(h('div', 'rays'));
       if (game === 'roulette') vis.appendChild(h('div', 'mini-wheel'));
-      else {
+      else if (game === 'flamingo') {
+        const fan = h('div', 'fan');
+        [['xWa', 'f-left'], ['c7a', 'f-right'], ['vRa', 'f-mid']].forEach(([c, cls]) => { const e = CardUI.flamingo(c, 86); e.style.position = 'absolute'; e.classList.add(cls); fan.appendChild(e); });
+        vis.appendChild(fan);
+      } else {
         const fan = h('div', 'fan');
         const b = CardUI.back(game, { size: 104, noOverride: true });
         const r = CardUI.card(info.cards[1][0], info.cards[1][1], { size: 104 });
@@ -488,7 +493,7 @@
     const st = S && S.state;
     const me = st && st.mySeat !== -1 ? st.seats[st.mySeat] : null;
     const playing = st && me && me.inHand && ['preflop', 'flop', 'turn', 'river', 'betting', 'playing', 'spinning'].includes(st.stage);
-    if (playing && !confirm(st.game === 'durak' ? 'Leave in the middle of a game? You will be the durak.' : 'Leave in the middle of a hand? You lose what you have bet.')) return;
+    if (playing && !confirm(st.game === 'durak' ? 'Leave in the middle of a game? You will be the durak.' : st.game === 'flamingo' ? 'Leave in the middle of a game? You give up this round.' : 'Leave in the middle of a hand? You lose what you have bet.')) return;
     send({ t: 'leave' });
     setTimeout(() => { if (App.tableId) backToHub(); }, 1500);
   }
@@ -556,7 +561,7 @@
       ctx.topbar.replaceChildren();
       ui.build(ctx);
       buildTopbar(game);
-      $('oddsTab').classList.toggle('hidden', game === 'durak' || game === 'roulette');
+      $('oddsTab').classList.toggle('hidden', game === 'durak' || game === 'roulette' || game === 'flamingo');
     }
     ctx.S = S;
     ctx.st = st;
@@ -594,7 +599,7 @@
   }
 
   // Top bar shared by every room (styled per room by its CSS).
-  const ROOM_TITLES = { holdem: ["Texas Hold'em", 'The Club Room'], blackjack: ['Blackjack', 'Salon Privé'], durak: ['Дурак', 'The Winter Palace'], roulette: ['Roulette', 'The Wheel Room'] };
+  const ROOM_TITLES = { holdem: ["Texas Hold'em", 'The Club Room'], blackjack: ['Blackjack', 'Salon Privé'], durak: ['Дурак', 'The Winter Palace'], roulette: ['Roulette', 'The Wheel Room'], flamingo: ['Flamingo', 'The Flamingo Lounge'] };
   function buildTopbar(game) {
     const tb = ctx.topbar;
     const [title, room] = ROOM_TITLES[game];
@@ -740,11 +745,11 @@
   function renderTableInfo(S, st) {
     const g = st.game;
     const s = st.settings || {};
-    const info = g === 'holdem' ? `Blinds ${s.smallBlind} / ${s.bigBlind}` : g === 'blackjack' || g === 'roulette' ? `Bets from ${st.minBet}` : 'Two to six players · 36 cards';
+    const info = g === 'holdem' ? `Blinds ${s.smallBlind} / ${s.bigBlind}` : g === 'blackjack' || g === 'roulette' ? `Bets from ${st.minBet}` : g === 'flamingo' ? 'Two to six players · 108 pink cards' : 'Two to six players · 36 cards';
     $('tableInfo').innerHTML = `<b>${esc(S.tableName)}</b><span>${esc(info)} · cards are dealt automatically once enough players are seated.</span>
       ${S.usesChips && App.account ? '<span>Your chips come from your bankroll and return to it when you leave.</span>' : S.usesChips ? '<span>As a guest you play with free table chips.</span>' : ''}`;
     const seated = st.seats.filter(Boolean).length;
-    const cap = g === 'durak' ? 6 : g === 'blackjack' ? 7 : 8;
+    const cap = g === 'durak' || g === 'flamingo' ? 6 : g === 'blackjack' ? 7 : 8;
     $('addBotBtn').disabled = seated >= cap;
     $('removeBotBtn').disabled = !st.seats.some((x) => x && x.isBot);
   }
@@ -1226,7 +1231,7 @@
   function statsTable(stats) {
     if (!stats.length) return '<p class="muted">No hands played yet.</p>';
     return `<table class="stats"><thead><tr><th>Game</th><th>Hands</th><th>Won</th><th>${'Result'}</th></tr></thead><tbody>
-      ${stats.map((s) => `<tr><td>${MODE_NAMES[s.mode] || esc(s.mode)}</td><td>${fmt(s.hands)}</td><td>${s.hands ? Math.round((s.wins / s.hands) * 100) : 0}%</td><td class="${s.net >= 0 ? 'pos' : 'neg'}">${s.mode === 'durak' ? `${s.net >= 0 ? '+' : ''}${s.net} pts` : `${s.net >= 0 ? '+' : ''}${fmt(s.net)}`}</td></tr>`).join('')}</tbody></table>`;
+      ${stats.map((s) => `<tr><td>${MODE_NAMES[s.mode] || esc(s.mode)}</td><td>${fmt(s.hands)}</td><td>${s.hands ? Math.round((s.wins / s.hands) * 100) : 0}%</td><td class="${s.net >= 0 ? 'pos' : 'neg'}">${s.mode === 'durak' || s.mode === 'flamingo' ? `${s.net >= 0 ? '+' : ''}${s.net} pts` : `${s.net >= 0 ? '+' : ''}${fmt(s.net)}`}</td></tr>`).join('')}</tbody></table>`;
   }
   async function paintMyProfile(body) {
     body.innerHTML = '<p class="muted">Loading…</p>';
@@ -1273,6 +1278,8 @@
         bots: 'Hold\'em hands played against the house\'s bots.',
         blackjack: 'Blackjack hands against the dealer. Ranked by chips won.',
         durak: 'Durak: +1 point for escaping, −1 for being the durak.',
+        roulette: 'Roulette spins. Ranked by chips won.',
+        flamingo: 'Flamingo: +1 point for every game you win.',
       };
       const load = async (m) => {
         note.textContent = NOTES[m];
@@ -1281,13 +1288,13 @@
         if (!r.ok) { body.textContent = 'Could not load the leaderboard.'; return; }
         const rows = r.data.rows;
         if (!rows.length) { body.innerHTML = '<p class="muted">No results yet. The first member to play takes the top spot.</p>'; return; }
-        body.innerHTML = `<table class="stats lb"><thead><tr><th>#</th><th>Member</th><th>${m === 'durak' ? 'Points' : 'Chips won'}</th><th>${m === 'durak' ? 'Games' : 'Hands'}</th><th>Won</th></tr></thead><tbody>
+        body.innerHTML = `<table class="stats lb"><thead><tr><th>#</th><th>Member</th><th>${m === 'durak' || m === 'flamingo' ? 'Points' : 'Chips won'}</th><th>${m === 'durak' || m === 'flamingo' ? 'Games' : 'Hands'}</th><th>Won</th></tr></thead><tbody>
           ${rows.map((x, i) => `<tr class="${App.account && x.username.toLowerCase() === App.account.username.toLowerCase() ? 'me' : ''}"><td>${['I', 'II', 'III'][i] || i + 1}</td><td><button class="link" data-prof="${esc(x.username)}">${esc(x.username)}</button></td>
             <td class="${x.net >= 0 ? 'pos' : 'neg'}">${x.net > 0 ? '+' : ''}${fmt(x.net)}</td><td>${fmt(x.hands)}</td><td>${Math.round((x.wins / x.hands) * 100)}%</td></tr>`).join('')}</tbody></table>`;
         body.querySelectorAll('[data-prof]').forEach((b) => { b.onclick = () => openProfile(b.dataset.prof); });
         if (!r.data.persistent) body.appendChild(h('p', 'fine warn', 'Test mode: no database is connected, so results are temporary.'));
       };
-      tabs(card, [['friends', 'Hold\'em'], ['bots', 'vs Bots'], ['blackjack', 'Blackjack'], ['durak', 'Durak'], ['roulette', 'Roulette']], load, mode);
+      tabs(card, [['friends', 'Hold\'em'], ['bots', 'vs Bots'], ['blackjack', 'Blackjack'], ['durak', 'Durak'], ['roulette', 'Roulette'], ['flamingo', 'Flamingo']], load, mode);
       card.append(note, body);
       load(mode);
     }, { wide: true });
@@ -1351,6 +1358,13 @@
       <li>Everyone bets at the same time until the clock runs out (or everybody pressed <b>Spin</b>). Then: <i>rien ne va plus</i> — the wheel spins.</li>
       <li><b>Payouts:</b> a single number pays <b>35 to 1</b>; a dozen or a column pays <b>2 to 1</b>; red/black, even/odd, 1–18/19–36 pay <b>1 to 1</b>.</li>
       <li>When the ball lands on <b>zero</b>, all bets except a bet on 0 are lost — that is the house's edge.</li></ol>`;
+  RULES.flamingo = `<ol class="rules-list">
+      <li><b>Goal:</b> be the first to play all your cards. Everyone starts with <b>7 pink cards</b>.</li>
+      <li>Four colours — <b>Cherry, Violet, Sun, Teal</b> — with numbers 0–9. On your turn, play a card that matches the <b>colour</b> or the <b>number</b> of the top card.</li>
+      <li>Nothing fits? <b>Draw</b> a card — if it fits you may play it at once, otherwise <b>pass</b>.</li>
+      <li><b>⊘ Skip</b>: the next player misses a turn. <b>⇄ Reverse</b>: play changes direction. <b>+2</b>: the next player draws two and misses a turn.</li>
+      <li><b>Wild</b>: play on anything and choose the next colour. <b>Wild +4</b>: the same, and the next player draws four and misses a turn.</li>
+      <li>Down to one card? Everyone sees “Last card!”. The first player with an empty hand wins 10 coins.</li></ol>`;
   const RANKINGS = [
     ['Royal Flush', 'As Ks Qs Js Ts', 'A, K, Q, J, 10 of one suit.'], ['Straight Flush', '9h 8h 7h 6h 5h', 'Five in a row, one suit.'],
     ['Four of a Kind', 'Qc Qd Qh Qs 4d', 'Four of one rank.'], ['Full House', 'Kh Kd Ks 7c 7h', 'Three of a kind and a pair.'],
@@ -1373,7 +1387,7 @@
           });
         }
       };
-      tabs(card, [['holdem', "Hold'em"], ['blackjack', 'Blackjack'], ['durak', 'Durak'], ['roulette', 'Roulette']], paint, game);
+      tabs(card, [['holdem', "Hold'em"], ['blackjack', 'Blackjack'], ['durak', 'Durak'], ['roulette', 'Roulette'], ['flamingo', 'Flamingo']], paint, game);
       card.appendChild(body);
       paint(game);
     }, { wide: true });

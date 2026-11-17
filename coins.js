@@ -323,10 +323,10 @@ function makeCoins(store) {
 }
 
 // Coins for one player's result: 1 per 100 chips won (at least 1 per win).
-// Durak has no chips: escaping a game earns 10 coins.
+// Durak and Flamingo have no chips: escaping Durak / winning Flamingo earns 10 coins.
 function rewardFor(r) {
   if (!r.won) return 0;
-  if (r.mode === 'durak') return 10;
+  if (r.mode === 'durak' || r.mode === 'flamingo') return 10;
   return coinsForWin(r.net);
 }
 

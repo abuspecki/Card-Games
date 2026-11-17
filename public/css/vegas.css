@@ -120,7 +120,8 @@ html[data-theme="light"] .marquee { background: radial-gradient(ellipse at 50% 0
 /* ---------- games ---------- */
 #hub .rooms { padding: 40px var(--pad) 60px; gap: 28px; }
 #hub .section-head h2 { font: 700 clamp(28px, 3.2vw, 44px)/1.1 var(--v-head); letter-spacing: .08em; background: var(--v-gold); -webkit-background-clip: text; background-clip: text; color: transparent; }
-#hub .room-grid { grid-template-columns: repeat(4, 1fr); max-width: none; gap: 20px; }
+#hub .room-grid { display: flex; flex-wrap: wrap; justify-content: center; max-width: 1200px; margin: 0 auto; gap: 20px; }
+#hub .room-grid > .room { flex: 0 1 calc((100% - 40px) / 3); min-width: 260px; }
 #hub .room { border-radius: 20px; padding: 20px 18px 22px; gap: 12px; border: 1px solid rgba(242, 207, 107, .45) !important;
   box-shadow: 0 20px 45px rgba(0, 0, 0, .45), inset 0 0 0 1px rgba(255, 255, 255, .04); }
 #hub .room:hover { transform: translateY(-8px); box-shadow: 0 30px 60px rgba(0, 0, 0, .55), 0 0 40px rgba(242, 207, 107, .22); }
@@ -162,9 +163,9 @@ html[data-theme="dark"] .mobile-menu { background: #081A11; border-bottom: 1px s
 .mobile-menu a { font-family: var(--v-body) !important; }
 
 /* ---------- responsive ---------- */
-@media (max-width: 1200px) { #hub .room-grid { grid-template-columns: repeat(2, 1fr); max-width: 900px; margin: 0 auto; } }
+@media (max-width: 1200px) { #hub .room-grid { max-width: 900px; } #hub .room-grid > .room { flex-basis: calc((100% - 20px) / 2); } }
 @media (max-width: 760px) {
-  #hub .room-grid { grid-template-columns: 1fr; max-width: 460px; }
+  #hub .room-grid { max-width: 460px; } #hub .room-grid > .room { flex-basis: 100%; }
   .perks { grid-template-columns: 1fr; }
   .marquee { padding: 26px 22px 22px; }
   #hub .hero { padding-top: 34px; }

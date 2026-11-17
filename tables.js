@@ -6,6 +6,7 @@ const bots = require('./bots');
 const { Blackjack } = require('./games/blackjack');
 const { Durak } = require('./games/durak');
 const { Roulette } = require('./games/roulette');
+const { Flamingo } = require('./games/flamingo');
 const { rewardFor, dayString, GESTURE_COOLDOWN } = require('./coins');
 
 const GAMES = {
@@ -13,6 +14,7 @@ const GAMES = {
   blackjack: { name: 'Blackjack', make: (settings) => new Blackjack(settings) },
   durak: { name: 'Durak', make: (settings) => new Durak(settings) },
   roulette: { name: 'Roulette', make: (settings) => new Roulette(settings) },
+  flamingo: { name: 'Flamingo', make: (settings) => new Flamingo(settings) },
 };
 
 // Two tables per game. `buyIn` is the stack you bring (from your bankroll if
@@ -25,6 +27,7 @@ const TABLES = [
   { id: 'DURAK-1', name: 'Durak · Table 1', game: 'durak', capacity: 6 },
   { id: 'DURAK-2', name: 'Durak · High Roller', game: 'durak', capacity: 6, highRoller: true, minBankroll: 10000 },
   { id: 'ROULETTE-1', name: 'Roulette · Table 1', game: 'roulette', capacity: 8, buyIn: 1000, minBuyIn: 100, settings: { bigBlind: 5 } },
+  { id: 'FLAMINGO-1', name: 'Flamingo · Table 1', game: 'flamingo', capacity: 6 },
   { id: 'ROULETTE-2', name: 'Roulette · High Roller', game: 'roulette', capacity: 8, highRoller: true, buyIn: 5000, minBuyIn: 1000, settings: { bigBlind: 25 } },
 ];
 
@@ -52,7 +55,7 @@ function createLobby(ctx) {
     };
   }
 
-  const usesChips = (room) => room.game !== 'durak';
+  const usesChips = (room) => room.game !== 'durak' && room.game !== 'flamingo';
   const seatedCount = (t) => t.seats.filter(Boolean).length;
 
   function send(ws, msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
@@ -109,7 +112,7 @@ function createLobby(ctx) {
         if (hasHuman(room)) { rebuyBots(t); if (t.canStart()) t.startHand(); else t.stage = 'waiting'; }
         else t.stage = 'waiting';
         pushState(room);
-      }, t.game === 'durak' ? NEXT_HAND_DELAY + 2000 : NEXT_HAND_DELAY);
+      }, t.game === 'durak' || t.game === 'flamingo' ? NEXT_HAND_DELAY + 2000 : NEXT_HAND_DELAY);
     }
     // Games with a clock (roulette): move on when the betting / spinning time is up.
     clearTimeout(room.phaseTimer);
