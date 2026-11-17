@@ -1,0 +1,196 @@
+/* =========================================================
+   CardGames — shared base styles
+   Cards, card backs, chips, buttons and the game "stage".
+   Used by every page (hub + all three games).
+   ========================================================= */
+
+*,
+*::before,
+*::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+body {
+  font-family: 'EB Garamond', Georgia, 'Times New Roman', serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+a { color: inherit; text-decoration: none; }
+button { font: inherit; cursor: pointer; border: 0; background: none; color: inherit; }
+button:disabled { cursor: not-allowed; opacity: .35; }
+svg { display: block; }
+
+/* ---------- Playing card (face) ----------
+   Size with --w (width). Height is always 1.4 × width.        */
+.card {
+  --w: 120px;
+  --ink: #14161C;
+  position: relative;
+  flex: none;
+  width: var(--w);
+  height: calc(var(--w) * 1.4);
+  border-radius: calc(var(--w) * .083);
+  background: #FBF7EC;
+  border: 1px solid #D9CFB8;
+  box-shadow: 0 calc(var(--w) * .066) calc(var(--w) * .17) rgba(0, 0, 0, .35);
+  color: var(--ink);
+  user-select: none;
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.card.red { --ink: #8E1B24; }
+.card::before {               /* thin inner frame */
+  content: '';
+  position: absolute;
+  inset: calc(var(--w) * .117) calc(var(--w) * .208);
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  opacity: .22;
+}
+.card .corner {
+  position: absolute;
+  top: calc(var(--w) * .05);
+  left: calc(var(--w) * .05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  font-size: calc(var(--w) * .183);
+  line-height: 1;
+}
+.card .corner svg { width: calc(var(--w) * .11); height: calc(var(--w) * .11); }
+.card .corner.br { top: auto; left: auto; bottom: calc(var(--w) * .05); right: calc(var(--w) * .05); transform: rotate(180deg); }
+.card .pip {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: calc(var(--w) * .43);
+  height: calc(var(--w) * .43);
+}
+.card svg path { fill: currentColor; }
+.card.selectable { cursor: pointer; }
+.card.selectable:hover { box-shadow: 0 10px 28px rgba(0, 0, 0, .45); }
+
+/* ---------- Card back (one theme per game) ---------- */
+.card-back {
+  --w: 120px;
+  --acc: #B08D57;
+  --bg1: #1E4632;
+  --bg2: #153424;
+  --mono-font: 'Cormorant Garamond', Georgia, serif;
+  position: relative;
+  flex: none;
+  width: var(--w);
+  height: calc(var(--w) * 1.4);
+  border-radius: calc(var(--w) * .083);
+  border: calc(var(--w) * .033) solid #FBF7EC;
+  background: radial-gradient(circle at 50% 50%, var(--bg1), var(--bg2));
+  box-shadow: 0 calc(var(--w) * .066) calc(var(--w) * .17) rgba(0, 0, 0, .35);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.card-back::before,
+.card-back::after {
+  content: '';
+  position: absolute;
+  border-radius: calc(var(--w) * .04);
+  pointer-events: none;
+}
+.card-back::before { inset: calc(var(--w) * .05);  border: 1px solid var(--acc); }
+.card-back::after  { inset: calc(var(--w) * .083); border: .75px solid var(--acc); opacity: .5; }
+.card-back .mono {
+  position: relative;
+  z-index: 2;
+  font-family: var(--mono-font);
+  font-weight: 700;
+  font-size: calc(var(--w) * .18);
+  color: var(--acc);
+  letter-spacing: .02em;
+}
+.card-back .deco { position: absolute; inset: 0; pointer-events: none; }
+
+/* Hold'em: green + brass, double ring */
+.card-back.holdem .deco::before,
+.card-back.holdem .deco::after {
+  content: ''; position: absolute; left: 50%; top: 50%; border-radius: 50%;
+  transform: translate(-50%, -50%); border: 1px solid var(--acc);
+}
+.card-back.holdem .deco::before { width: 48%; aspect-ratio: 1; }
+.card-back.holdem .deco::after  { width: 37%; aspect-ratio: 1; opacity: .5; }
+
+/* Blackjack: oxblood + gold, art-deco sunburst */
+.card-back.blackjack { --acc: #C9A45C; --bg1: #5A1A22; --bg2: #3E1016; --mono-font: 'Bodoni Moda', Georgia, serif; }
+.card-back.blackjack .mono { margin-top: -22%; }
+.card-back.blackjack .deco {
+  background: repeating-conic-gradient(from 0deg at 50% 90%, rgba(201, 164, 92, .4) 0 .7deg, transparent .7deg 10deg);
+  clip-path: inset(8% 8% 10% 8%);
+}
+.card-back.blackjack .deco::after {
+  content: ''; position: absolute; left: 50%; top: 90%; width: 36%; aspect-ratio: 1;
+  transform: translate(-50%, -50%); border-radius: 50%;
+  background: #5A1A22; border: 1px solid var(--acc);
+}
+
+/* Durak: navy + silver, lozenge */
+.card-back.durak { --acc: #C9CED6; --bg1: #14213D; --bg2: #0C1529; --mono-font: 'Prata', Georgia, serif; }
+.card-back.durak .mono { font-weight: 400; }
+.card-back.durak .deco::before {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 52%; aspect-ratio: 1;
+  transform: translate(-50%, -50%) rotate(45deg);
+  border: 1px solid rgba(201, 206, 214, .6);
+  outline: 1px solid rgba(201, 206, 214, .3); outline-offset: -8px;
+}
+
+/* ---------- Chips ---------- */
+.chip {
+  --s: 56px;
+  --bg: #1E4632;
+  --acc: #E9D9B0;
+  position: relative;
+  flex: none;
+  width: var(--s);
+  height: var(--s);
+  border-radius: 50%;
+  background: repeating-conic-gradient(var(--acc) 0 11deg, var(--bg) 11deg 30deg);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, .45);
+}
+.chip::before {
+  content: ''; position: absolute; inset: 9%; border-radius: 50%;
+  background: var(--bg);
+  box-shadow: inset 0 0 0 calc(var(--s) * .09) var(--bg), inset 0 0 0 calc(var(--s) * .09 + 1px) var(--acc);
+}
+.chip::after {
+  content: attr(data-v);
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font: 700 calc(var(--s) * .27)/1 'Cormorant Garamond', Georgia, serif;
+  color: var(--acc);
+}
+.chip.v5   { --bg: #F4EFE3; --acc: #8E1B24; }
+.chip.v25  { --bg: #8E1B24; --acc: #F4EFE3; }
+.chip.v100 { --bg: #1E4632; --acc: #E9D9B0; }
+.chip.v500 { --bg: #14213D; --acc: #C9A45C; }
+
+/* ---------- Game stage ----------
+   Every table is designed on a 1440×900 canvas and scaled to
+   fit the window (see CardUI.fitStage in js/cards.js).       */
+body.game { overflow: hidden; }
+.stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1440px;
+  height: 900px;
+  transform: translate(-50%, -50%);
+  transform-origin: center;
+  overflow: hidden;
+}
+.abs { position: absolute; }
+
+/* Small helpers used on the tables */
+.row { display: flex; align-items: center; }
+.col { display: flex; flex-direction: column; }
+.lobby-link { display: inline-flex; align-items: center; gap: 10px; }
+.lobby-link svg { width: 14px; height: 14px; }
+.lobby-link svg path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

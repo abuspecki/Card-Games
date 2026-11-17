@@ -78,6 +78,9 @@ for (let g = 0; g < 2000; g++) {
     assert(mv, 'player to act has no moves');
     assert(mv.cards.length || mv.canTake || mv.canPass, 'player to act cannot do anything');
     const d = g % 2 ? t.botAction(i) : (() => { // half the games: random legal moves
+      // (a defender who can beat usually does — always taking could pass the same
+      // cards back and forth forever, which no real player would do)
+      if (mv.canTake && mv.cards.length && Math.random() < 0.85) return { action: 'play', amount: mv.cards[Math.floor(Math.random() * mv.cards.length)] };
       const opts = mv.cards.map((c) => ({ action: 'play', amount: c }));
       if (mv.canTake) opts.push({ action: 'take' });
       if (mv.canPass) opts.push({ action: 'pass' });

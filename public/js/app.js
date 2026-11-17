@@ -1,0 +1,1179 @@
+/* =========================================================
+   CardGames — application shell
+   Hub, accounts, wallet & shop, friends, profiles, feedback,
+   leaderboard, rules, and the live table connection.
+   The three table views live in holdem.js / blackjack.js / durak.js
+   and register themselves in window.TableUI.
+   ========================================================= */
+(function () {
+  const { fmt } = CardUI;
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+  window.TableUI = window.TableUI || {};
+
+  const GAME_NAMES = { holdem: "Texas Hold'em", blackjack: 'Blackjack', durak: 'Durak' };
+  const ROOM_INFO = {
+    holdem: { tag: 'The Club Room', desc: 'The classic. Read the table, play your hand and outlast the room. No-Limit, up to eight players.', cards: [['A', 'spade'], ['K', 'spade']] },
+    blackjack: { tag: 'Salon Privé', desc: 'You against the house. Hit, stand, double or split — and draw as close to twenty-one as you dare.', cards: [['A', 'heart'], ['K', 'club']] },
+    durak: { tag: 'The Winter Palace', desc: 'The Russian classic. Attack, defend, and whatever you do — don\'t be the last one holding cards.', cards: [['6', 'heart'], ['Q', 'spade']] },
+  };
+
+  // ---------------- state ----------------
+  const App = window.App = {
+    session: localStorage.getItem('cg.session') || localStorage.getItem('poker.session'),
+    account: null,     // { username, isOwner }
+    wallet: null,      // wallet status from the server
+    shop: null,        // { items, slots, rules }
+    tables: [],        // lobby summaries
+    S: null,           // latest table state message
+    ws: null,
+    tableId: null,
+    game: null,
+    layout: 'land',
+  };
+  if (App.session) localStorage.setItem('cg.session', App.session);
+
+  // ---------------- api ----------------
+  async function api(path, body, method) {
+    const opts = { method: method || (body ? 'POST' : 'GET'), headers: { 'Content-Type': 'application/json' } };
+    if (App.session) opts.headers.Authorization = 'Bearer ' + App.session;
+    if (body) opts.body = JSON.stringify(body);
+    try {
+      const r = await fetch(path, opts);
+      const data = await r.json().catch(() => ({}));
+      if (r.status === 401 && App.account && path !== '/api/me') signedOut();
+      return { ok: r.ok, status: r.status, data };
+    } catch {
+      return { ok: false, status: 0, data: { error: 'Network problem — please try again' } };
+    }
+  }
+  App.api = api;
+
+  // ---------------- toasts & coin pop ----------------
+  function toast(msg, opts = {}) {
+    const t = h('div', 'toast' + (opts.kind ? ' ' + opts.kind : ''));
+    t.appendChild(h('span', '', esc(msg)));
+    if (opts.action) {
+      const b = h('button', 'toast-btn', esc(opts.action.label));
+      b.onclick = () => { t.remove(); opts.action.fn(); };
+      t.appendChild(b);
+    }
+    const x = h('button', 'toast-x', '✕');
+    x.setAttribute('aria-label', 'Dismiss');
+    x.onclick = () => t.remove();
+    t.appendChild(x);
+    $('toasts').appendChild(t);
+    setTimeout(() => t.remove(), opts.timeout || 4500);
+  }
+  App.toast = toast;
+
+  function coinPop(amount, label, kind = 'coin') {
+    const el = $('coinPop');
+    el.innerHTML = `<b>+${fmt(amount)} <i class="ico-${kind}"></i></b><span>${esc(label)}</span>`;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+  }
+  $('coinPop').addEventListener('animationend', () => $('coinPop').classList.remove('show'));
+
+  // ---------------- modal ----------------
+  let modalOnClose = null;
+  function openModal(build, opts = {}) {
+    const card = $('modalCard');
+    card.className = 'modal-card' + (opts.wide ? ' wide' : '') + (opts.theme ? ' ' + opts.theme : '');
+    card.replaceChildren();
+    const close = h('button', 'modal-x', '✕');
+    close.setAttribute('aria-label', 'Close');
+    close.onclick = closeModal;
+    card.appendChild(close);
+    build(card);
+    $('modal').classList.remove('hidden');
+    document.body.classList.add('modal-open');
+    modalOnClose = opts.onClose || null;
+    const first = card.querySelector('input, textarea, select');
+    if (first && window.innerWidth > 700) setTimeout(() => first.focus(), 50);
+  }
+  function closeModal() {
+    $('modal').classList.add('hidden');
+    document.body.classList.remove('modal-open');
+    if (modalOnClose) { const f = modalOnClose; modalOnClose = null; f(); }
+  }
+  App.openModal = openModal;
+  App.closeModal = closeModal;
+  $('modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeModal(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('modal').classList.contains('hidden')) closeModal(); });
+
+  function modalHead(card, eyebrow, title) {
+    card.appendChild(h('p', 'eyebrow', esc(eyebrow)));
+    card.appendChild(h('h2', 'modal-title', title));
+    card.appendChild(h('div', 'ornament small', '<span></span><i></i><span></span>'));
+  }
+  function tabs(container, items, onPick, current) {
+    const bar = h('div', 'mtabs');
+    items.forEach(([key, label]) => {
+      const b = h('button', key === current ? 'on' : '', label);
+      b.onclick = () => { bar.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); onPick(key); };
+      bar.appendChild(b);
+    });
+    container.appendChild(bar);
+    return bar;
+  }
+
+  // ---------------- data-open buttons ----------------
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('[data-open]');
+    if (!a) return;
+    e.preventDefault();
+    closeMobileMenu();
+    const what = a.dataset.open;
+    if (what === 'signin') authModal('login');
+    else if (what === 'register') authModal('register');
+    else if (what === 'lounge') openLounge();
+    else if (what === 'leaderboard') openLeaderboard();
+    else if (what === 'feedback') openFeedback();
+    else if (what === 'howto') openHowTo(App.game || 'holdem');
+  });
+
+  // mobile menu
+  function closeMobileMenu() { $('mobileMenu').classList.add('hidden'); $('navBurger').setAttribute('aria-expanded', 'false'); }
+  $('navBurger').onclick = () => {
+    const open = $('mobileMenu').classList.toggle('hidden');
+    $('navBurger').setAttribute('aria-expanded', String(!open));
+  };
+  $('mobileMenu').addEventListener('click', (e) => { if (e.target.closest('a')) closeMobileMenu(); });
+
+  // ================= ACCOUNTS =================
+  function authModal(mode, note) {
+    openModal((card) => {
+      modalHead(card, 'Members', mode === 'login' ? 'Welcome back' : 'Become a <em>member</em>');
+      if (note) card.appendChild(h('p', 'modal-note', esc(note)));
+      tabs(card, [['login', 'Sign in'], ['register', 'Become a member']], (k) => { mode = k; paint(); }, mode);
+      const form = h('form', 'mform');
+      form.innerHTML = `
+        <label>Username<input name="u" maxlength="16" autocomplete="username" required></label>
+        <label>Password<input name="p" type="password" maxlength="100" required></label>
+        <p class="merror" role="alert"></p>
+        <button class="btn btn-navy wide" type="submit"></button>
+        <p class="fine"></p>`;
+      card.appendChild(form);
+      const paint = () => {
+        card.querySelector('.modal-title').innerHTML = mode === 'login' ? 'Welcome back' : 'Become a <em>member</em>';
+        form.querySelector('button').textContent = mode === 'login' ? 'Sign in' : 'Create my membership';
+        form.p.autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+        form.querySelector('.fine').textContent = mode === 'login'
+          ? 'Forgotten your details? Send us a note via Feedback.'
+          : 'Members receive 5,000 chips and 200 coins, keep their winnings and appear on the leaderboard. 3–16 letters, numbers, _ or -; password of 6+ characters.';
+        form.querySelector('.merror').textContent = '';
+      };
+      paint();
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        const r = await api(mode === 'login' ? '/api/login' : '/api/register', { username: form.u.value.trim(), password: form.p.value });
+        if (!r.ok) { form.querySelector('.merror').textContent = r.data.error || 'Something went wrong'; return; }
+        App.session = r.data.token;
+        localStorage.setItem('cg.session', App.session);
+        closeModal();
+        await loadAccount();
+        toast(mode === 'login' ? `Welcome back, ${r.data.username}.` : `Welcome to the club, ${r.data.username}. 5,000 chips are waiting for you.`, { kind: 'good' });
+        if (App.pendingJoin) { const id = App.pendingJoin; App.pendingJoin = null; joinTable(id); }
+      };
+    });
+  }
+
+  function guestModal(tableId) {
+    openModal((card) => {
+      modalHead(card, 'A seat for you', 'How shall we <em>call you?</em>');
+      card.appendChild(h('p', 'modal-note', 'Guests play with free table chips. Members keep their winnings, collect coins and appear on the leaderboard.'));
+      const form = h('form', 'mform');
+      form.innerHTML = `<label>Your name<input name="n" maxlength="16" required value="${esc(localStorage.getItem('cg.guestName') || '')}"></label>
+        <button class="btn btn-navy wide" type="submit">Take my seat as a guest</button>
+        <button class="btn btn-outline wide" type="button" data-member>Sign in or become a member</button>`;
+      card.appendChild(form);
+      form.onsubmit = (e) => {
+        e.preventDefault();
+        const n = form.n.value.trim().replace(/[<>]/g, '');
+        if (!n) return;
+        localStorage.setItem('cg.guestName', n);
+        closeModal();
+        connectAndJoin(tableId, n);
+      };
+      form.querySelector('[data-member]').onclick = () => { App.pendingJoin = tableId; authModal('login'); };
+    });
+  }
+
+  async function loadAccount() {
+    if (!App.session) { renderAccount(); return; }
+    const r = await api('/api/me');
+    if (r.ok) App.account = { username: r.data.username, isOwner: r.data.isOwner };
+    else if (r.status === 401) { App.session = null; localStorage.removeItem('cg.session'); App.account = null; }
+    renderAccount();
+    if (App.account) { await loadWallet(); pollPresence(); }
+  }
+
+  function signedOut() {
+    App.session = null; App.account = null; App.wallet = null;
+    localStorage.removeItem('cg.session');
+    renderAccount();
+    applyCosmetics();
+  }
+
+  async function logout() {
+    await api('/api/logout', {});
+    signedOut();
+    closeModal();
+    toast('You have signed out. Do come again.');
+  }
+
+  function renderAccount() {
+    const a = App.account;
+    $('navGuest').classList.toggle('hidden', !!a);
+    $('navMember').classList.toggle('hidden', !a);
+    document.querySelectorAll('.owner-only').forEach((x) => x.classList.toggle('hidden', !(a && a.isOwner)));
+    if (a) {
+      $('navAvatar').textContent = myAvatar();
+      $('navChips').textContent = fmt(App.wallet ? App.wallet.chips : 0);
+      $('navCoins').textContent = fmt(App.wallet ? App.wallet.coins : 0);
+    }
+    renderTopbarWallet();
+  }
+
+  const initials = (name) => String(name || '?').slice(0, 2).toUpperCase();
+  function myAvatar() {
+    const id = App.wallet && App.wallet.equipped && App.wallet.equipped.avatar;
+    const item = id && App.shop && App.shop.items.find((i) => i.id === id);
+    return item ? item.preview : initials(App.account && App.account.username);
+  }
+
+  // ================= WALLET =================
+  async function loadShop() {
+    if (App.shop) return App.shop;
+    const r = await api('/api/shop');
+    if (r.ok) App.shop = r.data;
+    return App.shop;
+  }
+  async function loadWallet() {
+    if (!App.account) return;
+    await loadShop();
+    const r = await api('/api/wallet');
+    if (r.ok) { App.wallet = r.data; renderAccount(); applyCosmetics(); }
+  }
+  App.loadWallet = loadWallet;
+
+  async function walletAction(path, body) {
+    const r = await api(path, body || {});
+    if (!r.ok) { toast(r.data.error || 'Something went wrong', { kind: 'bad' }); return null; }
+    if (r.data.wallet) { App.wallet = r.data.wallet; renderAccount(); applyCosmetics(); }
+    return r.data;
+  }
+
+  // Apply bought cosmetics (card back / face / felt / background) to this screen.
+  function applyCosmetics() {
+    const eq = (App.wallet && App.wallet.equipped) || {};
+    const pick = (slot) => { const it = eq[slot] && App.shop && App.shop.items.find((i) => i.id === eq[slot]); return it ? it.preview : ''; };
+    CardUI.backOverride = pick('cardback') ? 'cb-' + pick('cardback') : null;
+    document.body.dataset.cardface = pick('cardface');
+    document.body.dataset.felt = pick('felt');
+    document.body.dataset.bg = pick('background');
+    if (App.S) renderTable();
+  }
+
+  // ================= HUB: rooms & tables =================
+  function buildTrio() {
+    const trio = $('trio');
+    [['holdem', -16], ['durak', 16], ['blackjack', 0]].forEach(([theme, deg]) => {
+      const b = CardUI.back(theme, { size: 150, noOverride: true });
+      b.style.setProperty('--rot', deg + 'deg');
+      b.classList.add('trio-' + theme);
+      trio.appendChild(b);
+    });
+  }
+
+  function buildRooms() {
+    const grid = $('roomGrid');
+    grid.replaceChildren();
+    for (const game of ['holdem', 'blackjack', 'durak']) {
+      const info = ROOM_INFO[game];
+      const art = h('article', `room room-${game}`);
+      const vis = h('div', 'visual');
+      if (game === 'blackjack') vis.appendChild(h('div', 'rays'));
+      const fan = h('div', 'fan');
+      const b = CardUI.back(game, { size: 104, noOverride: true });
+      const r = CardUI.card(info.cards[1][0], info.cards[1][1], { size: 104 });
+      const m = CardUI.card(info.cards[0][0], info.cards[0][1], { size: 104 });
+      b.classList.add('f-left'); r.classList.add('f-right'); m.classList.add('f-mid');
+      fan.append(b, r, m);
+      vis.appendChild(fan);
+      art.appendChild(vis);
+      art.appendChild(h('p', 'tag', esc(info.tag)));
+      art.appendChild(h('h3', '', game === 'durak' ? 'Durak <span lang="ru">Дурак</span>' : esc(GAME_NAMES[game])));
+      art.appendChild(h('p', 'desc', esc(info.desc)));
+      art.appendChild(h('hr'));
+      const list = h('div', 'room-tables');
+      list.dataset.game = game;
+      art.appendChild(list);
+      const help = h('button', 'room-help', 'How to play');
+      help.onclick = () => openHowTo(game);
+      art.appendChild(help);
+      grid.appendChild(art);
+    }
+  }
+
+  async function loadTables() {
+    if (!$('hub').classList.contains('hidden') || !App.tables.length) {
+      const r = await api('/api/tables');
+      if (r.ok) { App.tables = r.data.tables; renderTables(); }
+    }
+  }
+
+  function renderTables() {
+    let people = 0;
+    for (const list of document.querySelectorAll('.room-tables')) {
+      list.replaceChildren();
+      for (const t of App.tables.filter((x) => x.game === list.dataset.game)) {
+        people += t.humans;
+        const seated = t.humans + t.bots;
+        const full = seated >= t.capacity && t.bots === 0;
+        const row = h('div', 'rt' + (t.highRoller ? ' hr' : ''));
+        const lock = t.highRoller && !App.account;
+        const short = App.account && App.wallet && (t.minBankroll ? App.wallet.chips < t.minBankroll : t.highRoller && App.wallet.chips < t.minBuyIn);
+        row.innerHTML = `
+          <div class="rt-head"><b>${esc(t.name.split('·')[1] || t.name)}</b>
+            <span class="rt-status ${t.playing ? 'live' : ''}">${t.playing ? '● In play' : seated ? 'Waiting' : 'Empty'}</span></div>
+          <div class="rt-seats"></div>
+          <div class="rt-meta">${esc(t.stakes)}${t.buyIn ? ` · buy-in ${fmt(t.buyIn)}` : ''}${t.minBankroll ? ` · members with ${fmt(t.minBankroll)}+ chips` : t.highRoller ? ' · members only' : ''}</div>`;
+        const seats = row.querySelector('.rt-seats');
+        for (let k = 0; k < t.capacity; k++) {
+          const p = t.players[k];
+          const d = h('span', 'rt-seat' + (p ? (p.bot ? ' bot' : ' human') : ''), p ? esc(p.bot ? '🤖' : (p.avatar || p.name[0].toUpperCase())) : '');
+          d.title = p ? p.name : 'Open seat';
+          seats.appendChild(d);
+        }
+        const btn = h('button', 'btn room-btn', full ? 'Table full' : lock ? 'Members only' : short ? 'Not enough chips' : 'Take a Seat');
+        btn.disabled = full;
+        btn.onclick = () => joinTable(t.id);
+        row.appendChild(btn);
+        list.appendChild(row);
+      }
+    }
+    $('onlineLine').textContent = people ? `${people} ${people === 1 ? 'guest is' : 'guests are'} at the tables right now` : 'The tables are quiet — be the first to sit down.';
+  }
+  setInterval(() => { if (!$('hub').classList.contains('hidden') && document.visibilityState === 'visible') loadTables(); }, 4000);
+
+  // ================= JOINING A TABLE =================
+  function joinTable(id) {
+    const t = App.tables.find((x) => x.id === id);
+    $('lobbyError').textContent = '';
+    if (t && t.highRoller && !App.account) { App.pendingJoin = id; authModal('login', 'The High Roller tables are reserved for members.'); return; }
+    if (!App.account) { guestModal(id); return; }
+    connectAndJoin(id);
+  }
+  App.joinTable = joinTable;
+
+  function connectAndJoin(id, guestName) {
+    Sound.unlock();
+    if (App.ws) { App.ws.onclose = null; App.ws.close(); }
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${proto}://${location.host}`);
+    App.ws = ws;
+    App.joining = id;
+    ws.onopen = () => ws.send(JSON.stringify({
+      t: 'join', room: id, session: App.session, name: guestName || localStorage.getItem('cg.guestName') || 'Guest',
+      token: localStorage.getItem('cg.seat.' + id),
+    }));
+    ws.onmessage = (e) => onMessage(JSON.parse(e.data));
+    ws.onclose = () => {
+      if (App.tableId && App.ws === ws) { toast('Connection lost — reconnecting…'); setTimeout(() => { if (App.tableId) connectAndJoin(App.tableId, guestName); }, 1500); }
+    };
+  }
+
+  const send = (m) => { if (App.ws && App.ws.readyState === 1) App.ws.send(JSON.stringify(m)); };
+  App.send = send;
+
+  function onMessage(m) {
+    if (m.t === 'joined') {
+      localStorage.setItem('cg.seat.' + m.room, m.token);
+      App.tableId = m.room;
+      history.replaceState(null, '', '?table=' + m.room);
+      setTimeout(loadWallet, 300); // the buy-in moved chips from your bankroll
+      return;
+    }
+    if (m.t === 'error') {
+      if (!App.tableId) { App.joining = null; showError(m.msg); if (App.ws) { App.ws.onclose = null; App.ws.close(); } }
+      else toast(m.msg, { kind: 'bad' });
+      return;
+    }
+    if (m.t === 'state') {
+      App.S = m;
+      if ($('tableScreen').classList.contains('hidden')) showTable();
+      renderTable();
+      return;
+    }
+    if (m.t === 'sfx') { Sound.play(m.name); return; }
+    if (m.t === 'coins') {
+      if (App.wallet) { App.wallet.coins = m.coins; renderAccount(); }
+      if (m.amount > 0) { coinPop(m.amount, m.capped ? 'Daily table limit reached' : 'For your win'); Sound.play('chips'); }
+      return;
+    }
+    if (m.t === 'notice') { toast(m.msg, { kind: 'good', timeout: 7000 }); return; }
+    if (m.t === 'left') { backToHub(); return; }
+    if (m.t === 'kicked') { toast(m.msg, { kind: 'bad', timeout: 10000 }); backToHub(); signedOut(); }
+  }
+
+  function showError(msg) {
+    if ($('hub').classList.contains('hidden')) { toast(msg, { kind: 'bad' }); return; }
+    $('lobbyError').textContent = msg;
+    toast(msg, { kind: 'bad' });
+    $('rooms').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function leaveTable() {
+    const S = App.S;
+    const st = S && S.state;
+    const me = st && st.mySeat !== -1 ? st.seats[st.mySeat] : null;
+    const playing = st && me && me.inHand && ['preflop', 'flop', 'turn', 'river', 'betting', 'playing'].includes(st.stage);
+    if (playing && !confirm(st.game === 'durak' ? 'Leave in the middle of a game? You will be the durak.' : 'Leave in the middle of a hand? You lose what you have bet.')) return;
+    send({ t: 'leave' });
+    setTimeout(() => { if (App.tableId) backToHub(); }, 1500);
+  }
+  App.leaveTable = leaveTable;
+
+  function backToHub() {
+    if (App.tableId) localStorage.removeItem('cg.seat.' + App.tableId);
+    App.tableId = null; App.S = null; App.game = null;
+    if (App.ws) { App.ws.onclose = null; App.ws.close(); App.ws = null; }
+    $('tableScreen').classList.add('hidden');
+    $('hub').classList.remove('hidden');
+    document.body.className = 'hub';
+    applyCosmetics();
+    history.replaceState(null, '', location.pathname);
+    lastChatId = null;
+    loadTables();
+    loadWallet();
+  }
+
+  // ================= TABLE SCREEN =================
+  function showTable() {
+    $('hub').classList.add('hidden');
+    $('tableScreen').classList.remove('hidden');
+    window.scrollTo(0, 0);
+    setDrawer(window.innerWidth >= 1280 && localStorage.getItem('cg.drawer') !== '0');
+  }
+
+  function computeLayout() {
+    const wrap = $('stageWrap');
+    const w = wrap.clientWidth || window.innerWidth;
+    const hgt = wrap.clientHeight || window.innerHeight;
+    return w / hgt < 1.15 ? 'port' : 'land'; // upright unless clearly wider than tall
+  }
+
+  // Shared helpers every table view receives.
+  const ctx = {
+    stage: $('stage'), controls: $('controls'), topbar: $('tbar'), send, esc, h, fmt, toast,
+    leave: () => leaveTable(),
+    openDrawer: (tab) => { setDrawer(true); if (tab) pickTab(tab); },
+    openRules: () => openHowTo(App.game),
+    plates: {},   // seat index -> [x, y] on the stage (for chat bubbles)
+    avatarHtml: (s) => esc(s.avatar || initials(s.name)),
+    nameHtml: (s) => `${s.badge ? `<span class="badge">${esc(s.badge)}</span>` : ''}${s.isBot ? '<span class="botmark" title="Computer player">🤖</span>' : ''}${esc(s.name)}`,
+  };
+  App.ctx = ctx;
+
+  function renderTable() {
+    const S = App.S;
+    if (!S) return;
+    const st = S.state;
+    const game = st.game || 'holdem';
+    const layout = computeLayout();
+    const ui = window.TableUI[game];
+    if (!ui) return;
+    document.body.className = `game ${game} ${layout === 'port' ? 'portrait' : 'landscape'}${$('drawer').classList.contains('open') ? ' drawer-open' : ''}`;
+    if (App.game !== game || App.layout !== layout) {
+      App.game = game;
+      App.layout = layout;
+      ctx.layout = layout;
+      ctx.stage.replaceChildren();
+      ctx.controls.replaceChildren();
+      ctx.topbar.replaceChildren();
+      ui.build(ctx);
+      buildTopbar(game);
+      $('oddsTab').classList.toggle('hidden', game === 'durak');
+    }
+    ctx.S = S;
+    ctx.st = st;
+    ctx.plates = {};
+    fit();
+    ui.render(st, S, ctx);
+    renderChat(st);
+    renderBubbles(st);
+    renderLog(st);
+    renderTableInfo(S, st);
+    renderOdds(st);
+    const title = document.querySelector('[data-tb-title]');
+    if (title) title.textContent = S.tableName.replace(/^[^·]*·\s*/, '') + (st.game === 'holdem' ? ` · Blinds ${st.settings.smallBlind} / ${st.settings.bigBlind}` : st.game === 'blackjack' ? ` · Bets from ${st.minBet}` : st.stage !== 'waiting' ? ` · Game ${st.handNo}` : '');
+    renderTopbarWallet();
+    myTurnSound(st);
+  }
+  App.renderTable = renderTable;
+
+  function fit() {
+    const ui = window.TableUI[App.game];
+    if (!ui) return;
+    const [w, hh] = App.layout === 'port' ? ui.size.port : ui.size.land;
+    CardUI.fitStage($('stage'), w, hh, $('stageWrap'));
+  }
+  window.addEventListener('resize', () => {
+    if (!App.S) return;
+    if (computeLayout() !== App.layout) renderTable(); else fit();
+  });
+
+  let wasMyTurn = false;
+  function myTurnSound(st) {
+    const mine = st.toAct !== -1 && st.toAct === st.mySeat;
+    if (mine && !wasMyTurn) Sound.play('turn');
+    wasMyTurn = mine;
+  }
+
+  // Top bar shared by every room (styled per room by its CSS).
+  const ROOM_TITLES = { holdem: ["Texas Hold'em", 'The Club Room'], blackjack: ['Blackjack', 'Salon Privé'], durak: ['Дурак', 'The Winter Palace'] };
+  function buildTopbar(game) {
+    const tb = ctx.topbar;
+    const [title, room] = ROOM_TITLES[game];
+    tb.innerHTML = `
+      <button class="lobby-link" data-act="lobby"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg><span>Lobby</span></button>
+      <div class="tb-center"><small>${esc(game === 'durak' ? 'Durak' : title)} · ${esc(room)}</small><strong data-tb-title></strong></div>
+      <div class="tb-right"><span data-topbar-wallet></span>
+        <button class="tb-btn" data-act="rules" title="How to play" aria-label="How to play">?</button>
+        <button class="tb-btn" data-act="panel" title="Chat & table" aria-label="Open chat and table panel">☰<span class="dot hidden" data-chat-dot></span></button></div>`;
+    tb.querySelector('[data-act=lobby]').onclick = leaveTable;
+    tb.querySelector('[data-act=rules]').onclick = () => openHowTo(game);
+    tb.querySelector('[data-act=panel]').onclick = () => setDrawer(!$('drawer').classList.contains('open'));
+  }
+
+  // The table top bar shows your bankroll / coins (members only).
+  function renderTopbarWallet() {
+    const el = document.querySelector('[data-topbar-wallet]');
+    if (!el) return;
+    if (!App.account || !App.wallet) { el.innerHTML = '<span class="tb-guest">Guest</span>'; return; }
+    el.innerHTML = `<button class="tb-wallet" title="Your lounge"><span><i class="ico-chip"></i>${fmt(App.wallet.chips)}</span><span><i class="ico-coin"></i>${fmt(App.wallet.coins)}</span></button>`;
+    el.querySelector('button').onclick = () => openLounge();
+  }
+  App.renderTopbarWallet = renderTopbarWallet;
+
+  // ----- drawer (chat / log / odds / table) -----
+  function setDrawer(open) {
+    $('drawer').classList.toggle('open', open);
+    document.body.classList.toggle('drawer-open', open);
+    if (window.innerWidth >= 1280) localStorage.setItem('cg.drawer', open ? '1' : '0');
+    if (open && currentTab === 'chat') $('chatDot').classList.add('hidden');
+    document.querySelectorAll('[data-chat-dot]').forEach((d) => d.classList.toggle('hidden', open || !unread));
+    if (open) unread = false;
+    setTimeout(() => { if (App.S) fit(); }, 260);
+  }
+  App.setDrawer = setDrawer;
+  $('drawerClose').onclick = () => setDrawer(false);
+  let currentTab = 'chat';
+  function pickTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('#drawer [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+    document.querySelectorAll('#drawer [data-pane]').forEach((p) => p.classList.toggle('hidden', p.dataset.pane !== tab));
+    if (tab === 'chat') { $('chatDot').classList.add('hidden'); $('chatList').scrollTop = $('chatList').scrollHeight; }
+    if (tab === 'log') $('logList').scrollTop = $('logList').scrollHeight;
+    if (tab === 'table') renderInvites();
+    if (tab === 'odds' && App.S) renderOdds(App.S.state);
+  }
+  document.querySelectorAll('#drawer [data-tab]').forEach((b) => { b.onclick = () => pickTab(b.dataset.tab); });
+
+  // ----- chat & bubbles -----
+  let lastChatId = null;
+  let unread = false;
+  const bubbles = {};
+  function renderChat(st) {
+    const msgs = st.chat || [];
+    const newest = msgs.length ? msgs[msgs.length - 1].id : 0;
+    if (lastChatId !== null) {
+      for (const m of msgs) {
+        if (m.id <= lastChatId || m.seat < 0) continue;
+        bubbles[m.seat] = { text: m.text, until: Date.now() + 5000 };
+        setTimeout(() => { if (App.S) renderBubbles(App.S.state); }, 5100);
+        const drawerOpen = $('drawer').classList.contains('open');
+        if (m.seat !== st.mySeat && (!drawerOpen || currentTab !== 'chat')) {
+          unread = true;
+          $('chatDot').classList.remove('hidden');
+          document.querySelectorAll('[data-chat-dot]').forEach((d) => d.classList.toggle('hidden', drawerOpen));
+        }
+      }
+    }
+    lastChatId = newest;
+    const list = $('chatList');
+    const atBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 10;
+    list.replaceChildren();
+    if (!msgs.length) list.appendChild(h('p', 'empty', 'No messages yet. Say good evening.'));
+    for (const m of msgs) {
+      const d = h('div', 'msg' + (m.seat === st.mySeat ? ' mine' : ''));
+      d.innerHTML = `<b></b><span></span><time>${new Date(m.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>`;
+      d.querySelector('b').textContent = m.from;
+      d.querySelector('span').textContent = m.text;
+      list.appendChild(d);
+    }
+    if (atBottom) list.scrollTop = list.scrollHeight;
+  }
+
+  function renderBubbles(st) {
+    document.querySelectorAll('.stage .bubble').forEach((b) => b.remove());
+    for (const [seat, b] of Object.entries(bubbles)) {
+      const pos = ctx.plates[seat];
+      if (!pos || b.until < Date.now()) { if (b.until < Date.now()) delete bubbles[seat]; continue; }
+      const el = h('div', 'bubble');
+      el.textContent = b.text.length > 80 ? b.text.slice(0, 77) + '…' : b.text;
+      el.style.left = pos[0] + 'px';
+      el.style.top = pos[1] + 'px';
+      $('stage').appendChild(el);
+    }
+  }
+
+  $('chatForm').onsubmit = (e) => {
+    e.preventDefault();
+    const text = $('chatInput').value.trim();
+    if (text) send({ t: 'chat', text });
+    $('chatInput').value = '';
+  };
+
+  function renderLog(st) {
+    const list = $('logList');
+    const atBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 10;
+    list.replaceChildren();
+    for (const line of st.log) if (typeof line === 'string') list.appendChild(h('p', line.startsWith('—') ? 'hand' : '', esc(line)));
+    if (atBottom) list.scrollTop = list.scrollHeight;
+  }
+
+  function renderTableInfo(S, st) {
+    const g = st.game;
+    const s = st.settings || {};
+    const info = g === 'holdem' ? `Blinds ${s.smallBlind} / ${s.bigBlind}` : g === 'blackjack' ? `Bets from ${st.minBet}` : 'Two to six players · 36 cards';
+    $('tableInfo').innerHTML = `<b>${esc(S.tableName)}</b><span>${esc(info)} · cards are dealt automatically once enough players are seated.</span>
+      ${S.usesChips && App.account ? '<span>Your chips come from your bankroll and return to it when you leave.</span>' : S.usesChips ? '<span>As a guest you play with free table chips.</span>' : ''}`;
+    const seated = st.seats.filter(Boolean).length;
+    const cap = g === 'durak' ? 6 : g === 'blackjack' ? 7 : 8;
+    $('addBotBtn').disabled = seated >= cap;
+    $('removeBotBtn').disabled = !st.seats.some((x) => x && x.isBot);
+  }
+  $('addBotBtn').onclick = () => send({ t: 'addBot' });
+  $('removeBotBtn').onclick = () => send({ t: 'removeBot' });
+  $('copyLinkBtn').onclick = () => {
+    const url = `${location.origin}${location.pathname}?table=${App.tableId}`;
+    (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => toast('Table link copied — send it to a friend.'), () => toast(url));
+  };
+
+  // ----- sound controls -----
+  function paintSound() { $('muteBtn').textContent = Sound.muted ? 'Sound off' : 'Sound on'; }
+  $('muteBtn').onclick = () => { Sound.toggleMute(); paintSound(); };
+  $('volume').value = Sound.volume;
+  $('volume').oninput = (e) => { Sound.setVolume(Number(e.target.value)); Sound.play('chips'); };
+  paintSound();
+
+  // ================= ODDS (drawer tab) =================
+  let oddsWorker = null, oddsKey = '', oddsResult = null, oddsReq = 0;
+  const HAND_NAMES = ['High Card', 'Pair', 'Two Pair', 'Three of a Kind', 'Straight', 'Flush', 'Full House', 'Four of a Kind', 'Straight Flush'];
+  function renderOdds(st) {
+    const body = $('oddsBody');
+    if (currentTab !== 'odds' && !(window.TableUI[st.game] && window.TableUI[st.game].wantsOdds)) return;
+    if (st.game === 'blackjack') { body.innerHTML = blackjackTips(st); return; }
+    if (st.game !== 'holdem') { body.innerHTML = ''; return; }
+    const me = st.mySeat !== -1 ? st.seats[st.mySeat] : null;
+    const inHand = me && me.inHand && !me.folded && me.hole && ['preflop', 'flop', 'turn', 'river'].includes(st.stage);
+    if (!inHand) { body.innerHTML = '<p class="muted">Your chances appear here while you play a hand.</p>'; return; }
+    const opponents = st.seats.filter((s, i) => s && i !== st.mySeat && s.inHand && !s.folded).length;
+    const key = [st.handNo, me.hole.join(''), st.board.join(''), opponents].join('|');
+    if (key !== oddsKey) {
+      oddsKey = key; oddsResult = null;
+      if (!oddsWorker) {
+        oddsWorker = new Worker('odds-worker.js');
+        oddsWorker.onmessage = (e) => { if (e.data.id === oddsReq) { oddsResult = e.data; if (App.S) renderOdds(App.S.state); } };
+      }
+      oddsWorker.postMessage({ id: ++oddsReq, hole: me.hole, board: st.board, variant: 'holdem', opponents: Math.max(1, opponents) });
+    }
+    if (!oddsResult) { body.innerHTML = '<p class="muted">Calculating…</p>'; return; }
+    const pct = (x) => (x > 0 && x < 0.01 ? '<1' : Math.round(x * 100)) + '%';
+    const win = oddsResult.win;
+    let html = `<div class="odds-big">${pct(win)}</div><div class="meter"><i style="width:${win * 100}%"></i></div>
+      <p class="muted">chance to win against ${opponents} player${opponents === 1 ? '' : 's'}${me.handName ? ` · you hold <b>${esc(me.handName)}</b>` : ''}</p>`;
+    const lim = st.limits;
+    if (lim && lim.toCall > 0) {
+      const need = lim.toCall / (st.pot + lim.toCall);
+      html += `<p class="verdict ${win >= need ? 'good' : 'bad'}">Calling ${fmt(lim.toCall)} to win ${fmt(st.pot)} needs ${pct(need)}. ${win >= need ? 'The odds favour a call.' : 'The price is steep.'}</p>`;
+    }
+    if (st.stage !== 'river') {
+      html += '<h4>By the river</h4><div class="made">';
+      oddsResult.made.map((p, cat) => ({ p, cat })).filter((r) => r.p >= 0.005).sort((a, b) => b.cat - a.cat).slice(0, 6)
+        .forEach((r) => { html += `<span>${HAND_NAMES[r.cat]}</span><i><b style="width:${r.p * 100}%"></b></i><em>${pct(r.p)}</em>`; });
+      html += '</div>';
+    }
+    body.innerHTML = html + '<p class="fine">An estimate against random hands. Nobody\'s cards are peeked.</p>';
+  }
+
+  function blackjackTips(st) {
+    const me = st.mySeat !== -1 ? st.seats[st.mySeat] : null;
+    const lim = st.limits;
+    if (!me || !lim || lim.phase !== 'play' || !me.hands[lim.handIdx]) return '<p class="muted">Advice appears on your turn.</p>';
+    const hand = me.hands[lim.handIdx];
+    const tip = window.TableUI.blackjack.advise(hand.cards, st.dealer.cards[0], lim);
+    return `<p class="muted">You hold <b>${hand.soft && hand.total < 21 ? 'soft ' : ''}${hand.total}</b> against the dealer's ${esc(CardUI.nameOf(st.dealer.cards[0]))}.</p>
+      <div class="odds-big">${tip.bust}%</div><div class="meter"><i style="width:${tip.bust}%"></i></div>
+      <p class="muted">chance to bust if you hit</p>
+      <p class="verdict good">The book says: <b>${tip.move}</b>.</p>
+      <p class="fine">Based on basic strategy — the mathematically soundest play.</p>`;
+  }
+
+  // ================= LOUNGE (wallet · shop · friends · profile) =================
+  let loungeTab = 'wallet';
+  async function openLounge(tab) {
+    if (!App.account) { authModal('login'); return; }
+    if (tab) loungeTab = tab;
+    await loadWallet();
+    openModal((card) => {
+      modalHead(card, `The Members' Lounge`, `Good evening, <em>${esc(App.account.username)}</em>`);
+      const body = h('div', 'lounge-body');
+      tabs(card, [['wallet', 'Wallet'], ['shop', 'The Shop'], ['friends', 'Friends'], ['profile', 'My Profile']], (k) => { loungeTab = k; paintLounge(body); }, loungeTab);
+      card.appendChild(body);
+      const foot = h('div', 'lounge-foot');
+      if (App.account.isOwner) foot.appendChild(h('a', 'btn btn-outline', 'Owner dashboard')).setAttribute('href', '/admin');
+      const out = h('button', 'btn btn-outline', 'Sign out');
+      out.onclick = logout;
+      foot.appendChild(out);
+      card.appendChild(foot);
+      paintLounge(body);
+    }, { wide: true });
+  }
+  App.openLounge = openLounge;
+
+  function paintLounge(body) {
+    body.replaceChildren();
+    if (loungeTab === 'wallet') paintWallet(body);
+    else if (loungeTab === 'shop') paintShop(body);
+    else if (loungeTab === 'friends') paintFriends(body);
+    else paintMyProfile(body);
+  }
+
+  function untilText(t) {
+    const mins = Math.max(1, Math.ceil((t - Date.now()) / 60000));
+    const hh = Math.floor(mins / 60), m = mins % 60;
+    return hh ? `${hh}h ${m}m` : `${m}m`;
+  }
+
+  function paintWallet(body) {
+    const w = App.wallet;
+    if (!w) { body.textContent = 'Loading…'; return; }
+    const d = w.daily;
+    const c = w.convert;
+    body.innerHTML = `
+      <div class="balances">
+        <div class="bal"><small>Bankroll</small><strong><i class="ico-chip"></i>${fmt(w.chips)}</strong><em>chips to play with</em></div>
+        <div class="bal"><small>At the tables</small><strong><i class="ico-chip"></i>${fmt(w.inPlay)}</strong><em>returns when you leave</em></div>
+        <div class="bal"><small>Coins</small><strong><i class="ico-coin"></i>${fmt(w.coins)}</strong><em>for the shop</em></div>
+      </div>
+      <div class="wcards">
+        <section class="wcard">
+          <h4>The Daily Bonus</h4>
+          <p>Visit every day for a growing gift of coins — up to 250 on the seventh day in a row.</p>
+          <div class="streak">${[1, 2, 3, 4, 5, 6, 7].map((k) => `<span class="${k <= d.streak ? 'done' : ''}${d.ready && k === Math.min(d.streak + 1, 7) ? ' next' : ''}">${k}</span>`).join('')}</div>
+          <button class="btn btn-navy wide" data-daily ${d.ready ? '' : 'disabled'}>${d.ready ? `Collect ${d.amount} coins` : `Next gift in ${untilText(d.nextAt)} · ${d.amount} coins`}</button>
+        </section>
+        <section class="wcard">
+          <h4>The Exchange</h4>
+          <p>Turn chips you have <em>won</em> into coins: ${fmt(c.rate)} chips buy 1 coin. You always keep your first ${fmt(c.floor)} chips, and up to ${c.dailyMax} coins may be exchanged per day.</p>
+          ${c.maxCoins > 0 ? `
+            <div class="exchange">
+              <input type="range" min="1" max="${c.maxCoins}" value="${c.maxCoins}" data-conv-range aria-label="Coins to receive">
+              <div class="row gap"><input type="number" min="1" max="${c.maxCoins}" value="${c.maxCoins}" data-conv-num aria-label="Coins"><span>coins for <b data-conv-chips>${fmt(c.maxCoins * c.rate)}</b> chips</span></div>
+            </div>
+            <button class="btn btn-navy wide" data-convert>Exchange</button>`
+    : `<p class="muted">${c.usedToday >= c.dailyMax ? 'You have exchanged today\'s maximum. Come back tomorrow.' : `Nothing to exchange yet — win chips above ${fmt(c.floor)} at the tables first.`}</p>`}
+          <p class="fine">Exchanged today: ${c.usedToday} / ${c.dailyMax} coins</p>
+        </section>
+        <section class="wcard">
+          <h4>Hard Luck?</h4>
+          ${w.bankrupt.eligible
+    ? `<p>Out of chips? The house will stake you ${fmt(w.bankrupt.amount)} chips to keep playing.</p>
+             <button class="btn btn-navy wide" data-bankrupt ${w.bankrupt.ready ? '' : 'disabled'}>${w.bankrupt.ready ? `Receive ${fmt(w.bankrupt.amount)} chips` : `Next stake in ${untilText(w.bankrupt.nextAt)}`}</button>`
+    : `<p>Should your bankroll ever run dry (under ${w.bankrupt.below} chips), the house will stake you ${fmt(w.bankrupt.amount)} fresh chips. It also happens automatically when you sit down with nothing left.</p>`}
+          <h4 class="mt">Coins from the tables</h4>
+          <p>Win a hand, a Blackjack or escape a game of Durak to earn coins — double at the High Roller tables. Today: ${fmt(w.earnedToday)} / ${fmt(w.tableCap)}.</p>
+        </section>
+      </div>`;
+    const daily = body.querySelector('[data-daily]');
+    if (daily) daily.onclick = async () => { const r = await walletAction('/api/wallet/daily'); if (r) { coinPop(r.amount, r.streak > 1 ? `Day ${r.streak} in a row` : 'Daily bonus'); Sound.play('win'); paintLounge(body); } };
+    const bk = body.querySelector('[data-bankrupt]');
+    if (bk) bk.onclick = async () => { const r = await walletAction('/api/wallet/bankrupt'); if (r) { coinPop(r.amount, 'A fresh stake', 'chip'); Sound.play('chips'); paintLounge(body); } };
+    const range = body.querySelector('[data-conv-range]');
+    if (range) {
+      const num = body.querySelector('[data-conv-num]');
+      const sync = (v) => { v = Math.max(1, Math.min(c.maxCoins, Math.floor(Number(v)) || 1)); range.value = v; num.value = v; body.querySelector('[data-conv-chips]').textContent = fmt(v * c.rate); };
+      range.oninput = () => sync(range.value);
+      num.oninput = () => sync(num.value);
+      body.querySelector('[data-convert]').onclick = async () => {
+        const r = await walletAction('/api/wallet/convert', { coins: Number(num.value) });
+        if (r) { coinPop(r.converted, `For ${fmt(r.spentChips)} chips`); Sound.play('chips'); paintLounge(body); }
+      };
+    }
+  }
+
+  // ----- shop -----
+  const SLOT_INFO = {
+    cardback: ['Card backs', 'The back of every face-down card — on your screen.'],
+    cardface: ['Card faces', 'How the faces of the cards are printed — on your screen.'],
+    felt: ['Table felt', 'The cloth of every table you sit at — on your screen.'],
+    background: ['Backgrounds', 'The wallpaper of the club and the rooms — on your screen.'],
+    avatar: ['Portraits', 'Your portrait on the nameplate — everyone at your table sees it.'],
+    badge: ['Badges', 'A small mark beside your name — everyone sees it.'],
+  };
+  let shopSlot = 'cardback';
+  function shopPreview(item) {
+    const box = h('div', 'shop-preview');
+    if (item.slot === 'cardback') {
+      const b = CardUI.back('holdem', { size: 56, noOverride: true });
+      b.className = 'card-back ' + (item.preview === 'classic' ? 'holdem' : 'cb-' + item.preview);
+      box.appendChild(b);
+    } else if (item.slot === 'cardface') {
+      const wrap = h('div', 'face-' + item.preview);
+      wrap.append(CardUI.card('Q', 'diamond', { size: 52 }), CardUI.card('7', 'club', { size: 52 }));
+      box.appendChild(wrap);
+    } else if (item.slot === 'felt') box.appendChild(h('div', 'mini-felt', '')).dataset.felt = item.preview;
+    else if (item.slot === 'background') box.appendChild(h('div', 'mini-bg', '')).dataset.bg = item.preview;
+    else if (item.slot === 'avatar') box.appendChild(h('span', 'mini-avatar', esc(item.preview === 'classic' ? initials(App.account.username) : item.preview)));
+    else box.appendChild(h('span', 'mini-badge', `${item.preview === 'classic' ? '' : esc(item.preview) + ' '}${esc(App.account.username)}`));
+    return box;
+  }
+  function paintShop(body) {
+    const w = App.wallet;
+    const head = h('div', 'shop-head', `<span>Your coins: <b><i class="ico-coin"></i>${fmt(w.coins)}</b></span>`);
+    body.appendChild(head);
+    const sub = h('div', 'subtabs');
+    for (const slot of App.shop.slots) {
+      const b = h('button', slot === shopSlot ? 'on' : '', SLOT_INFO[slot][0]);
+      b.onclick = () => { shopSlot = slot; paintLounge(body); };
+      sub.appendChild(b);
+    }
+    body.appendChild(sub);
+    body.appendChild(h('p', 'fine', esc(SLOT_INFO[shopSlot][1])));
+    const grid = h('div', 'shop-grid');
+    const equipped = w.equipped[shopSlot];
+    const def = h('div', 'shop-item' + (!equipped ? ' on' : ''));
+    def.appendChild(shopPreview({ slot: shopSlot, preview: 'classic' }));
+    def.appendChild(h('b', '', shopSlot === 'badge' ? 'No badge' : shopSlot === 'avatar' ? 'Initials' : 'House classic'));
+    def.appendChild(h('em', '', 'Free'));
+    const db = h('button', 'pill', equipped ? 'Use' : 'In use');
+    db.disabled = !equipped;
+    db.onclick = async () => { if (await walletAction('/api/shop/equip', { slot: shopSlot, item: null })) paintLounge(body); };
+    def.appendChild(db);
+    grid.appendChild(def);
+    for (const item of App.shop.items.filter((i) => i.slot === shopSlot)) {
+      const owned = w.owned.includes(item.id);
+      const on = equipped === item.id;
+      const el = h('div', 'shop-item' + (on ? ' on' : '') + (owned ? ' owned' : ''));
+      el.appendChild(shopPreview(item));
+      el.appendChild(h('b', '', esc(item.name)));
+      el.appendChild(h('em', '', owned ? 'In your collection' : `<i class="ico-coin"></i>${fmt(item.price)}`));
+      const b = h('button', 'pill');
+      if (on) { b.textContent = 'In use'; b.disabled = true; }
+      else if (owned) { b.textContent = 'Use'; b.onclick = async () => { if (await walletAction('/api/shop/equip', { slot: item.slot, item: item.id })) paintLounge(body); }; }
+      else {
+        const short = item.price - w.coins;
+        b.textContent = short > 0 ? `${fmt(short)} more coins` : 'Purchase';
+        b.className = 'pill gold';
+        b.disabled = short > 0;
+        b.onclick = async () => {
+          if (!confirm(`Purchase "${item.name}" for ${fmt(item.price)} coins?`)) return;
+          if (await walletAction('/api/shop/buy', { item: item.id })) {
+            Sound.play('win');
+            await walletAction('/api/shop/equip', { slot: item.slot, item: item.id });
+            toast(`"${item.name}" is yours.`, { kind: 'good' });
+            paintLounge(body);
+          }
+        };
+      }
+      el.appendChild(b);
+      grid.appendChild(el);
+    }
+    body.appendChild(grid);
+  }
+
+  // ----- friends -----
+  async function paintFriends(body) {
+    body.innerHTML = '<p class="muted">Loading…</p>';
+    const r = await api('/api/friends');
+    if (!r.ok) { body.textContent = r.data.error; return; }
+    const list = r.data.friends;
+    body.replaceChildren();
+    const form = h('form', 'add-friend');
+    form.innerHTML = '<input name="u" maxlength="16" placeholder="Add a friend by username" aria-label="Friend\'s username"><button class="btn btn-navy" type="submit">Send request</button>';
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const u = form.u.value.trim();
+      if (!u) return;
+      const x = await api('/api/friends/request', { username: u });
+      if (!x.ok) toast(x.data.error, { kind: 'bad' });
+      else toast(x.data.status === 'friend' ? `You and ${u} are now friends.` : `Request sent to ${u}.`, { kind: 'good' });
+      paintFriends(body);
+    };
+    body.appendChild(form);
+    const received = list.filter((f) => f.status === 'received');
+    const sent = list.filter((f) => f.status === 'sent');
+    const friends = list.filter((f) => f.status === 'friend').sort((a, b) => b.online - a.online);
+    const section = (title, items, row) => {
+      if (!items.length) return;
+      body.appendChild(h('h4', 'mt', esc(title)));
+      const ul = h('div', 'flist');
+      items.forEach((f) => ul.appendChild(row(f)));
+      body.appendChild(ul);
+    };
+    const who = (f) => {
+      const d = h('button', 'fwho');
+      d.innerHTML = `<span class="mini-avatar">${esc(f.avatar || initials(f.username))}</span><span><b>${esc(f.username)}</b><em>${f.status !== 'friend' ? '' : f.online ? (f.where ? `At ${esc(f.where.tableName)}` : 'Online') : 'Offline'}</em></span>${f.status === 'friend' ? `<i class="presence ${f.online ? 'on' : ''}"></i>` : ''}`;
+      d.onclick = () => openProfile(f.username);
+      return d;
+    };
+    const btn = (label, cls, fn) => { const b = h('button', 'pill ' + (cls || ''), label); b.onclick = fn; return b; };
+    const act = async (path, username, msg) => { const x = await api(path, { username }); if (!x.ok) toast(x.data.error, { kind: 'bad' }); else if (msg) toast(msg); paintFriends(body); pollPresence(); };
+    const respond = async (username, accept) => {
+      const x = await api('/api/friends/respond', { username, accept });
+      if (!x.ok) toast(x.data.error, { kind: 'bad' });
+      else if (accept) toast(`You and ${username} are now friends.`, { kind: 'good' });
+      paintFriends(body);
+      pollPresence();
+    };
+    section('Requests for you', received, (f) => {
+      const row = h('div', 'frow');
+      row.append(who(f), btn('Accept', 'gold', () => respond(f.username, true)), btn('Decline', 'quiet', () => respond(f.username, false)));
+      return row;
+    });
+    section('Your friends', friends, (f) => {
+      const row = h('div', 'frow');
+      row.appendChild(who(f));
+      if (f.where) row.appendChild(btn('Join', 'gold', () => { closeModal(); joinTable(f.where.table); }));
+      if (App.tableId && f.online) row.appendChild(btn('Invite', '', () => inviteFriend(f.username)));
+      row.appendChild(btn('Remove', 'quiet', () => { if (confirm(`Remove ${f.username} from your friends?`)) act('/api/friends/remove', f.username); }));
+      return row;
+    });
+    section('Waiting for an answer', sent, (f) => {
+      const row = h('div', 'frow');
+      row.append(who(f), btn('Cancel', 'quiet', () => act('/api/friends/remove', f.username)));
+      return row;
+    });
+    if (!list.length) body.appendChild(h('p', 'muted mt', 'No friends yet. Add someone by their username — once they accept, you can see when they are online and invite them to your table.'));
+  }
+
+  async function inviteFriend(username) {
+    if (!App.tableId) return;
+    const r = await api('/api/friends/invite', { username, table: App.tableId });
+    toast(r.ok ? `Invitation sent to ${username}.` : r.data.error, { kind: r.ok ? 'good' : 'bad' });
+  }
+
+  async function renderInvites() {
+    const box = $('inviteList');
+    if (!App.account) { box.innerHTML = '<p class="muted">Members can invite friends to the table.</p>'; return; }
+    const r = await api('/api/friends');
+    const online = r.ok ? r.data.friends.filter((f) => f.status === 'friend' && f.online && !(f.where && f.where.table === App.tableId)) : [];
+    box.replaceChildren();
+    if (!online.length) box.appendChild(h('p', 'muted', 'None of your friends are online right now.'));
+    online.forEach((f) => {
+      const row = h('div', 'frow');
+      row.innerHTML = `<span class="mini-avatar">${esc(f.avatar || initials(f.username))}</span><b>${esc(f.username)}</b>`;
+      const b = h('button', 'pill gold', 'Invite');
+      b.onclick = () => inviteFriend(f.username);
+      row.appendChild(b);
+      box.appendChild(row);
+    });
+  }
+
+  // ----- presence: heartbeat, invites, friend requests -----
+  const seenInvites = new Set();
+  async function pollPresence() {
+    if (!App.account || document.visibilityState !== 'visible') return;
+    const r = await api('/api/presence');
+    if (!r.ok) return;
+    $('navDot').classList.toggle('hidden', !r.data.requests);
+    for (const inv of r.data.invites) {
+      if (seenInvites.has(inv.id)) continue;
+      seenInvites.add(inv.id);
+      if (App.tableId === inv.table) continue;
+      Sound.play('turn');
+      toast(`${inv.from} invites you to ${inv.tableName}.`, {
+        timeout: 20000,
+        action: { label: 'Join', fn: () => { api('/api/friends/dismiss', { id: inv.id, username: inv.from }); if (App.tableId) { send({ t: 'leave' }); setTimeout(() => joinTable(inv.table), 800); } else joinTable(inv.table); } },
+      });
+    }
+  }
+  setInterval(pollPresence, 20000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pollPresence(); });
+
+  // ----- profiles -----
+  const MODE_NAMES = { friends: "Hold'em with friends", bots: "Hold'em with bots", blackjack: 'Blackjack', durak: 'Durak' };
+  function statsTable(stats) {
+    if (!stats.length) return '<p class="muted">No hands played yet.</p>';
+    return `<table class="stats"><thead><tr><th>Game</th><th>Hands</th><th>Won</th><th>${'Result'}</th></tr></thead><tbody>
+      ${stats.map((s) => `<tr><td>${MODE_NAMES[s.mode] || esc(s.mode)}</td><td>${fmt(s.hands)}</td><td>${s.hands ? Math.round((s.wins / s.hands) * 100) : 0}%</td><td class="${s.net >= 0 ? 'pos' : 'neg'}">${s.mode === 'durak' ? `${s.net >= 0 ? '+' : ''}${s.net} pts` : `${s.net >= 0 ? '+' : ''}${fmt(s.net)}`}</td></tr>`).join('')}</tbody></table>`;
+  }
+  async function paintMyProfile(body) {
+    body.innerHTML = '<p class="muted">Loading…</p>';
+    const r = await api(`/api/players/${encodeURIComponent(App.account.username)}`);
+    if (!r.ok) { body.textContent = r.data.error; return; }
+    body.innerHTML = profileHtml(r.data);
+  }
+  function profileHtml(p) {
+    return `<div class="profile-head"><span class="big-avatar">${esc(p.avatar || initials(p.username))}</span>
+      <div><h3>${p.badge ? esc(p.badge) + ' ' : ''}${esc(p.username)}</h3>
+      <p class="muted"><i class="presence ${p.online ? 'on' : ''}"></i>${p.online ? (p.where ? `Playing at ${esc(p.where.tableName)}` : 'Online') : 'Offline'} · Member since ${new Date(p.memberSince).toLocaleDateString([], { month: 'long', year: 'numeric' })} · ${p.friends} friend${p.friends === 1 ? '' : 's'}</p></div></div>
+      ${statsTable(p.stats)}`;
+  }
+  async function openProfile(username) {
+    const r = await api(`/api/players/${encodeURIComponent(username)}`);
+    if (!r.ok) { toast(r.data.error || 'Player not found', { kind: 'bad' }); return; }
+    const p = r.data;
+    openModal((card) => {
+      modalHead(card, 'Member profile', esc(p.username));
+      const body = h('div', 'profile', profileHtml(p));
+      card.appendChild(body);
+      const row = h('div', 'row gap mt');
+      const btn = (label, cls, fn) => { const b = h('button', 'btn ' + cls, label); b.onclick = fn; row.appendChild(b); return b; };
+      if (App.account && !p.isMe) {
+        if (p.friendship === 'none') btn('Add as friend', 'btn-navy', async () => { const x = await api('/api/friends/request', { username: p.username }); toast(x.ok ? 'Friend request sent.' : x.data.error, { kind: x.ok ? 'good' : 'bad' }); closeModal(); });
+        if (p.friendship === 'received') btn('Accept friend request', 'btn-navy', async () => { await api('/api/friends/respond', { username: p.username, accept: true }); toast(`You and ${p.username} are now friends.`, { kind: 'good' }); closeModal(); });
+        if (p.friendship === 'sent') row.appendChild(h('span', 'muted', 'Friend request sent.'));
+        if (p.friendship === 'friends' && App.tableId && p.online) btn('Invite to my table', 'btn-navy', () => { inviteFriend(p.username); closeModal(); });
+        if (p.where && p.friendship === 'friends' && p.where.table !== App.tableId) btn(`Join at ${p.where.tableName}`, 'btn-outline', () => { closeModal(); joinTable(p.where.table); });
+      }
+      card.appendChild(row);
+    });
+  }
+  App.openProfile = openProfile;
+
+  // ================= LEADERBOARD =================
+  async function openLeaderboard(mode = 'friends') {
+    openModal((card) => {
+      modalHead(card, 'The Club Ledger', 'Leaderboard');
+      const note = h('p', 'fine', '');
+      const body = h('div', 'lb-body');
+      const NOTES = {
+        friends: 'Hold\'em hands with at least two people. Ranked by total chips won — losses count.',
+        bots: 'Hold\'em hands played against the house\'s bots.',
+        blackjack: 'Blackjack hands against the dealer. Ranked by chips won.',
+        durak: 'Durak: +1 point for escaping, −1 for being the durak.',
+      };
+      const load = async (m) => {
+        note.textContent = NOTES[m];
+        body.innerHTML = '<p class="muted">Loading…</p>';
+        const r = await api('/api/leaderboard?mode=' + m);
+        if (!r.ok) { body.textContent = 'Could not load the leaderboard.'; return; }
+        const rows = r.data.rows;
+        if (!rows.length) { body.innerHTML = '<p class="muted">No results yet. The first member to play takes the top spot.</p>'; return; }
+        body.innerHTML = `<table class="stats lb"><thead><tr><th>#</th><th>Member</th><th>${m === 'durak' ? 'Points' : 'Chips won'}</th><th>${m === 'durak' ? 'Games' : 'Hands'}</th><th>Won</th></tr></thead><tbody>
+          ${rows.map((x, i) => `<tr class="${App.account && x.username.toLowerCase() === App.account.username.toLowerCase() ? 'me' : ''}"><td>${['I', 'II', 'III'][i] || i + 1}</td><td><button class="link" data-prof="${esc(x.username)}">${esc(x.username)}</button></td>
+            <td class="${x.net >= 0 ? 'pos' : 'neg'}">${x.net > 0 ? '+' : ''}${fmt(x.net)}</td><td>${fmt(x.hands)}</td><td>${Math.round((x.wins / x.hands) * 100)}%</td></tr>`).join('')}</tbody></table>`;
+        body.querySelectorAll('[data-prof]').forEach((b) => { b.onclick = () => openProfile(b.dataset.prof); });
+        if (!r.data.persistent) body.appendChild(h('p', 'fine warn', 'Test mode: no database is connected, so results are temporary.'));
+      };
+      tabs(card, [['friends', 'Hold\'em'], ['bots', 'vs Bots'], ['blackjack', 'Blackjack'], ['durak', 'Durak']], load, mode);
+      card.append(note, body);
+      load(mode);
+    }, { wide: true });
+  }
+
+  // ================= FEEDBACK =================
+  function openFeedback() {
+    openModal((card) => {
+      modalHead(card, 'Correspondence', 'Your <em>feedback</em>');
+      card.appendChild(h('p', 'modal-note', 'Found a bug, have an idea or simply a remark? Every note is read by the house.'));
+      const form = h('form', 'mform');
+      form.innerHTML = `
+        <label>Category<select name="c">
+          <option value="bug">Bug report</option><option value="suggestion">Suggestion</option>
+          <option value="feature">Feature request</option><option value="general" selected>General feedback</option></select></label>
+        <label>Your message<textarea name="m" rows="6" maxlength="2000" required placeholder="Tell us what happened, or what you would like to see…"></textarea></label>
+        <p class="fine count">0 / 2000</p>
+        <p class="merror" role="alert"></p>
+        <button class="btn btn-navy wide" type="submit">Send to the house</button>`;
+      card.appendChild(form);
+      form.m.oninput = () => { form.querySelector('.count').textContent = `${form.m.value.length} / 2000`; };
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        const context = `${App.tableId ? 'table ' + App.tableId : 'hub'} · ${window.innerWidth}×${window.innerHeight} · ${navigator.userAgent.slice(0, 120)}`;
+        const r = await api('/api/feedback', { category: form.c.value, message: form.m.value, context });
+        if (!r.ok) { form.querySelector('.merror').textContent = r.data.error; return; }
+        [...card.children].forEach((c) => { if (!c.classList.contains('modal-x')) c.remove(); });
+        modalHead(card, 'Correspondence', 'Thank you');
+        card.appendChild(h('p', 'modal-note', 'Your note has been delivered to the house. We read every one.'));
+        const ok = h('button', 'btn btn-navy wide', 'Close');
+        ok.onclick = closeModal;
+        card.appendChild(ok);
+      };
+    });
+  }
+
+  // ================= HOW TO PLAY =================
+  const RULES = {
+    holdem: `<ol class="rules-list">
+      <li>Everyone receives <b>two private cards</b>. Five shared cards are dealt to the middle: three (the flop), one (the turn), one (the river).</li>
+      <li>Make the best five-card hand from your two cards and the five on the board, in any combination.</li>
+      <li>In each betting round you may <b>fold</b>, <b>check</b> (if nobody has bet), <b>call</b> a bet, or <b>raise</b>. No-Limit: you may bet everything you have.</li>
+      <li>The best hand at the showdown — or the last player who has not folded — wins the pot.</li></ol><h4>The hands, from best to worst</h4><div id="rankings"></div>`,
+    blackjack: `<ol class="rules-list">
+      <li><b>Goal:</b> finish closer to 21 than the dealer without going over. You only play against the dealer.</li>
+      <li>2–10 count their number, J/Q/K count 10, an Ace counts 11 or 1.</li>
+      <li>Place your bet, then you and the dealer receive two cards (one of the dealer's is hidden).</li>
+      <li><b>Hit</b> takes a card, <b>Stand</b> stops. Over 21 is a <b>bust</b>. <b>Double</b> doubles your bet for exactly one card. <b>Split</b> turns a pair into two hands.</li>
+      <li>The dealer draws to 16 and stands on all 17s. A win pays 1:1, a <b>Blackjack</b> (Ace + ten-card) pays <b>3:2</b>, a tie returns your bet.</li></ol>`,
+    durak: `<ol class="rules-list">
+      <li><b>Goal:</b> be rid of your cards. The last player holding cards is the <b>durak</b> — the fool.</li>
+      <li>36 cards, six to Ace. Everyone holds six; the card beneath the deck sets the <b>trump</b> suit.</li>
+      <li>The <b>attacker</b> plays a card at the <b>defender</b> (the next player), who beats it with a higher card of the same suit, or any trump.</li>
+      <li>Others may <b>add</b> cards whose rank is already on the table — at most six per round.</li>
+      <li>All beaten and nobody adds more: the cards are discarded (<i>бито</i>) and the defender attacks next. Cannot or will not beat: the defender <b>takes</b> everything and loses their turn to attack.</li>
+      <li>Everyone draws back to six after each round. Once the deck is empty, players who run out of cards are safe.</li></ol>`,
+  };
+  const RANKINGS = [
+    ['Royal Flush', 'As Ks Qs Js Ts', 'A, K, Q, J, 10 of one suit.'], ['Straight Flush', '9h 8h 7h 6h 5h', 'Five in a row, one suit.'],
+    ['Four of a Kind', 'Qc Qd Qh Qs 4d', 'Four of one rank.'], ['Full House', 'Kh Kd Ks 7c 7h', 'Three of a kind and a pair.'],
+    ['Flush', 'Ad Jd 8d 6d 2d', 'Five of one suit.'], ['Straight', 'Tc 9d 8h 7s 6c', 'Five in a row.'],
+    ['Three of a Kind', '8s 8h 8d Kc 3s', 'Three of one rank.'], ['Two Pair', 'Jh Jc 4s 4d Ac', 'Two different pairs.'],
+    ['Pair', 'Ts Th Kd 6c 2h', 'Two of one rank.'], ['High Card', 'Ad Qs 9c 6h 3d', 'Nothing else — your highest card plays.'],
+  ];
+  function openHowTo(game = 'holdem') {
+    openModal((card) => {
+      modalHead(card, 'The House Rules', 'How to play');
+      const body = h('div', 'howto');
+      const paint = (g) => {
+        body.innerHTML = RULES[g];
+        const r = body.querySelector('#rankings');
+        if (r) {
+          RANKINGS.forEach(([name, cards, desc], i) => {
+            const row = h('div', 'rank-row', `<span class="n">${['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][i]}</span><span class="cards"></span><span><b>${name}</b><em>${desc}</em></span>`);
+            cards.split(' ').forEach((c) => row.querySelector('.cards').appendChild(CardUI.fromCode(c, { size: 30 })));
+            r.appendChild(row);
+          });
+        }
+      };
+      tabs(card, [['holdem', "Hold'em"], ['blackjack', 'Blackjack'], ['durak', 'Durak']], paint, game);
+      card.appendChild(body);
+      paint(game);
+    }, { wide: true });
+  }
+  App.openHowTo = openHowTo;
+
+  // ================= START =================
+  buildTrio();
+  buildRooms();
+  applyCosmetics();
+  loadTables();
+  loadAccount().then(() => {
+    renderTables();
+    // Returning from a refresh or following an invite link: ?table=ID
+    const params = new URLSearchParams(location.search);
+    const id = (params.get('table') || '').toUpperCase();
+    if (id) {
+      const seated = localStorage.getItem('cg.seat.' + id);
+      if (seated && (App.account || localStorage.getItem('cg.guestName'))) connectAndJoin(id);
+      else { history.replaceState(null, '', location.pathname); setTimeout(() => { $('rooms').scrollIntoView(); joinTable(id); }, 300); }
+    }
+  });
+})();

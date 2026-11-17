@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Owner Dashboard · CardGames</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,600&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/hub.css">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="hub admin">
+  <header class="nav">
+    <a class="brand" href="/"><span class="crest">CG</span><span class="wordmark">CardGames<small>OWNER'S OFFICE</small></span></a>
+    <nav class="admin-tabs" id="adminTabs" aria-label="Dashboard sections">
+      <button data-view="overview" class="on">Overview</button>
+      <button data-view="players">Players</button>
+      <button data-view="feedback">Feedback <span class="count hidden" id="fbCount"></span></button>
+    </nav>
+    <div class="actions"><span class="who" id="who"></span><a class="btn btn-outline" href="/">Back to the club</a></div>
+  </header>
+  <div class="double-rule" aria-hidden="true"></div>
+
+  <main class="admin-main">
+    <section id="gate" class="gate hidden"></section>
+
+    <section data-section="overview" class="hidden">
+      <div class="admin-head"><div><p class="eyebrow">The Ledger</p><h1>Overview</h1></div><button class="btn btn-outline" id="refresh">Refresh</button></div>
+      <div class="kpis" id="kpis"></div>
+      <div class="admin-grid">
+        <div class="panel">
+          <h2>Hands played · last 14 days</h2>
+          <div id="chart" class="chart"></div>
+          <div class="legend"><span><i class="lg holdem"></i>Hold'em</span><span><i class="lg blackjack"></i>Blackjack</span><span><i class="lg durak"></i>Durak</span></div>
+        </div>
+        <div class="panel">
+          <h2>The tables right now</h2>
+          <div id="live" class="live"></div>
+        </div>
+      </div>
+    </section>
+
+    <section data-section="players" class="hidden">
+      <div class="admin-head"><div><p class="eyebrow">The Membership</p><h1>Players</h1></div>
+        <form id="searchForm" class="search"><input id="search" placeholder="Search by username" aria-label="Search players"><button class="btn btn-navy">Search</button></form></div>
+      <div class="panel table-panel">
+        <table class="grid" id="players">
+          <thead><tr><th>Member</th><th>Status</th><th class="num">Coins</th><th class="num">Chips</th><th class="num">At tables</th><th class="num">Hands</th><th class="num">Won</th><th>Last seen</th><th>Joined</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="pager"><button class="btn btn-outline" id="prev">Previous</button><span id="pageInfo"></span><button class="btn btn-outline" id="next">Next</button></div>
+      </div>
+    </section>
+
+    <section data-section="feedback" class="hidden">
+      <div class="admin-head"><div><p class="eyebrow">Correspondence</p><h1>Feedback</h1></div>
+        <div class="filters" id="fbFilters"><button data-status="new" class="on">New</button><button data-status="read">Read</button><button data-status="resolved">Resolved</button><button data-status="">All</button></div></div>
+      <div id="feedback" class="fb-list"></div>
+    </section>
+  </main>
+
+  <aside class="detail hidden" id="detail" aria-label="Player details"></aside>
+  <div id="toasts" class="toasts"></div>
+  <script src="js/admin.js"></script>
+</body>
+</html>

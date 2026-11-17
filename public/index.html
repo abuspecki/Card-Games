@@ -1,222 +1,173 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Poker Night</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#14213D">
+  <title>CardGames — A Private Card Room</title>
+  <meta name="description" content="Play Texas Hold'em, Blackjack and Durak with friends at CardGames — a private card room for the discerning player.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:wght@700&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Italiana&family=Playfair+Display:wght@700&family=Prata&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/hub.css">
+  <link rel="stylesheet" href="css/holdem.css">
+  <link rel="stylesheet" href="css/blackjack.css">
+  <link rel="stylesheet" href="css/durak.css">
+  <link rel="stylesheet" href="css/app.css">
 </head>
-<body>
-  <!-- Lobby -->
-  <div id="lobby" class="screen">
-    <header class="lobby-top">
-      <div class="brand">
-        <div class="brand-mark">♠<span>♥</span></div>
-        <div>
-          <h1>Poker Night</h1>
-          <p class="tagline">Hold'em · Blackjack · Durak — with friends</p>
-        </div>
-      </div>
-      <nav class="lobby-nav">
-        <button id="lobbyLeaderboard" class="ghost">🥇 Leaderboard</button>
+<body class="hub">
+
+  <!-- ================= HUB ================= -->
+  <div id="hub">
+    <header class="nav">
+      <a class="brand" href="#top" aria-label="CardGames home">
+        <span class="crest">CG</span>
+        <span class="wordmark">CardGames<small>EST. MMXXVI</small></span>
+      </a>
+      <nav class="links" aria-label="Main">
+        <a href="#rooms">The Rooms</a>
+        <a href="#rules">House Rules</a>
+        <a href="#" data-open="leaderboard">Leaderboard</a>
+        <a href="#" data-open="feedback">Feedback</a>
       </nav>
-    </header>
-
-    <main class="lobby-main">
-      <!-- Profile -->
-      <section class="profile gold-card">
-        <h2>Your seat</h2>
-        <div id="accountIn" class="account hidden">
-          <div class="avatar" id="avatar"></div>
-          <div class="who">
-            <div class="muted-small">Signed in as</div>
-            <b id="accountName"></b>
-          </div>
-          <button id="logoutBtn" class="ghost small">Log out</button>
+      <div class="actions">
+        <div id="navGuest" class="nav-guest">
+          <a class="signin" href="#" data-open="signin">Sign in</a>
+          <a class="btn btn-navy" href="#" data-open="register">Become a Member</a>
         </div>
-        <div id="walletBox" class="wallet hidden">
-          <div class="balance"><span class="coin">🪙</span> <b id="coinBalance">0</b> <span class="muted-small">coins</span></div>
-          <div class="daily">
-            <div class="daily-head"><b>🎁 Daily bonus</b><span id="streakText" class="muted-small"></span></div>
-            <div id="streakDots" class="streak-dots"></div>
-            <button id="dailyBtn" class="gold">Claim</button>
-          </div>
-          <button id="refillBtn" class="ghost hidden">🆘 Free refill</button>
-          <div id="earnedToday" class="muted-small"></div>
-          <button id="shopBtn" class="ghost">🛍️ Shop</button>
-        </div>
-        <div id="accountOut" class="account-box">
-          <div class="tabs">
-            <button id="tabLogin" class="tab on">Log in</button>
-            <button id="tabRegister" class="tab">Create account</button>
-          </div>
-          <form id="authForm" class="auth">
-            <input id="authUser" maxlength="16" placeholder="Username" autocomplete="username" />
-            <input id="authPass" type="password" maxlength="100" placeholder="Password" autocomplete="current-password" />
-            <button id="authBtn" type="submit" class="gold">Log in</button>
-          </form>
-          <div id="authError" class="error"></div>
-          <div class="divider"><span>or play as a guest</span></div>
-          <input id="name" maxlength="16" placeholder="Guest name, e.g. Sam" />
-          <p class="muted-small">Guests can play, but only accounts appear on the leaderboard.</p>
-        </div>
-      </section>
-
-      <!-- Tables -->
-      <section class="tables">
-        <div class="tables-head">
-          <h2>Choose a table</h2>
-          <span id="onlineCount" class="muted-small"></span>
-        </div>
-        <div id="lobbyError" class="error"></div>
-        <div id="tableGrid" class="table-grid"></div>
-      </section>
-    </main>
-    <footer class="lobby-foot">Play money only · Cards are dealt automatically once enough players sit down</footer>
-  </div>
-
-  <!-- Table -->
-  <div id="game" class="screen hidden">
-    <header>
-      <div class="room-info"><button id="leaveBtn" class="small">← Lobby</button> <b id="roomLabel"></b> <button id="copyLink" class="small">Copy invite link</button></div>
-      <div id="variantLabel" class="variant"></div>
-      <div class="header-right">
-        <span id="coinChip" class="coin-chip hidden" title="Your coins">🪙 <b id="coinChipVal">0</b></span>
-        <button id="oddsToggle" class="small" title="Show/hide your win chances (O)">📊 Odds</button>
-        <button id="rankingsBtn" class="small" title="List of winning hands (H)">🏆 Hand rankings</button>
-        <button id="leaderboardBtn" class="small" title="Leaderboard (L)">🥇 Leaderboard</button>
-        <button id="muteBtn" class="small" title="Sound on/off">🔊</button>
-        <input id="volume" type="range" min="0" max="1" step="0.05" value="0.6" title="Volume" />
+        <button id="navMember" class="nav-member hidden" data-open="lounge" aria-label="Open your lounge">
+          <span class="nm-balances"><span><i class="ico-chip"></i><b id="navChips">0</b></span><span><i class="ico-coin"></i><b id="navCoins">0</b></span></span>
+          <span class="nm-avatar" id="navAvatar">?</span>
+          <span class="nm-dot hidden" id="navDot"></span>
+        </button>
+        <button class="nav-burger" id="navBurger" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
       </div>
     </header>
+    <div class="mobile-menu hidden" id="mobileMenu">
+      <a href="#rooms">The Rooms</a>
+      <a href="#rules">House Rules</a>
+      <a href="#" data-open="leaderboard">Leaderboard</a>
+      <a href="#" data-open="feedback">Feedback</a>
+      <a href="#" data-open="howto">How to play</a>
+      <a href="/admin" class="owner-only hidden">Owner dashboard</a>
+    </div>
+    <div class="double-rule" aria-hidden="true"></div>
 
-    <main>
-      <div class="table-wrap">
-        <div id="table" class="table">
-          <div class="center">
-            <div id="board" class="board"></div>
-            <div id="pot" class="pot"></div>
-            <div id="message" class="message"></div>
-          </div>
-          <div id="seats"></div>
+    <section class="hero" id="top">
+      <p class="eyebrow">A private card room &nbsp;·&nbsp; Est. MMXXVI</p>
+      <h1>The finest tables,<br>open to <em>every guest.</em></h1>
+      <p class="lede">Texas Hold'em, Blackjack and Durak — three distinguished rooms, each with its own table, its own manners, and a seat reserved for you.</p>
+      <div class="ornament" aria-hidden="true"><span></span><i></i><span></span></div>
+      <div class="cta-row">
+        <a class="btn btn-navy" href="#rooms">Choose Your Table</a>
+        <a class="btn btn-outline" href="#rules">Read the House Rules</a>
+      </div>
+      <div class="trio" id="trio" aria-hidden="true"></div>
+    </section>
+
+    <section class="rooms" id="rooms">
+      <header class="section-head">
+        <p class="eyebrow">The Rooms</p>
+        <h2>Three tables. Three traditions.</h2>
+        <p class="section-sub" id="onlineLine">&nbsp;</p>
+      </header>
+      <p class="lobby-error" id="lobbyError" role="alert"></p>
+      <div class="room-grid" id="roomGrid"></div>
+    </section>
+
+    <section class="rules" id="rules">
+      <header class="section-head">
+        <p class="eyebrow">The House Rules</p>
+        <h2>Manners make the game.</h2>
+      </header>
+      <div class="rule-grid">
+        <div class="rule"><span class="num">I.</span><h3>A Fair Deal</h3><p>Every hand is dealt by the house from a freshly shuffled deck. What you see on the felt is what fate intended — nobody, not even a bot, sees your cards.</p></div>
+        <div class="rule"><span class="num">II.</span><h3>Chips &amp; Coins</h3><p>Members receive 5,000 chips to play with. Chips you win can be exchanged for coins, spent in the shop on card backs, felts, backgrounds and portraits. Play money only — always.</p></div>
+        <div class="rule"><span class="num">III.</span><h3>Good Company</h3><p>Add friends, see who is at the tables and invite them to your seat. Short of company? Anyone at a table may invite a bot.</p></div>
+      </div>
+      <div class="cta-row rules-cta">
+        <button class="btn btn-outline" data-open="howto">How to play each game</button>
+        <button class="btn btn-outline" data-open="feedback">Send us feedback</button>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <a class="brand" href="#top"><span class="crest">CG</span><span class="wordmark">CardGames</span></a>
+          <p>A private card room for the discerning player.</p>
+        </div>
+        <div class="footer-cols">
+          <div><h4>The Rooms</h4><a href="#rooms">Texas Hold'em</a><a href="#rooms">Blackjack</a><a href="#rooms">Durak</a></div>
+          <div><h4>The House</h4><a href="#rules">House Rules</a><a href="#" data-open="howto">How to play</a><a href="#" data-open="leaderboard">Leaderboard</a></div>
+          <div><h4>Correspondence</h4><a href="#" data-open="feedback">Feedback &amp; bugs</a><a href="/admin" class="owner-only hidden">Owner dashboard</a></div>
         </div>
       </div>
-
-      <aside>
-        <div id="oddsPanel" class="odds hidden">
-          <div class="odds-head"><span>📊 Your odds</span><button id="oddsClose" class="small" title="Hide or show your odds (O)">Hide</button></div>
-          <div id="oddsBody"></div>
-        </div>
-        <div id="tablePanel" class="panel hidden">
-          <h3>Table</h3>
-          <div id="tableInfo" class="table-info"></div>
-          <div class="row">
-            <button id="addBotBtn" class="small">🤖 Add bot</button>
-            <button id="removeBotBtn" class="small">Remove bot</button>
-          </div>
-        </div>
-        <div class="panel log-panel">
-          <div class="tabs side-tabs">
-            <button id="tabChat" class="tab on">💬 Chat <span id="chatDot" class="dot hidden"></span></button>
-            <button id="tabLog" class="tab">📜 Game log</button>
-          </div>
-          <div id="chatList" class="log chat-list"></div>
-          <div id="log" class="log hidden"></div>
-          <form id="chatForm" class="row">
-            <input id="chatInput" maxlength="200" placeholder="Say something…" autocomplete="off" />
-            <button>Send</button>
-          </form>
-        </div>
-      </aside>
-    </main>
-
-    <footer id="actions" class="actions hidden">
-      <div id="pokerActions" class="game-actions">
-      <button id="foldBtn" class="act fold">Fold</button>
-      <button id="callBtn" class="act call">Check</button>
-      <div class="raise-box">
-        <div class="presets">
-          <button data-preset="min" class="small">Min</button>
-          <button data-preset="half" class="small">½ Pot</button>
-          <button data-preset="pot" class="small">Pot</button>
-          <button data-preset="max" class="small">All-in</button>
-        </div>
-        <div class="row">
-          <input id="raiseSlider" type="range" />
-          <input id="raiseInput" type="number" />
-        </div>
-      </div>
-      <button id="raiseBtn" class="act raise">Raise</button>
-      </div>
-
-      <div id="bjActions" class="game-actions hidden">
-        <div id="bjBet" class="row">
-          <span class="muted-label">Your bet</span>
-          <input id="bjBetInput" type="number" />
-          <button data-bjbet="min" class="small">Min</button>
-          <button data-bjbet="x2" class="small">×2</button>
-          <button data-bjbet="x5" class="small">×5</button>
-          <button id="bjBetBtn" class="act raise">Place bet</button>
-        </div>
-        <div id="bjPlay" class="row">
-          <button id="bjHit" class="act call">Hit</button>
-          <button id="bjStand" class="act fold">Stand</button>
-          <button id="bjDouble" class="act raise">Double</button>
-          <button id="bjSplit" class="act raise">Split</button>
-        </div>
-      </div>
-
-      <div id="durakActions" class="game-actions hidden">
-        <div id="durakPrompt" class="durak-prompt"></div>
-        <div id="durakHand" class="durak-hand"></div>
-        <div class="row">
-          <button id="durakTake" class="act fold">Take cards</button>
-          <button id="durakPass" class="act call">Pass</button>
-        </div>
+      <div class="footer-bottom">
+        <span>© MMXXVI CardGames. Play money only — play responsibly.</span>
+        <em>Texas Hold'em &nbsp;·&nbsp; Blackjack &nbsp;·&nbsp; Durak</em>
       </div>
     </footer>
-    <div id="toast" class="toast"></div>
-
-    <div id="rankingsModal" class="modal hidden">
-      <div class="modal-box">
-        <div class="odds-head"><h2>🏆 Winning hands</h2><button id="rankingsClose" class="small">✕</button></div>
-        <p class="sub">From best to worst. Every hand is made of exactly 5 cards.</p>
-        <div id="rankingsList"></div>
-        <p id="rankingsNote" class="sub"></p>
-      </div>
-    </div>
   </div>
 
-  <div id="leaderboardModal" class="modal hidden">
-    <div class="modal-box">
-      <div class="odds-head"><h2>🥇 Leaderboard</h2><button id="leaderboardClose" class="small">✕</button></div>
-      <div class="tabs">
-        <button data-mode="friends" class="tab on">Poker · friends</button>
-        <button data-mode="bots" class="tab">Poker · bots</button>
-        <button data-mode="blackjack" class="tab">Blackjack</button>
-        <button data-mode="durak" class="tab">Durak</button>
+  <!-- ================= TABLE ================= -->
+  <div id="tableScreen" class="hidden">
+    <div class="table-main">
+      <header class="tbar" id="tbar"></header>
+      <div class="stage-wrap" id="stageWrap">
+        <main class="stage" id="stage"></main>
       </div>
-      <p class="sub" id="lbNote"></p>
-      <table class="lb"><thead><tr><th>#</th><th>Player</th><th>Chips won</th><th>Hands</th><th>Won</th><th>Biggest pot</th></tr></thead>
-        <tbody id="lbBody"></tbody></table>
+      <div class="controls" id="controls" aria-label="Your actions"></div>
     </div>
+    <aside class="drawer" id="drawer" aria-label="Table panel">
+      <div class="drawer-head">
+        <div class="tabs" role="tablist">
+          <button data-tab="chat" class="on">Chat<span class="dot hidden" id="chatDot"></span></button>
+          <button data-tab="log">Log</button>
+          <button data-tab="odds" id="oddsTab">Odds</button>
+          <button data-tab="table">Table</button>
+        </div>
+        <button class="drawer-close" id="drawerClose" aria-label="Close panel">✕</button>
+      </div>
+      <section class="pane" data-pane="chat">
+        <div class="chat-list" id="chatList"></div>
+        <form class="chat-form" id="chatForm">
+          <input id="chatInput" maxlength="200" placeholder="Say something…" autocomplete="off" aria-label="Chat message">
+          <button type="submit">Send</button>
+        </form>
+      </section>
+      <section class="pane hidden" data-pane="log"><div class="log-list" id="logList"></div></section>
+      <section class="pane hidden" data-pane="odds"><div id="oddsBody" class="odds-body"></div></section>
+      <section class="pane hidden" data-pane="table">
+        <div class="table-info" id="tableInfo"></div>
+        <h4>Company</h4>
+        <div class="row gap"><button class="pill" id="addBotBtn">Invite a bot</button><button class="pill" id="removeBotBtn">Dismiss a bot</button></div>
+        <h4>Invite a friend</h4>
+        <div id="inviteList" class="invite-list"></div>
+        <button class="pill" id="copyLinkBtn">Copy table link</button>
+        <h4>House</h4>
+        <div class="row gap"><button class="pill" data-open="howto">How to play</button><button class="pill" data-open="feedback">Report a problem</button></div>
+        <h4>Sound</h4>
+        <div class="row gap"><button class="pill" id="muteBtn">Sound on</button><input type="range" id="volume" min="0" max="1" step="0.05" aria-label="Volume"></div>
+      </section>
+    </aside>
   </div>
 
-  <div id="shopModal" class="modal hidden">
-    <div class="modal-box shop-box">
-      <div class="odds-head"><h2>🛍️ Shop</h2><span class="shop-balance">🪙 <b id="shopBalance">0</b></span><button id="shopClose" class="small">✕</button></div>
-      <div class="tabs" id="shopTabs">
-        <button data-slot="cardback" class="tab on">Card backs</button>
-        <button data-slot="felt" class="tab">Table felt</button>
-        <button data-slot="badge" class="tab">Name badges</button>
-      </div>
-      <p class="sub" id="shopNote"></p>
-      <div id="shopGrid" class="shop-grid"></div>
-    </div>
+  <!-- ================= MODALS ================= -->
+  <div class="modal hidden" id="modal" role="dialog" aria-modal="true">
+    <div class="modal-card" id="modalCard"></div>
   </div>
-  <div id="coinPop" class="coin-pop"></div>
 
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+  <div id="coinPop" class="coin-pop" aria-hidden="true"></div>
+
+  <script src="js/cards.js"></script>
   <script src="sound.js"></script>
-  <script src="client.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/holdem.js"></script>
+  <script src="js/blackjack.js"></script>
+  <script src="js/durak.js"></script>
 </body>
 </html>

@@ -1,0 +1,150 @@
+/* =========================================================
+   Texas Hold'em — "The Club Room"
+   Mahogany, green felt, brass. Cormorant Garamond + EB Garamond.
+   ========================================================= */
+body.holdem {
+  --brass: #B08D57;
+  --brass-l: #D8BC84;
+  --ivory: #F2EBDD;
+  --leather: #1A0F0A;
+  background: #0E0805;
+  color: var(--ivory);
+}
+.holdem .stage { background: radial-gradient(ellipse at 50% 50%, #3A2216, #1E120B 60%, #0E0805); }
+
+/* ---------- Top bar ---------- */
+.holdem .topbar {
+  position: absolute; left: 0; top: 0; width: 1440px; height: 72px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 40px;
+  background: rgba(14, 8, 5, .6);
+  border-bottom: 1px solid rgba(176, 141, 87, .3);
+}
+.holdem .tb-left { gap: 20px; }
+.holdem .lobby-link { font-weight: 500; font-size: 13px; letter-spacing: .2em; text-transform: uppercase; color: var(--brass); }
+.holdem .vr { width: 1px; height: 24px; background: rgba(176, 141, 87, .4); }
+.holdem .brand { font: italic 600 24px 'Cormorant Garamond', serif; }
+.holdem .tb-center { align-items: center; gap: 2px; }
+.holdem .tb-center small { font-weight: 500; font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: var(--brass); }
+.holdem .tb-center strong { font: 600 21px 'Cormorant Garamond', serif; }
+.holdem .tb-right { gap: 12px; }
+.holdem .tb-right strong { font: 700 22px 'Cormorant Garamond', serif; }
+.holdem .leave {
+  margin-left: 8px; padding: 7px 14px; border-radius: 999px;
+  border: 1px solid rgba(176, 141, 87, .6); color: var(--brass-l); font-weight: 500; font-size: 13px;
+}
+.holdem .leave:hover { background: rgba(176, 141, 87, .15); }
+
+/* ---------- Table ---------- */
+.holdem .table { position: absolute; left: 160px; top: 150px; width: 1120px; height: 560px; }
+.holdem .table > div { position: absolute; }
+.holdem .rail {
+  inset: 0; border-radius: 280px;
+  background: linear-gradient(180deg, #6B3A24, #3E2014 50%, #2B140C);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, .6), inset 0 0 0 4px rgba(224, 168, 120, .12);
+}
+.holdem .trim { left: 28px; top: 28px; right: 28px; bottom: 28px; border-radius: 252px; border: 2px solid var(--brass); }
+.holdem .felt {
+  left: 32px; top: 32px; right: 32px; bottom: 32px; border-radius: 248px;
+  background: radial-gradient(ellipse at 50% 50%, #2F654A, #1F4A34 55%, #132E20);
+  box-shadow: inset 0 6px 30px rgba(0, 0, 0, .55);
+}
+.holdem .print { left: 80px; top: 80px; right: 80px; bottom: 80px; border-radius: 200px; border: 1px solid rgba(176, 141, 87, .35); }
+.holdem .monogram {
+  left: 0; right: 0; top: 360px; text-align: center;
+  font: italic 600 44px 'Cormorant Garamond', serif; color: var(--brass); opacity: .25;
+}
+
+/* Pot */
+.holdem .pot { left: 0; right: 0; top: 118px; display: flex; justify-content: center; align-items: center; gap: 12px; }
+.holdem .pot .stack { position: relative; width: 40px; height: 52px; }
+.holdem .pot .stack .chip { position: absolute; left: 0; }
+.holdem .pot small { display: block; font-weight: 500; font-size: 11px; letter-spacing: .3em; color: var(--brass); }
+.holdem .pot strong { font: 700 28px/1 'Cormorant Garamond', serif; }
+
+/* Board */
+.holdem .board { left: 296px; top: 196px; display: flex; gap: 12px; }
+.holdem .board .slot { width: 96px; height: 134px; border-radius: 8px; border: 1px dashed rgba(176, 141, 87, .45); }
+.holdem .board .card { animation: deal .35s ease both; }
+@keyframes deal { from { opacity: 0; transform: translateY(-20px) scale(.95); } }
+
+/* ---------- Seats ---------- */
+.holdem .seat {
+  position: absolute; transform: translate(-50%, -50%);
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 22px 8px 8px; border-radius: 40px;
+  background: linear-gradient(180deg, #2E1C13, #1A0F0A);
+  border: 1px solid rgba(176, 141, 87, .8);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, .5);
+  white-space: nowrap;
+}
+.holdem .seat .avatar {
+  width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  background: #1F4A34; border: 1px solid var(--brass);
+  font: 700 17px 'Cormorant Garamond', serif; color: var(--brass-l);
+}
+.holdem .seat .name { font-weight: 500; font-size: 15px; line-height: 1.2; }
+.holdem .seat .chips { font: 700 16px/1.1 'Cormorant Garamond', serif; color: var(--brass-l); }
+.holdem .seat.folded { opacity: .5; }
+.holdem .seat.active { border: 2px solid var(--brass-l); box-shadow: 0 0 22px rgba(216, 188, 132, .6); }
+.holdem .seat.empty { background: transparent; border-style: dashed; opacity: .6; padding-right: 16px; }
+.holdem .seat.empty .avatar { background: transparent; border-style: dashed; }
+.holdem .timer { position: absolute; width: 180px; height: 3px; border-radius: 2px; background: rgba(176, 141, 87, .25); transform: translateX(-50%); }
+.holdem .timer i { display: block; height: 100%; border-radius: 2px; background: var(--brass-l); transition: width .3s linear; }
+
+.holdem .hole { position: absolute; }
+.holdem .hole .card-back { position: absolute; }
+.holdem .bet { position: absolute; display: flex; align-items: center; gap: 6px; font: 700 17px 'Cormorant Garamond', serif; }
+.holdem .dealer-btn {
+  position: absolute; width: 30px; height: 30px; border-radius: 50%;
+  background: var(--ivory); border: 1.5px solid var(--brass); box-shadow: 0 3px 6px rgba(0, 0, 0, .5);
+  display: grid; place-items: center; font: 700 16px 'Cormorant Garamond', serif; color: #1A0F0A;
+}
+
+/* Your cards */
+.holdem .my-cards { position: absolute; left: 0; top: 0; }
+.holdem .my-cards .card { position: absolute; }
+.holdem .hand-label {
+  position: absolute; left: 460px; top: 720px; padding: 7px 16px; border-radius: 999px;
+  background: rgba(26, 15, 10, .85); border: 1px solid rgba(176, 141, 87, .5);
+  font-style: italic; font-size: 16px; color: var(--brass-l);
+}
+.holdem .hand-label:empty { display: none; }
+
+/* ---------- Log ---------- */
+.holdem .log {
+  position: absolute; left: 40px; bottom: 36px; width: 300px;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 16px 18px; border-radius: 12px;
+  background: rgba(26, 15, 10, .75); border: 1px solid rgba(176, 141, 87, .25);
+}
+.holdem .log h4 { font-weight: 500; font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: var(--brass); }
+.holdem .log p { font-style: italic; font-size: 15px; opacity: .75; }
+
+/* ---------- Action panel ---------- */
+.holdem .action-panel {
+  position: absolute; right: 40px; bottom: 36px;
+  display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 14px;
+  background: rgba(26, 15, 10, .92); border: 1px solid rgba(176, 141, 87, .4);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
+}
+.holdem .sizing { gap: 8px; }
+.holdem .preset {
+  padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(176, 141, 87, .5);
+  font-weight: 500; font-size: 13px; color: var(--ivory);
+}
+.holdem .preset:hover { background: rgba(176, 141, 87, .15); }
+.holdem input[type=range] { -webkit-appearance: none; appearance: none; flex: 1; min-width: 150px; height: 20px; background: transparent; cursor: pointer; }
+.holdem input[type=range]::-webkit-slider-runnable-track { height: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--brass-l) var(--p, 40%), rgba(176, 141, 87, .3) var(--p, 40%)); }
+.holdem input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6.5px; border-radius: 50%; background: var(--brass-l); box-shadow: 0 2px 4px rgba(0, 0, 0, .5); }
+.holdem input[type=range]::-moz-range-track { height: 3px; border-radius: 2px; background: rgba(176, 141, 87, .3); }
+.holdem input[type=range]::-moz-range-progress { height: 3px; background: var(--brass-l); }
+.holdem input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: var(--brass-l); }
+.holdem .buttons { gap: 10px; }
+.holdem .act { padding: 13px 22px; border-radius: 6px; font-weight: 600; font-size: 15px; letter-spacing: .04em; transition: filter .2s, background .2s; }
+.holdem .act-fold { border: 1px solid rgba(176, 141, 87, .6); color: var(--ivory); }
+.holdem .act-fold:hover:not(:disabled) { background: rgba(176, 141, 87, .12); }
+.holdem .act-call { background: #2E1C13; border: 1px solid var(--brass); color: var(--brass-l); }
+.holdem .act-call:hover:not(:disabled) { background: #3A2418; }
+.holdem .act-raise { background: linear-gradient(90deg, #E2C68E, #A07C45); color: #1A1208; min-width: 150px; }
+.holdem .act-raise:hover:not(:disabled) { filter: brightness(1.08); }
