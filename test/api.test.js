@@ -85,9 +85,10 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // ----- wallet endpoints -----
   let r = await call('POST', '/api/wallet/convert', ta, { coins: 5 });
-  assert.strictEqual(r.status, 400, 'welcome chips do not convert');
+  assert.strictEqual(r.data.spentChips, 550, '5 coins cost 550 chips (100 each + 10 % fee)');
+  assert.strictEqual((await call('POST', '/api/wallet/convert', ta, { coins: 999999 })).status, 400, 'per-exchange limit');
   r = await call('POST', '/api/wallet/bankrupt', ta);
-  assert.strictEqual(r.status, 400, 'not bankrupt');
+  assert.strictEqual(r.status, 400, 'no top-up above 1,000 chips');
   r = await call('POST', '/api/wallet/daily', ta);
   assert.strictEqual(r.data.amount, 100);
   r = await call('GET', '/api/wallet', null);

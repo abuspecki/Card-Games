@@ -816,3 +816,12 @@ body.portrait .chip-stack .stack-amt { font-size: 12px; padding: 0 6px; }
   .blackjack .quick-bets { flex-direction: row; }
   .blackjack .quick-bets button { padding: 4px 9px; font-size: 12px; }
 }
+
+/* ================= THE ECONOMY IN THREE SENTENCES ================= */
+.principle { list-style: none; counter-reset: p; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0; padding: 0; }
+.principle li { counter-increment: p; position: relative; padding: 12px 14px 12px 46px; border: 1px solid rgba(184,144,47,.45); background: var(--paper); font-size: 15px; line-height: 1.45; }
+.principle li::before { content: counter(p); position: absolute; left: 12px; top: 10px; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%;
+  background: var(--navy); color: var(--ivory); font: 700 15px 'Cormorant Garamond', serif; }
+.principle b { color: var(--navy); }
+html[data-theme="dark"] .principle li::before { background: #DCC07A; color: #14161C; }
+@media (max-width: 760px) { .principle { grid-template-columns: 1fr; } }

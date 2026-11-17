@@ -57,44 +57,54 @@ const C = require('../coins');
   b = await coins.balances(p);
   assert.deepStrictEqual([b.chips, b.inPlay], [1500, 0]);
 
-  // ----- conversion: only chips above the floor, daily cap -----
-  assert((await coins.convert(p, 1)).error, 'below the floor nothing converts');
-  await coins.adjust(p, 0, 5000 + 4000 - 1500); // 9000 chips -> 40 convertible coins
-  st = await coins.getStatus(p);
-  assert.strictEqual(st.convert.maxCoins, 40);
-  r = await coins.convert(p, 25, t0);
-  assert.strictEqual(r.converted, 25);
+  // ----- the Bank: one rate (100 chips = 1 coin), 10 % fee each way -----
+  assert.strictEqual(C.CONVERT_RATE, 110);
+  assert.strictEqual(C.COIN_TO_CHIPS, 90);
+  st = await coins.getStatus(p);                      // 1500 chips
+  assert.strictEqual(st.convert.maxCoins, 13);
+  assert.deepStrictEqual(st.rules, { chipsPerCoin: 100, fee: 0.1, topUpTo: 1000 });
+  r = await coins.convert(p, 10);
+  assert.strictEqual(r.converted, 10);
+  assert.strictEqual(r.spentChips, 1100);
   b = await coins.balances(p);
-  assert.strictEqual(b.chips, 9000 - 2500);
-  assert.strictEqual(b.coins, C.WELCOME_COINS + 25);
-  assert((await coins.convert(p, 16, t0)).error, 'cannot convert below floor');
-  await coins.adjust(p, 0, 100000);
-  r = await coins.convert(p, C.CONVERT_DAILY_MAX, t0);
-  assert(r.error, 'daily cap includes earlier conversions');
-  r = await coins.convert(p, C.CONVERT_DAILY_MAX - 25, t0);
-  assert.strictEqual(r.converted, C.CONVERT_DAILY_MAX - 25);
-  assert((await coins.convert(p, 1, t0)).error, 'daily cap reached');
-  assert.strictEqual((await coins.convert(p, 10, t0 + DAY)).converted, 10, 'cap resets next day');
+  assert.strictEqual(b.chips, 400);
+  assert.strictEqual(b.coins, C.WELCOME_COINS + 10);
+  assert((await coins.convert(p, 4)).error, 'not enough chips');
+  r = await coins.buyChips(p, 10);
+  assert.strictEqual(r.gotChips, 900);
+  b = await coins.balances(p);
+  assert.strictEqual(b.chips, 1300, 'a round trip costs the fee both ways');
   assert((await coins.convert(p, 0)).error && (await coins.convert(p, -5)).error && (await coins.convert(p, 'abc')).error, 'bad amounts refused');
-  // concurrent conversions never exceed the cap
-  const q = await newUser('conv');
-  await coins.adjust(q, 0, 100000);
-  const conv = await Promise.all(Array.from({ length: 8 }, () => coins.convert(q, 100, t0)));
-  assert.strictEqual(conv.filter((x) => x.converted).length, 3, 'only 300 coins/day even in parallel');
+  assert((await coins.convert(p, C.BUYCHIPS_MAX + 1)).error, 'per-exchange limit');
+  // concurrent exchanges never overdraw
+  const q = await newUser('conv');                     // 5000 chips
+  const conv = await Promise.all(Array.from({ length: 8 }, () => coins.convert(q, 10)));
+  assert.strictEqual(conv.filter((x) => x.converted).length, 4, '4 x 1100 fits into 5000, the rest is refused');
+  assert.strictEqual((await coins.balances(q)).chips, 600);
 
-  // ----- bankruptcy refill -----
+  // ----- coins from the tables: 1 per 100 chips won, at least 1 -----
+  assert.strictEqual(C.rewardFor({ won: true, mode: 'friends', net: 460 }), 5);
+  assert.strictEqual(C.rewardFor({ won: true, mode: 'blackjack', net: 20 }), 1);
+  assert.strictEqual(C.rewardFor({ won: true, mode: 'roulette', net: 3500 }), 35);
+  assert.strictEqual(C.rewardFor({ won: true, mode: 'durak', net: 1 }), 10);
+  assert.strictEqual(C.rewardFor({ won: false, mode: 'friends', net: -50 }), 0);
+
+  // ----- the daily top-up to 1,000 chips -----
   const z = await newUser('broke');
-  assert((await coins.claimBankrupt(z, t0)).error, 'not bankrupt with welcome chips');
+  assert((await coins.claimBankrupt(z, t0)).error, 'not below 1,000 with welcome chips');
   await coins.buyIn(z, 5000, 1); // all chips at a table
   assert((await coins.claimBankrupt(z, t0)).error, 'chips at a table still count');
   await coins.cashOut(z, 40, 5000); // lost almost everything
+  st = await coins.getStatus(z);
+  assert(st.bankrupt.ready && st.bankrupt.amount === 960);
   r = await coins.claimBankrupt(z, t0);
-  assert.strictEqual(r.chips, 1040);
-  await coins.adjust(z, 0, -1040);
-  assert((await coins.claimBankrupt(z, t0 + 60000)).error, 'cooldown');
-  assert.strictEqual((await coins.claimBankrupt(z, t0 + C.BANKRUPT_COOLDOWN)).amount, C.BANKRUPT_GRANT);
-  // free chips never become convertible
-  assert.strictEqual((await coins.getStatus(z)).convert.maxCoins, 0);
+  assert.strictEqual(r.amount, 960);
+  assert.strictEqual(r.chips, 1000, 'topped up to exactly 1,000');
+  await coins.adjust(z, 0, -900);
+  assert((await coins.claimBankrupt(z, t0 + 3600000)).error, 'once a day');
+  assert.strictEqual((await coins.claimBankrupt(z, t0 + DAY)).amount, 900, 'again the next day');
+  const twice = await Promise.all([coins.claimBankrupt(z, t0 + 3 * DAY + 1), coins.claimBankrupt(z, t0 + 3 * DAY + 1)]);
+  assert(twice.every((x) => x.error), 'at 1,000 there is nothing to top up');
 
   // ----- shop -----
   const s = await newUser('shopper');
@@ -130,9 +140,8 @@ const C = require('../coins');
   assert(C.SLOTS.every((slot) => C.CATALOG.some((i) => i.slot === slot)), 'every slot has items');
 
   // ----- rewards -----
-  assert.strictEqual(C.rewardFor({ mode: 'friends', won: true, pot: 1250 }, false), 22);
-  assert.strictEqual(C.rewardFor({ mode: 'blackjack', won: true, net: 150 }, true), 16);
-  assert.strictEqual(C.rewardFor({ mode: 'durak', won: false }, true), 0);
+  assert.strictEqual(C.rewardFor({ mode: 'friends', won: true, net: 1250, pot: 1500 }), 13);
+  assert.strictEqual(C.rewardFor({ mode: 'durak', won: false }), 0);
   console.log(`coins ok (${store.kind})`);
   process.exit(0);
 })().catch((e) => { console.error(e); process.exit(1); });

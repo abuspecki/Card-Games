@@ -158,7 +158,7 @@ function createLobby(ctx) {
     store.recordActivity(dayString(Date.now()), room.game).catch((e) => console.error('activity error', e));
     for (const r of t.resultsForRecord()) {
       store.recordHand(r.accountId, r.mode, r.net, r.won, r.pot).catch((e) => console.error('record error', e));
-      const amount = rewardFor(r, room.highRoller);
+      const amount = rewardFor(r);
       if (!amount) continue;
       coins.earn(r.accountId, amount).then((res) => {
         const seat = room.table.seats.find((s) => s && s.accountId === r.accountId);
@@ -324,7 +324,7 @@ function createLobby(ctx) {
             const r = await buyChips(target, user.id);
             if (r.error) return send(ws, { t: 'error', msg: r.error });
             stack = r.amount;
-            if (r.refilled) send(ws, { t: 'notice', msg: `You were out of chips — here are ${r.refilled.toLocaleString()} free chips to get you going.` });
+            if (r.refilled) send(ws, { t: 'notice', msg: `Your daily top-up: ${r.refilled.toLocaleString()} chips from the house.` });
           }
           const newPid = crypto.randomUUID();
           const look = user ? await ctx.coins().lookOf(user.id).catch(() => ({})) : {};
@@ -372,7 +372,7 @@ function createLobby(ctx) {
             if (me.chips > 0 || !t.seats.includes(me)) { await ctx.coins().cashOut(me.accountId, r.amount, r.amount); return; }
             me.chips = r.amount;
             me.buyIn = (me.buyIn || 0) + r.amount;
-            if (r.refilled) send(ws, { t: 'notice', msg: `You were out of chips — here are ${r.refilled.toLocaleString()} free chips.` });
+            if (r.refilled) send(ws, { t: 'notice', msg: `Your daily top-up: ${r.refilled.toLocaleString()} chips from the house.` });
           } else {
             me.chips = t.settings.startingStack;
           }

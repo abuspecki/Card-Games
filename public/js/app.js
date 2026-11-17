@@ -848,6 +848,15 @@
     return hh ? `${hh}h ${m}m` : `${m}m`;
   }
 
+  // The whole economy in three sentences (shown in the wallet and the Bank).
+  function principle(w) {
+    const r = w.rules || { chipsPerCoin: 100, fee: 0.1, topUpTo: 1000 };
+    return `<ol class="principle">
+      <li><b>Chips are play money.</b> You bet with them at the tables. Below ${fmt(r.topUpTo)}? Once a day the house tops you up to ${fmt(r.topUpTo)}.</li>
+      <li><b>Coins are rewards.</b> You earn 1 coin for every ${fmt(r.chipsPerCoin)} chips you win (up to ${fmt(w.tableCap)} a day) plus the daily bonus — and spend them in the Shop.</li>
+      <li><b>The Bank trades both ways</b> at ${fmt(r.chipsPerCoin)} chips = 1 coin and keeps ${Math.round(r.fee * 100)} % of each exchange.</li></ol>`;
+  }
+
   function paintWallet(body) {
     const w = App.wallet;
     if (!w) { body.textContent = 'Loading…'; return; }
@@ -859,6 +868,7 @@
         <div class="bal"><small>At the tables</small><strong><i class="ico-chip"></i>${fmt(w.inPlay)}</strong><em>returns when you leave</em></div>
         <div class="bal"><small>Coins</small><strong><i class="ico-coin"></i>${fmt(w.coins)}</strong><em>for the shop</em></div>
       </div>
+      ${principle(w)}
       <div class="wcards">
         <section class="wcard">
           <h4>The Daily Bonus</h4>
@@ -868,25 +878,24 @@
         </section>
         <section class="wcard">
           <h4>The Bank</h4>
-          <p>Exchange won chips for coins, or coins back into chips. ${fmt(c.rate)} chips buy 1 coin; 1 coin buys ${fmt(w.buyChips.rate)} chips.</p>
-          <p class="muted">${c.maxCoins > 0 ? `You may exchange up to ${c.maxCoins} coins' worth of chips today.` : `Chips above ${fmt(c.floor)} can be exchanged — win some at the tables first.`}</p>
+          <p>Chips into coins and back: ${fmt(c.rate)} chips buy 1 coin, 1 coin buys ${fmt(w.buyChips.rate)} chips (the difference is the Bank's 10 % fee).</p>
           <button class="btn btn-navy wide" data-bank>Visit the Bank</button>
         </section>
         <section class="wcard">
-          <h4>Hard Luck?</h4>
+          <h4>The Daily Top-up</h4>
           ${w.bankrupt.eligible
-    ? `<p>Out of chips? The house will stake you ${fmt(w.bankrupt.amount)} chips to keep playing.</p>
-             <button class="btn btn-navy wide" data-bankrupt ${w.bankrupt.ready ? '' : 'disabled'}>${w.bankrupt.ready ? `Receive ${fmt(w.bankrupt.amount)} chips` : `Next stake in ${untilText(w.bankrupt.nextAt)}`}</button>`
-    : `<p>Should your bankroll ever run dry (under ${w.bankrupt.below} chips), the house will stake you ${fmt(w.bankrupt.amount)} fresh chips. It also happens automatically when you sit down with nothing left.</p>`}
+    ? `<p>You are below ${fmt(w.bankrupt.below)} chips. Once a day the house brings you back to ${fmt(w.bankrupt.below)}.</p>
+             <button class="btn btn-navy wide" data-bankrupt ${w.bankrupt.ready ? '' : 'disabled'}>${w.bankrupt.ready ? `Receive ${fmt(w.bankrupt.amount)} chips` : `Next top-up in ${untilText(w.bankrupt.nextAt)}`}</button>`
+    : `<p>Should you ever fall below ${fmt(w.bankrupt.below)} chips, the house tops you up to ${fmt(w.bankrupt.below)} — once a day. It also happens automatically when you sit down with too little.</p>`}
           <h4 class="mt">Coins from the tables</h4>
-          <p>Win a hand, a Blackjack or escape a game of Durak to earn coins — double at the High Roller tables. Today: ${fmt(w.earnedToday)} / ${fmt(w.tableCap)}.</p>
+          <p>1 coin for every 100 chips you win (at least 1 per win); escaping a game of Durak earns 10. Today: ${fmt(w.earnedToday)} / ${fmt(w.tableCap)}.</p>
         </section>
       </div>`;
     body.querySelector('[data-bank]').onclick = () => openBank();
     const daily = body.querySelector('[data-daily]');
     if (daily) daily.onclick = async () => { const r = await walletAction('/api/wallet/daily'); if (r) { coinPop(r.amount, r.streak > 1 ? `Day ${r.streak} in a row` : 'Daily bonus'); Sound.play('win'); paintLounge(body); } };
     const bk = body.querySelector('[data-bankrupt]');
-    if (bk) bk.onclick = async () => { const r = await walletAction('/api/wallet/bankrupt'); if (r) { coinPop(r.amount, 'A fresh stake', 'chip'); Sound.play('chips'); paintLounge(body); } };
+    if (bk) bk.onclick = async () => { const r = await walletAction('/api/wallet/bankrupt'); if (r) { coinPop(r.amount, 'Your daily top-up', 'chip'); Sound.play('chips'); paintLounge(body); } };
   }
 
   // ================= THE BANK =================
@@ -912,21 +921,22 @@
         <div class="bank-rate"><span>${fmt(c.rate)} chips → 1 coin</span><span>1 coin → ${fmt(b.rate)} chips</span></div>
         <div><small>Your coins</small><strong><i class="ico-coin"></i>${fmt(w.coins)}</strong><em>for the shop</em></div>
       </div>
+      ${principle(w)}
       <div class="bank-desks">
         <section class="desk">
           <h4>Chips → Coins</h4>
-          <p>Turn chips you have won into coins for the shop. You always keep your first ${fmt(c.floor)} chips; up to ${c.dailyMax} coins a day.</p>
+          <p>Turn chips into coins for the shop: ${fmt(c.rate)} chips per coin (100 + the 10 % fee).</p>
           ${c.maxCoins > 0 ? `
             <label class="amount"><span>Coins to receive</span><input type="number" min="1" max="${c.maxCoins}" value="${Math.min(c.maxCoins, 10)}" data-sell></label>
             <input type="range" min="1" max="${c.maxCoins}" value="${Math.min(c.maxCoins, 10)}" data-sell-range aria-label="Coins to receive">
             <p class="quote">You pay <b data-sell-cost></b> chips</p>
             <button class="btn btn-navy wide" data-sell-go>Exchange chips for coins</button>`
-    : `<p class="muted">${c.usedToday >= c.dailyMax ? 'You have exchanged today\'s maximum — the desk reopens tomorrow.' : `Nothing to exchange yet: only chips above ${fmt(c.floor)} can be turned into coins.`}</p>`}
-          <p class="fine">Exchanged today: ${c.usedToday} / ${c.dailyMax} coins</p>
+    : `<p class="muted">You need at least ${fmt(c.rate)} chips in your bankroll for one coin.</p>`}
+          <p class="fine">Up to ${fmt(b.max)} coins per exchange.</p>
         </section>
         <section class="desk">
           <h4>Coins → Chips</h4>
-          <p>Short of chips? Trade coins back into chips for your bankroll, at ${fmt(b.rate)} chips per coin.</p>
+          <p>Short of chips? Trade coins back into chips: ${fmt(b.rate)} chips per coin (100 − the 10 % fee).</p>
           ${w.coins > 0 ? `
             <label class="amount"><span>Coins to trade</span><input type="number" min="1" max="${Math.min(w.coins, b.max)}" value="${Math.min(w.coins, 10)}" data-buy></label>
             <input type="range" min="1" max="${Math.min(w.coins, b.max)}" value="${Math.min(w.coins, 10)}" data-buy-range aria-label="Coins to trade">
@@ -936,7 +946,7 @@
           <p class="fine">Up to ${fmt(b.max)} coins per exchange.</p>
         </section>
       </div>
-      <p class="fine center">Rates differ in each direction, so trading back and forth never creates chips or coins. Play money only — nothing here can be bought with or exchanged for real money.</p>`;
+      <p class="fine center">Play money only — nothing here can be bought with or exchanged for real money.</p>`;
     const wire = (numSel, rangeSel, outSel, rate, max) => {
       const num = body.querySelector(numSel), range = body.querySelector(rangeSel), out = body.querySelector(outSel);
       if (!num) return null;

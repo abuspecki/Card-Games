@@ -2,7 +2,7 @@
 // owner dashboard. Every request is validated here, on the server.
 const crypto = require('crypto');
 const { hashPassword, checkPassword, MODES, FEEDBACK_CATEGORIES, FEEDBACK_STATUSES } = require('./store');
-const { CATALOG, SHOP_TABS, CONVERT_RATE, CONVERT_FLOOR, CONVERT_DAILY_MAX, BANKRUPT_GRANT, COIN_TO_CHIPS, dayString } = require('./coins');
+const { CATALOG, SHOP_TABS, CHIPS_PER_COIN, EXCHANGE_FEE, CONVERT_RATE, TOPUP_TO, COIN_TO_CHIPS, dayString } = require('./coins');
 const fb = require('./feedback');
 const taskboard = require('./taskboard');
 
@@ -138,7 +138,7 @@ function createApi(ctx) {
       });
     }
     if (method === 'GET' && url === '/api/shop') {
-      return json(res, 200, { items: CATALOG, slots: SHOP_TABS, rules: { convertRate: CONVERT_RATE, convertFloor: CONVERT_FLOOR, convertDailyMax: CONVERT_DAILY_MAX, bankruptGrant: BANKRUPT_GRANT, coinToChips: COIN_TO_CHIPS } });
+      return json(res, 200, { items: CATALOG, slots: SHOP_TABS, rules: { chipsPerCoin: CHIPS_PER_COIN, fee: EXCHANGE_FEE, convertRate: CONVERT_RATE, coinToChips: COIN_TO_CHIPS, topUpTo: TOPUP_TO } });
     }
     const profileMatch = url.match(/^\/api\/players\/([A-Za-z0-9_-]{1,16})$/);
     if (method === 'GET' && profileMatch) {

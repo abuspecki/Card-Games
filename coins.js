@@ -1,14 +1,13 @@
-// The economy. Two play-money currencies for accounts (never bought with real
-// money, never cashed out):
-//   • Chips — your bankroll. You bring chips to a table (buy-in) and take them
-//     back when you leave. Going bankrupt gives you a fresh stack.
-//   • Coins — the shop currency. Earned from the daily bonus, from wins at the
-//     tables, and by converting chips you have WON.
-// Anti-exploit rules:
-//   • Only chips above CONVERT_FLOOR can be converted, and free chips (welcome +
-//     bankruptcy refills) never lift you above it — so only winnings convert.
-//   • Conversion and table coin rewards have daily caps.
-//   • Every balance change runs inside a locked wallet update (no double spends).
+// The economy — one principle: CHIPS ARE PLAY MONEY, COINS ARE REWARDS.
+// Both are play money for accounts (never bought with real money, never cashed out).
+//   • Chips — what you bet with. You bring them to a table and take them back
+//     when you leave. Below 1,000 chips? Once a day the house tops you up to 1,000.
+//   • Coins — what you earn and spend in the shop: 1 coin for every 100 chips
+//     you win (at least 1 per win, up to TABLE_DAILY_CAP a day), plus the
+//     daily bonus.
+//   • The Bank exchanges both ways at one rate (100 chips = 1 coin) and keeps
+//     a 10 % fee on every exchange — so trading back and forth never pays.
+// Every balance change runs inside a locked wallet update (no double spends).
 
 const WELCOME_COINS = 200;
 const WELCOME_CHIPS = 5000;
@@ -16,14 +15,13 @@ const DAILY_BASE = 100;          // daily coin bonus on day 1 of a streak
 const DAILY_STEP = 25;           // extra per consecutive day…
 const DAILY_MAX_DAYS = 7;        // …up to day 7 (250 coins)
 const TABLE_DAILY_CAP = 500;     // most coins you can win at tables per day
-const CONVERT_RATE = 100;        // chips per coin
-const CONVERT_FLOOR = 5000;      // chips you always keep; only chips above it convert
-const CONVERT_DAILY_MAX = 300;   // most coins from conversion per day
-const COIN_TO_CHIPS = 80;        // chips you get for 1 coin (less than 100, so trading in circles always loses)
+const CHIPS_PER_COIN = 100;      // the one exchange rate
+const EXCHANGE_FEE = 0.10;       // the Bank keeps 10 % of every exchange
+const CONVERT_RATE = Math.round(CHIPS_PER_COIN * (1 + EXCHANGE_FEE)); // chips you pay for 1 coin (110)
+const COIN_TO_CHIPS = Math.round(CHIPS_PER_COIN * (1 - EXCHANGE_FEE)); // chips you get for 1 coin (90)
 const BUYCHIPS_MAX = 1000;       // most coins per exchange
-const BANKRUPT_BELOW = 100;      // total chips (bankroll + at tables) to count as bankrupt
-const BANKRUPT_GRANT = 1000;
-const BANKRUPT_COOLDOWN = 15 * 60 * 1000;
+const TOPUP_TO = 1000;           // the daily top-up brings you back to this many chips
+const BANKRUPT_GRANT = TOPUP_TO; // (name kept for the API)
 const INIT = { coins: WELCOME_COINS, chips: WELCOME_CHIPS };
 
 // Equip slots — one item each:
@@ -137,11 +135,11 @@ function nextStreak(w, now) {
   return w.last_daily === dayString(now - 86400000) ? w.streak + 1 : 1;
 }
 
-function convertible(w, now) {
-  const usedToday = w.converted_day === dayString(now) ? w.converted_today : 0;
-  const byChips = Math.floor(Math.max(0, w.chips - CONVERT_FLOOR) / CONVERT_RATE);
-  return { coins: Math.max(0, Math.min(byChips, CONVERT_DAILY_MAX - usedToday)), usedToday };
-}
+// Coins you can get for your chips right now.
+const convertible = (w) => Math.floor(Math.max(0, w.chips) / CONVERT_RATE);
+
+// Coins earned for a net win of `chips`: 1 per 100, at least 1.
+const coinsForWin = (chips) => (chips > 0 ? Math.max(1, Math.round(chips / CHIPS_PER_COIN)) : 0);
 
 // Everything the client needs to show the wallet.
 function status(w, now = Date.now()) {
@@ -149,8 +147,8 @@ function status(w, now = Date.now()) {
   const streak = nextStreak(w, now);
   const dailyReady = w.last_daily !== today;
   const tomorrow = new Date(today + 'T00:00:00Z').getTime() + 86400000;
-  const bankruptAt = Number(w.last_bankrupt || 0) + BANKRUPT_COOLDOWN;
-  const conv = convertible(w, now);
+  const total = w.chips + w.in_play;
+  const toppedToday = w.last_bankrupt && dayString(Number(w.last_bankrupt)) === today;
   return {
     coins: w.coins,
     chips: w.chips,
@@ -161,18 +159,16 @@ function status(w, now = Date.now()) {
       streak: dailyReady ? streak - 1 : w.streak, // days already collected in a row
       nextAt: dailyReady ? null : tomorrow,
     },
-    bankrupt: {
-      eligible: w.chips + w.in_play < BANKRUPT_BELOW,
-      ready: w.chips + w.in_play < BANKRUPT_BELOW && now >= bankruptAt,
-      amount: BANKRUPT_GRANT,
-      below: BANKRUPT_BELOW,
-      nextAt: now >= bankruptAt ? null : bankruptAt,
+    bankrupt: {                                    // the daily top-up
+      eligible: total < TOPUP_TO,
+      ready: total < TOPUP_TO && !toppedToday,
+      amount: Math.max(0, TOPUP_TO - total),
+      below: TOPUP_TO,
+      nextAt: toppedToday ? tomorrow : null,
     },
     buyChips: { rate: COIN_TO_CHIPS, max: BUYCHIPS_MAX },
-    convert: {
-      rate: CONVERT_RATE, floor: CONVERT_FLOOR, dailyMax: CONVERT_DAILY_MAX,
-      maxCoins: conv.coins, usedToday: conv.usedToday,
-    },
+    convert: { rate: CONVERT_RATE, maxCoins: convertible(w) },
+    rules: { chipsPerCoin: CHIPS_PER_COIN, fee: EXCHANGE_FEE, topUpTo: TOPUP_TO },
     earnedToday: w.earned_day === today ? w.earned_today : 0,
     tableCap: TABLE_DAILY_CAP,
   };
@@ -202,36 +198,33 @@ function makeCoins(store) {
       });
     },
 
-    // Fresh chips for a bankrupt player.
+    // The daily top-up: below 1,000 chips (bankroll + at tables), once a day, back to 1,000.
     async claimBankrupt(userId, now = Date.now()) {
       return wallet(userId, (w) => {
-        if (w.chips + w.in_play >= BANKRUPT_BELOW) return { result: { error: `You still have chips — the refill is for players with fewer than ${BANKRUPT_BELOW}` } };
-        if (now < Number(w.last_bankrupt || 0) + BANKRUPT_COOLDOWN) return { result: { error: 'Your next refill isn\'t ready yet' } };
-        const chips = w.chips + BANKRUPT_GRANT;
-        return { update: { chips, last_bankrupt: now }, result: { amount: BANKRUPT_GRANT, chips } };
+        const total = w.chips + w.in_play;
+        if (total >= TOPUP_TO) return { result: { error: `The top-up is for players with fewer than ${TOPUP_TO.toLocaleString()} chips` } };
+        if (w.last_bankrupt && dayString(Number(w.last_bankrupt)) === dayString(now)) return { result: { error: 'You have had today\'s top-up — the next one comes tomorrow' } };
+        const amount = TOPUP_TO - total;
+        const chips = w.chips + amount;
+        return { update: { chips, last_bankrupt: now }, result: { amount, chips } };
       });
     },
 
-    // Convert won chips into coins.
-    async convert(userId, coinsWanted, now = Date.now()) {
+    // The Bank, chips -> coins: 110 chips per coin (100 + 10 % fee).
+    async convert(userId, coinsWanted) {
       const want = int(coinsWanted);
       if (!(want >= 1)) return { error: 'Choose how many coins you want' };
+      if (want > BUYCHIPS_MAX) return { error: `You can exchange up to ${BUYCHIPS_MAX.toLocaleString()} coins at once` };
       return wallet(userId, (w) => {
-        const c = convertible(w, now);
-        if (c.coins < want) {
-          if (c.usedToday >= CONVERT_DAILY_MAX) return { result: { error: `You can convert up to ${CONVERT_DAILY_MAX} coins per day — come back tomorrow` } };
-          return { result: { error: `You can convert up to ${c.coins} coins right now (only chips above ${CONVERT_FLOOR.toLocaleString()} can be converted)` } };
-        }
-        const chips = w.chips - want * CONVERT_RATE;
+        const cost = want * CONVERT_RATE;
+        if (w.chips < cost) return { result: { error: `${want} coins cost ${cost.toLocaleString()} chips — you have ${w.chips.toLocaleString()}` } };
+        const chips = w.chips - cost;
         const coins = w.coins + want;
-        return {
-          update: { chips, coins, converted_day: dayString(now), converted_today: c.usedToday + want },
-          result: { coins, chips, converted: want, spentChips: want * CONVERT_RATE },
-        };
+        return { update: { chips, coins }, result: { coins, chips, converted: want, spentChips: cost } };
       });
     },
 
-    // Trade coins back into chips.
+    // The Bank, coins -> chips: 90 chips per coin (100 − 10 % fee).
     async buyChips(userId, coinsGiven) {
       const n = int(coinsGiven);
       if (!(n >= 1)) return { error: 'Choose how many coins to trade' };
@@ -329,19 +322,16 @@ function makeCoins(store) {
   return api;
 }
 
-// Coins for one player's result at the end of a hand / Durak game.
-function rewardFor(r, highRoller) {
+// Coins for one player's result: 1 per 100 chips won (at least 1 per win).
+// Durak has no chips: escaping a game earns 10 coins.
+function rewardFor(r) {
   if (!r.won) return 0;
-  let coins = 0;
-  if (r.mode === 'friends' || r.mode === 'bots') coins = 10 + Math.min(40, Math.floor(Math.max(0, r.pot) / 100));
-  else if (r.mode === 'blackjack') coins = 5 + Math.min(20, Math.floor(Math.max(0, r.net) / 50));
-  else if (r.mode === 'durak') coins = 15;
-  else if (r.mode === 'roulette') coins = 3 + Math.min(20, Math.floor(Math.max(0, r.net) / 50));
-  return highRoller ? coins * 2 : coins;
+  if (r.mode === 'durak') return 10;
+  return coinsForWin(r.net);
 }
 
 module.exports = {
   makeCoins, rewardFor, status, dailyAmount, dayString, CATALOG, ITEMS, SLOTS, SHOP_TABS, GESTURE_COOLDOWN,
-  WELCOME_COINS, WELCOME_CHIPS, TABLE_DAILY_CAP, CONVERT_RATE, CONVERT_FLOOR, CONVERT_DAILY_MAX, COIN_TO_CHIPS, BUYCHIPS_MAX,
-  BANKRUPT_BELOW, BANKRUPT_GRANT, BANKRUPT_COOLDOWN,
+  WELCOME_COINS, WELCOME_CHIPS, TABLE_DAILY_CAP, CHIPS_PER_COIN, EXCHANGE_FEE, CONVERT_RATE, COIN_TO_CHIPS, BUYCHIPS_MAX,
+  TOPUP_TO, BANKRUPT_GRANT, coinsForWin,
 };
