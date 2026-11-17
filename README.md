@@ -41,7 +41,10 @@ Open http://localhost:3000.
   - Only chips above your 5,000 starting amount can be exchanged, so free chips never become coins.
   - At most 300 coins can be exchanged per day.
   - Every balance change locks the wallet row, so nothing can be claimed, spent or charged twice.
-- **The Shop:** card backs, card faces, table felts and backgrounds (shown on your own screen), plus portraits and badges (seen by everyone at your table).
+- **The Shop** (all items are bought with coins, never real money):
+  - On your own screen: card backs, decks (card faces), table felts, chip sets, backgrounds and turn markers.
+  - Seen by everyone at your table: portraits (a frame around your initials), titles before your name (Sir, Lady, Baron, Grand Duke…), and gestures you can use at the table (tip of the hat, polite applause…).
+  - Retired items (the old emoji portraits and badges, Flames) are no longer sold, but players who bought them keep them.
 
 **Friends:**
 - Send and accept requests, see who is online and at which table, invite friends to your table, and view profiles.

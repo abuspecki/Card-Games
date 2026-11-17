@@ -24,41 +24,105 @@ const BANKRUPT_GRANT = 1000;
 const BANKRUPT_COOLDOWN = 15 * 60 * 1000;
 const INIT = { coins: WELCOME_COINS, chips: WELCOME_CHIPS };
 
-// slots: cardback / cardface / felt / background are shown on your own screen;
-// avatar and badge are seen by everyone at your table and on your profile.
+// Equip slots — one item each:
+//   cardback / cardface / felt / chips / background / turn — your own screen only;
+//   avatar (portrait frame) and badge (title) — seen by everyone at your table
+//   and on your profile.
+// Gestures are a collection, not a slot: every gesture you own can be used at
+// the table (everyone sees it).
+// `retired` items are no longer sold. Players who bought them keep them and
+// can still use them; the shop only shows them to their owners.
 const CATALOG = [
+  // ----- card backs -----
   { id: 'back-royal', slot: 'cardback', name: 'Royal Blue', price: 200, preview: 'royal' },
+  { id: 'back-ivory', slot: 'cardback', name: 'Ivory Lace', price: 250, preview: 'ivory' },
   { id: 'back-midnight', slot: 'cardback', name: 'Midnight Gold', price: 300, preview: 'midnight' },
   { id: 'back-emerald', slot: 'cardback', name: 'Emerald Lattice', price: 300, preview: 'emerald' },
+  { id: 'back-saville', slot: 'cardback', name: 'Savile Row', price: 350, preview: 'saville' },
+  { id: 'back-regatta', slot: 'cardback', name: 'Regatta', price: 350, preview: 'regatta' },
   { id: 'back-sunburst', slot: 'cardback', name: 'Bordeaux Sunburst', price: 450, preview: 'sunburst' },
-  { id: 'back-flames', slot: 'cardback', name: 'Flames', price: 500, preview: 'flames' },
+  { id: 'back-tartan', slot: 'cardback', name: 'Hunting Lodge', price: 450, preview: 'tartan' },
+  { id: 'back-faberge', slot: 'cardback', name: 'Fabergé', price: 750, preview: 'faberge' },
+  { id: 'back-flames', slot: 'cardback', name: 'Flames', price: 500, preview: 'flames', retired: true },
+  // ----- decks (card faces) -----
+  { id: 'face-bridge', slot: 'cardface', name: 'Bridge Club', price: 200, preview: 'bridge' },
   { id: 'face-fourcolor', slot: 'cardface', name: 'Four-Colour Deck', price: 250, preview: 'fourcolor' },
+  { id: 'face-ink', slot: 'cardface', name: 'Ink & Paper', price: 300, preview: 'ink' },
+  { id: 'face-cyrillic', slot: 'cardface', name: 'Imperial Russian', price: 400, preview: 'cyrillic' },
   { id: 'face-gilded', slot: 'cardface', name: 'Gilded Edges', price: 600, preview: 'gilded' },
+  // ----- table felts -----
   { id: 'felt-blue', slot: 'felt', name: 'Ocean Felt', price: 250, preview: 'blue' },
   { id: 'felt-purple', slot: 'felt', name: 'Royal Purple', price: 250, preview: 'purple' },
+  { id: 'felt-camel', slot: 'felt', name: 'Camel Hair', price: 300, preview: 'camel' },
+  { id: 'felt-navy', slot: 'felt', name: 'Admiralty Navy', price: 350, preview: 'navy' },
   { id: 'felt-crimson', slot: 'felt', name: 'Crimson', price: 400, preview: 'crimson' },
+  { id: 'felt-ice', slot: 'felt', name: 'Neva Ice', price: 500, preview: 'ice' },
   { id: 'felt-black', slot: 'felt', name: 'Black Velvet', price: 600, preview: 'black' },
+  // ----- chip sets -----
+  { id: 'chips-clay', slot: 'chips', name: 'Monte Carlo Clay', price: 300, preview: 'clay' },
+  { id: 'chips-brass', slot: 'chips', name: 'Engraved Brass', price: 450, preview: 'brass' },
+  { id: 'chips-onyx', slot: 'chips', name: 'Onyx & Silver', price: 500, preview: 'onyx' },
+  { id: 'chips-malachite', slot: 'chips', name: 'Malachite', price: 650, preview: 'malachite' },
+  { id: 'chips-pearl', slot: 'chips', name: 'Mother-of-Pearl', price: 800, preview: 'pearl' },
+  // ----- backgrounds -----
   { id: 'bg-damask', slot: 'background', name: 'Ivory Damask', price: 200, preview: 'damask' },
+  { id: 'bg-riviera', slot: 'background', name: 'Riviera Awning', price: 250, preview: 'riviera' },
   { id: 'bg-marble', slot: 'background', name: 'White Marble', price: 300, preview: 'marble' },
+  { id: 'bg-tweed', slot: 'background', name: 'Country Tweed', price: 350, preview: 'tweed' },
   { id: 'bg-library', slot: 'background', name: 'Oak Library', price: 400, preview: 'library' },
+  { id: 'bg-club', slot: 'background', name: "Gentlemen's Club", price: 450, preview: 'club' },
   { id: 'bg-midnight', slot: 'background', name: 'Midnight Salon', price: 500, preview: 'midnight' },
-  { id: 'avatar-fox', slot: 'avatar', name: 'The Fox', price: 150, preview: '🦊' },
-  { id: 'avatar-owl', slot: 'avatar', name: 'The Owl', price: 150, preview: '🦉' },
-  { id: 'avatar-wolf', slot: 'avatar', name: 'The Wolf', price: 250, preview: '🐺' },
-  { id: 'avatar-bear', slot: 'avatar', name: 'The Bear', price: 250, preview: '🐻' },
-  { id: 'avatar-lion', slot: 'avatar', name: 'The Lion', price: 400, preview: '🦁' },
-  { id: 'avatar-tophat', slot: 'avatar', name: 'The Gentleman', price: 400, preview: '🎩' },
-  { id: 'avatar-queen', slot: 'avatar', name: 'The Queen', price: 700, preview: '👸' },
-  { id: 'avatar-king', slot: 'avatar', name: 'The King', price: 700, preview: '🤴' },
-  { id: 'badge-star', slot: 'badge', name: 'Star', price: 150, preview: '⭐' },
-  { id: 'badge-clover', slot: 'badge', name: 'Lucky Clover', price: 150, preview: '🍀' },
-  { id: 'badge-fire', slot: 'badge', name: 'On Fire', price: 200, preview: '🔥' },
-  { id: 'badge-shark', slot: 'badge', name: 'Card Shark', price: 400, preview: '🦈' },
-  { id: 'badge-crown', slot: 'badge', name: 'Crown', price: 800, preview: '👑' },
-  { id: 'badge-diamond', slot: 'badge', name: 'Diamond', price: 1000, preview: '💎' },
+  // ----- portraits (a frame around your initials) -----
+  { id: 'pf-signet', slot: 'avatar', name: 'Signet Ring', price: 200, preview: 'pf:signet' },
+  { id: 'pf-cameo', slot: 'avatar', name: 'Cameo', price: 250, preview: 'pf:cameo' },
+  { id: 'pf-seal', slot: 'avatar', name: 'Wax Seal', price: 350, preview: 'pf:seal' },
+  { id: 'pf-crest', slot: 'avatar', name: 'Family Crest', price: 450, preview: 'pf:crest' },
+  { id: 'pf-laurel', slot: 'avatar', name: 'Laurel Wreath', price: 600, preview: 'pf:laurel' },
+  { id: 'pf-sovereign', slot: 'avatar', name: 'Gold Sovereign', price: 900, preview: 'pf:sovereign' },
+  { id: 'avatar-fox', slot: 'avatar', name: 'The Fox', price: 150, preview: '🦊', retired: true },
+  { id: 'avatar-owl', slot: 'avatar', name: 'The Owl', price: 150, preview: '🦉', retired: true },
+  { id: 'avatar-wolf', slot: 'avatar', name: 'The Wolf', price: 250, preview: '🐺', retired: true },
+  { id: 'avatar-bear', slot: 'avatar', name: 'The Bear', price: 250, preview: '🐻', retired: true },
+  { id: 'avatar-lion', slot: 'avatar', name: 'The Lion', price: 400, preview: '🦁', retired: true },
+  { id: 'avatar-tophat', slot: 'avatar', name: 'The Gentleman', price: 400, preview: '🎩', retired: true },
+  { id: 'avatar-queen', slot: 'avatar', name: 'The Queen', price: 700, preview: '👸', retired: true },
+  { id: 'avatar-king', slot: 'avatar', name: 'The King', price: 700, preview: '🤴', retired: true },
+  // ----- titles (shown before your name) -----
+  { id: 'title-hon', slot: 'badge', name: 'The Honourable', price: 150, preview: 't:The Hon.' },
+  { id: 'title-sir', slot: 'badge', name: 'Sir', price: 250, preview: 't:Sir' },
+  { id: 'title-dame', slot: 'badge', name: 'Dame', price: 250, preview: 't:Dame' },
+  { id: 'title-lord', slot: 'badge', name: 'Lord', price: 400, preview: 't:Lord' },
+  { id: 'title-lady', slot: 'badge', name: 'Lady', price: 400, preview: 't:Lady' },
+  { id: 'title-baron', slot: 'badge', name: 'Baron', price: 600, preview: 't:Baron' },
+  { id: 'title-baroness', slot: 'badge', name: 'Baroness', price: 600, preview: 't:Baroness' },
+  { id: 'title-count', slot: 'badge', name: 'Count', price: 800, preview: 't:Count' },
+  { id: 'title-countess', slot: 'badge', name: 'Countess', price: 800, preview: 't:Countess' },
+  { id: 'title-duke', slot: 'badge', name: 'Duke', price: 1200, preview: 't:Duke' },
+  { id: 'title-duchess', slot: 'badge', name: 'Duchess', price: 1200, preview: 't:Duchess' },
+  { id: 'title-grandduke', slot: 'badge', name: 'Grand Duke', price: 2000, preview: 't:Grand Duke' },
+  { id: 'badge-star', slot: 'badge', name: 'Star', price: 150, preview: '⭐', retired: true },
+  { id: 'badge-clover', slot: 'badge', name: 'Lucky Clover', price: 150, preview: '🍀', retired: true },
+  { id: 'badge-fire', slot: 'badge', name: 'On Fire', price: 200, preview: '🔥', retired: true },
+  { id: 'badge-shark', slot: 'badge', name: 'Card Shark', price: 400, preview: '🦈', retired: true },
+  { id: 'badge-crown', slot: 'badge', name: 'Crown', price: 800, preview: '👑', retired: true },
+  { id: 'badge-diamond', slot: 'badge', name: 'Diamond', price: 1000, preview: '💎', retired: true },
+  // ----- turn markers (marks whose turn it is) -----
+  { id: 'turn-candle', slot: 'turn', name: 'Candlelight', price: 200, preview: 'candle' },
+  { id: 'turn-hourglass', slot: 'turn', name: 'Hourglass', price: 300, preview: 'hourglass' },
+  { id: 'turn-watch', slot: 'turn', name: 'Pocket Watch', price: 400, preview: 'watch' },
+  // ----- gestures (owned, used at the table) -----
+  { id: 'gesture-nod', slot: 'gesture', name: 'A Courteous Nod', price: 100, preview: 'nods courteously' },
+  { id: 'gesture-wellplayed', slot: 'gesture', name: 'Well Played', price: 150, preview: 'says “Well played.”' },
+  { id: 'gesture-applause', slot: 'gesture', name: 'Polite Applause', price: 200, preview: 'applauds politely' },
+  { id: 'gesture-hat', slot: 'gesture', name: 'Tip of the Hat', price: 250, preview: 'tips the hat' },
+  { id: 'gesture-eyebrow', slot: 'gesture', name: 'A Raised Eyebrow', price: 300, preview: 'raises an eyebrow' },
+  { id: 'gesture-watch', slot: 'gesture', name: 'Checks the Watch', price: 300, preview: 'checks the pocket watch' },
+  { id: 'gesture-monocle', slot: 'gesture', name: 'The Monocle Drop', price: 500, preview: 'drops the monocle' },
 ];
 const ITEMS = Object.fromEntries(CATALOG.map((i) => [i.id, i]));
-const SLOTS = ['cardback', 'cardface', 'felt', 'background', 'avatar', 'badge'];
+const SLOTS = ['cardback', 'cardface', 'felt', 'chips', 'background', 'turn', 'avatar', 'badge'];
+const SHOP_TABS = ['cardback', 'cardface', 'felt', 'chips', 'background', 'avatar', 'badge', 'turn', 'gesture'];
+const GESTURE_COOLDOWN = 4000;   // ms between gestures per player
 
 const dayString = (t) => new Date(t).toISOString().slice(0, 10); // UTC day
 const dailyAmount = (streak) => DAILY_BASE + DAILY_STEP * (Math.min(streak, DAILY_MAX_DAYS) - 1);
@@ -197,6 +261,7 @@ function makeCoins(store) {
     async buy(userId, itemId) {
       const item = ITEMS[itemId];
       if (!item) return { error: 'That item doesn\'t exist' };
+      if (item.retired) return { error: 'That item is no longer sold' };
       // Ownership is checked inside the locked update, so two quick clicks
       // can't buy (and pay for) the same item twice.
       return wallet(userId, (w, owned) => {
@@ -217,6 +282,14 @@ function makeCoins(store) {
       }
       await store.setEquipped(userId, slot, itemId || null);
       return { ok: true };
+    },
+
+    // The gesture to show at the table, or null if the player doesn't own it.
+    async gestureOf(userId, itemId) {
+      const item = ITEMS[itemId];
+      if (!item || item.slot !== 'gesture') return null;
+      const { owned } = await store.getItems(userId);
+      return owned.includes(itemId) ? item : null;
     },
 
     // Avatar + badge, shown to other players.
@@ -251,7 +324,7 @@ function rewardFor(r, highRoller) {
 }
 
 module.exports = {
-  makeCoins, rewardFor, status, dailyAmount, dayString, CATALOG, ITEMS, SLOTS,
+  makeCoins, rewardFor, status, dailyAmount, dayString, CATALOG, ITEMS, SLOTS, SHOP_TABS, GESTURE_COOLDOWN,
   WELCOME_COINS, WELCOME_CHIPS, TABLE_DAILY_CAP, CONVERT_RATE, CONVERT_FLOOR, CONVERT_DAILY_MAX,
   BANKRUPT_BELOW, BANKRUPT_GRANT, BANKRUPT_COOLDOWN,
 };

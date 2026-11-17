@@ -231,7 +231,7 @@
     $('navMember').classList.toggle('hidden', !a);
     document.querySelectorAll('.owner-only').forEach((x) => x.classList.toggle('hidden', !(a && a.isOwner)));
     if (a) {
-      $('navAvatar').textContent = myAvatar();
+      $('navAvatar').innerHTML = myAvatar();
       $('navChips').textContent = fmt(App.wallet ? App.wallet.chips : 0);
       $('navCoins').textContent = fmt(App.wallet ? App.wallet.coins : 0);
     }
@@ -239,10 +239,27 @@
   }
 
   const initials = (name) => String(name || '?').slice(0, 2).toUpperCase();
-  function myAvatar() {
-    const id = App.wallet && App.wallet.equipped && App.wallet.equipped.avatar;
+  // Portraits: 'pf:<frame>' draws a frame around the initials; anything else
+  // (older emoji portraits) is shown as it is.
+  function avatarMarkup(av, name, letters = 2) {
+    const ini = String(name || '?').slice(0, letters).toUpperCase();
+    if (av && av.startsWith('pf:')) return `<span class="pf pf-${esc(av.slice(3))}"><b>${esc(ini)}</b></span>`;
+    return esc(av || ini);
+  }
+  // Titles: 't:<word>' is written before the name; older emoji badges stay as marks.
+  function titleMarkup(b) {
+    if (!b) return '';
+    return b.startsWith('t:') ? `<span class="title">${esc(b.slice(2))}</span> ` : `<span class="badge">${esc(b)}</span>`;
+  }
+  App.avatarMarkup = avatarMarkup;
+  App.titleMarkup = titleMarkup;
+  function equippedPreview(slot) {
+    const id = App.wallet && App.wallet.equipped && App.wallet.equipped[slot];
     const item = id && App.shop && App.shop.items.find((i) => i.id === id);
-    return item ? item.preview : initials(App.account && App.account.username);
+    return item ? item.preview : null;
+  }
+  function myAvatar() {
+    return avatarMarkup(equippedPreview('avatar'), App.account && App.account.username);
   }
 
   // ================= WALLET =================
@@ -275,6 +292,8 @@
     document.body.dataset.cardface = pick('cardface');
     document.body.dataset.felt = pick('felt');
     document.body.dataset.bg = pick('background');
+    CardUI.chipSet = pick('chips') || null;
+    document.body.dataset.turn = pick('turn');
     if (App.S) renderTable();
   }
 
@@ -345,7 +364,7 @@
         const seats = row.querySelector('.rt-seats');
         for (let k = 0; k < t.capacity; k++) {
           const p = t.players[k];
-          const d = h('span', 'rt-seat' + (p ? (p.bot ? ' bot' : ' human') : ''), p ? esc(p.bot ? '🤖' : (p.avatar || p.name[0].toUpperCase())) : '');
+          const d = h('span', 'rt-seat' + (p ? (p.bot ? ' bot' : ' human') : ''), p ? (p.bot ? '🤖' : avatarMarkup(p.avatar, p.name, 1)) : '');
           d.title = p ? p.name : 'Open seat';
           seats.appendChild(d);
         }
@@ -410,6 +429,13 @@
       return;
     }
     if (m.t === 'sfx') { Sound.play(m.name); return; }
+    if (m.t === 'gesture') {
+      bubbles[m.seat] = { text: `${m.name} ${m.text}`, until: Date.now() + 4000, gesture: true };
+      Sound.play('chat');
+      if (App.S) renderBubbles(App.S.state);
+      setTimeout(() => { if (App.S) renderBubbles(App.S.state); }, 4100);
+      return;
+    }
     if (m.t === 'coins') {
       if (App.wallet) { App.wallet.coins = m.coins; renderAccount(); }
       if (m.amount > 0) { coinPop(m.amount, m.capped ? 'Daily table limit reached' : 'For your win'); Sound.play('chips'); }
@@ -474,8 +500,8 @@
     openDrawer: (tab) => { setDrawer(true); if (tab) pickTab(tab); },
     openRules: () => openHowTo(App.game),
     plates: {},   // seat index -> [x, y] on the stage (for chat bubbles)
-    avatarHtml: (s) => esc(s.avatar || initials(s.name)),
-    nameHtml: (s) => `${s.badge ? `<span class="badge">${esc(s.badge)}</span>` : ''}${s.isBot ? '<span class="botmark" title="Computer player">🤖</span>' : ''}${esc(s.name)}`,
+    avatarHtml: (s) => avatarMarkup(s.avatar, s.name),
+    nameHtml: (s) => `${titleMarkup(s.badge)}${s.isBot ? '<span class="botmark" title="Computer player">🤖</span>' : ''}${esc(s.name)}`,
   };
   App.ctx = ctx;
 
@@ -543,11 +569,42 @@
       <button class="lobby-link" data-act="lobby"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg><span>Lobby</span></button>
       <div class="tb-center"><small>${esc(game === 'durak' ? 'Durak' : title)} · ${esc(room)}</small><strong data-tb-title></strong></div>
       <div class="tb-right"><span data-topbar-wallet></span>
+        <button class="tb-btn" data-act="gesture" title="Gestures" aria-label="Gestures"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v11H7z M3 15h18v2.5H3z"/></svg></button>
         <button class="tb-btn" data-act="rules" title="How to play" aria-label="How to play">?</button>
         <button class="tb-btn" data-act="panel" title="Chat & table" aria-label="Open chat and table panel">☰<span class="dot hidden" data-chat-dot></span></button></div>`;
     tb.querySelector('[data-act=lobby]').onclick = leaveTable;
     tb.querySelector('[data-act=rules]').onclick = () => openHowTo(game);
+    tb.querySelector('[data-act=gesture]').onclick = (e) => { e.stopPropagation(); toggleGestureMenu(); };
     tb.querySelector('[data-act=panel]').onclick = () => setDrawer(!$('drawer').classList.contains('open'));
+  }
+
+  // Gestures: a small menu of the gestures you own.
+  function toggleGestureMenu() {
+    const old = document.querySelector('.gesture-menu');
+    if (old) { old.remove(); return; }
+    const menu = h('div', 'gesture-menu');
+    const owned = App.account && App.wallet && App.shop ? App.shop.items.filter((i) => i.slot === 'gesture' && App.wallet.owned.includes(i.id)) : [];
+    if (!App.account) menu.appendChild(h('p', '', 'Gestures are for members. Sign in to use them.'));
+    else if (!owned.length) {
+      menu.appendChild(h('p', '', 'You have no gestures yet.'));
+      const b = h('button', 'pill gold', 'Visit the Shop');
+      b.onclick = () => { menu.remove(); shopSlot = 'gesture'; openLounge('shop'); };
+      menu.appendChild(b);
+    } else {
+      menu.appendChild(h('small', '', 'Gestures'));
+      for (const g of owned) {
+        const b = h('button', '', `<b>${esc(g.name)}</b><em>${esc(g.preview)}</em>`);
+        b.onclick = () => { send({ t: 'gesture', item: g.id }); menu.remove(); };
+        menu.appendChild(b);
+      }
+    }
+    document.body.appendChild(menu);
+    const btn = ctx.topbar.querySelector('[data-act=gesture]').getBoundingClientRect();
+    menu.style.top = (btn.bottom + 8) + 'px';
+    menu.style.right = Math.max(8, window.innerWidth - btn.right) + 'px';
+    setTimeout(() => document.addEventListener('click', function close(ev) {
+      if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', close); }
+    }), 0);
   }
 
   // The table top bar shows your bankroll / coins (members only).
@@ -624,7 +681,7 @@
     for (const [seat, b] of Object.entries(bubbles)) {
       const pos = ctx.plates[seat];
       if (!pos || b.until < Date.now()) { if (b.until < Date.now()) delete bubbles[seat]; continue; }
-      const el = h('div', 'bubble');
+      const el = h('div', 'bubble' + (b.gesture ? ' gesture' : ''));
       el.textContent = b.text.length > 80 ? b.text.slice(0, 77) + '…' : b.text;
       el.style.left = pos[0] + 'px';
       el.style.top = pos[1] + 'px';
@@ -824,8 +881,11 @@
     cardface: ['Card faces', 'How the faces of the cards are printed — on your screen.'],
     felt: ['Table felt', 'The cloth of every table you sit at — on your screen.'],
     background: ['Backgrounds', 'The wallpaper of the club and the rooms — on your screen.'],
-    avatar: ['Portraits', 'Your portrait on the nameplate — everyone at your table sees it.'],
-    badge: ['Badges', 'A small mark beside your name — everyone sees it.'],
+    chips: ['Chip sets', 'The chips on every table — on your screen.'],
+    avatar: ['Portraits', 'A frame around your initials on your nameplate — everyone at your table sees it.'],
+    badge: ['Titles', 'A title written before your name — everyone at your table and on your profile sees it.'],
+    turn: ['Turn markers', 'How the player whose turn it is gets marked — on your screen.'],
+    gesture: ['Gestures', 'Little courtesies for the table. Every gesture you own is yours to use — open the hat button at any table.'],
   };
   let shopSlot = 'cardback';
   function shopPreview(item) {
@@ -840,8 +900,18 @@
       box.appendChild(wrap);
     } else if (item.slot === 'felt') box.appendChild(h('div', 'mini-felt', '')).dataset.felt = item.preview;
     else if (item.slot === 'background') box.appendChild(h('div', 'mini-bg', '')).dataset.bg = item.preview;
-    else if (item.slot === 'avatar') box.appendChild(h('span', 'mini-avatar', esc(item.preview === 'classic' ? initials(App.account.username) : item.preview)));
-    else box.appendChild(h('span', 'mini-badge', `${item.preview === 'classic' ? '' : esc(item.preview) + ' '}${esc(App.account.username)}`));
+    else if (item.slot === 'chips') {
+      const wrap = h('div', 'mini-chips');
+      wrap.dataset.chips = item.preview;
+      [5, 25, 100, 500].forEach((v) => wrap.appendChild(CardUI.chip(v, { size: 34, set: item.preview === 'classic' ? '' : item.preview })));
+      box.appendChild(wrap);
+    } else if (item.slot === 'turn') {
+      const plate = h('div', 'mini-turn', `<span class="mt-av">${avatarMarkup(null, App.account.username)}</span><span>Your turn</span>`);
+      plate.dataset.turn = item.preview;
+      box.appendChild(plate);
+    } else if (item.slot === 'gesture') box.appendChild(h('span', 'mini-gesture', `<b>${esc(App.account.username)}</b> ${esc(item.preview)}`));
+    else if (item.slot === 'avatar') box.appendChild(h('span', 'mini-avatar', avatarMarkup(item.preview === 'classic' ? null : item.preview, App.account.username)));
+    else box.appendChild(h('span', 'mini-badge', `${item.preview === 'classic' ? '' : titleMarkup(item.preview)}${esc(App.account.username)}`));
     return box;
   }
   function paintShop(body) {
@@ -857,25 +927,30 @@
     body.appendChild(sub);
     body.appendChild(h('p', 'fine', esc(SLOT_INFO[shopSlot][1])));
     const grid = h('div', 'shop-grid');
+    const isGesture = shopSlot === 'gesture';
     const equipped = w.equipped[shopSlot];
-    const def = h('div', 'shop-item' + (!equipped ? ' on' : ''));
-    def.appendChild(shopPreview({ slot: shopSlot, preview: 'classic' }));
-    def.appendChild(h('b', '', shopSlot === 'badge' ? 'No badge' : shopSlot === 'avatar' ? 'Initials' : 'House classic'));
-    def.appendChild(h('em', '', 'Free'));
-    const db = h('button', 'pill', equipped ? 'Use' : 'In use');
-    db.disabled = !equipped;
-    db.onclick = async () => { if (await walletAction('/api/shop/equip', { slot: shopSlot, item: null })) paintLounge(body); };
-    def.appendChild(db);
-    grid.appendChild(def);
-    for (const item of App.shop.items.filter((i) => i.slot === shopSlot)) {
+    if (!isGesture) {
+      const def = h('div', 'shop-item' + (!equipped ? ' on' : ''));
+      def.appendChild(shopPreview({ slot: shopSlot, preview: 'classic' }));
+      def.appendChild(h('b', '', shopSlot === 'badge' ? 'No title' : shopSlot === 'avatar' ? 'Initials' : 'House classic'));
+      def.appendChild(h('em', '', 'Free'));
+      const db = h('button', 'pill', equipped ? 'Use' : 'In use');
+      db.disabled = !equipped;
+      db.onclick = async () => { if (await walletAction('/api/shop/equip', { slot: shopSlot, item: null })) paintLounge(body); };
+      def.appendChild(db);
+      grid.appendChild(def);
+    }
+    // Retired items are only shown to players who own them.
+    for (const item of App.shop.items.filter((i) => i.slot === shopSlot && (!i.retired || w.owned.includes(i.id)))) {
       const owned = w.owned.includes(item.id);
       const on = equipped === item.id;
       const el = h('div', 'shop-item' + (on ? ' on' : '') + (owned ? ' owned' : ''));
       el.appendChild(shopPreview(item));
       el.appendChild(h('b', '', esc(item.name)));
-      el.appendChild(h('em', '', owned ? 'In your collection' : `<i class="ico-coin"></i>${fmt(item.price)}`));
+      el.appendChild(h('em', '', owned ? (item.retired ? 'Retired · still yours' : 'In your collection') : `<i class="ico-coin"></i>${fmt(item.price)}`));
       const b = h('button', 'pill');
-      if (on) { b.textContent = 'In use'; b.disabled = true; }
+      if (isGesture && owned) { b.textContent = 'Use at the table'; b.disabled = true; }
+      else if (on) { b.textContent = 'In use'; b.disabled = true; }
       else if (owned) { b.textContent = 'Use'; b.onclick = async () => { if (await walletAction('/api/shop/equip', { slot: item.slot, item: item.id })) paintLounge(body); }; }
       else {
         const short = item.price - w.coins;
@@ -886,7 +961,7 @@
           if (!confirm(`Purchase "${item.name}" for ${fmt(item.price)} coins?`)) return;
           if (await walletAction('/api/shop/buy', { item: item.id })) {
             Sound.play('win');
-            await walletAction('/api/shop/equip', { slot: item.slot, item: item.id });
+            if (!isGesture) await walletAction('/api/shop/equip', { slot: item.slot, item: item.id });
             toast(`"${item.name}" is yours.`, { kind: 'good' });
             paintLounge(body);
           }
@@ -929,7 +1004,7 @@
     };
     const who = (f) => {
       const d = h('button', 'fwho');
-      d.innerHTML = `<span class="mini-avatar">${esc(f.avatar || initials(f.username))}</span><span><b>${esc(f.username)}</b><em>${f.status !== 'friend' ? '' : f.online ? (f.where ? `At ${esc(f.where.tableName)}` : 'Online') : 'Offline'}</em></span>${f.status === 'friend' ? `<i class="presence ${f.online ? 'on' : ''}"></i>` : ''}`;
+      d.innerHTML = `<span class="mini-avatar">${avatarMarkup(f.avatar, f.username)}</span><span><b>${esc(f.username)}</b><em>${f.status !== 'friend' ? '' : f.online ? (f.where ? `At ${esc(f.where.tableName)}` : 'Online') : 'Offline'}</em></span>${f.status === 'friend' ? `<i class="presence ${f.online ? 'on' : ''}"></i>` : ''}`;
       d.onclick = () => openProfile(f.username);
       return d;
     };
@@ -978,7 +1053,7 @@
     if (!online.length) box.appendChild(h('p', 'muted', 'None of your friends are online right now.'));
     online.forEach((f) => {
       const row = h('div', 'frow');
-      row.innerHTML = `<span class="mini-avatar">${esc(f.avatar || initials(f.username))}</span><b>${esc(f.username)}</b>`;
+      row.innerHTML = `<span class="mini-avatar">${avatarMarkup(f.avatar, f.username)}</span><b>${esc(f.username)}</b>`;
       const b = h('button', 'pill gold', 'Invite');
       b.onclick = () => inviteFriend(f.username);
       row.appendChild(b);
@@ -1021,8 +1096,8 @@
     body.innerHTML = profileHtml(r.data);
   }
   function profileHtml(p) {
-    return `<div class="profile-head"><span class="big-avatar">${esc(p.avatar || initials(p.username))}</span>
-      <div><h3>${p.badge ? esc(p.badge) + ' ' : ''}${esc(p.username)}</h3>
+    return `<div class="profile-head"><span class="big-avatar">${avatarMarkup(p.avatar, p.username)}</span>
+      <div><h3>${titleMarkup(p.badge)}${esc(p.username)}</h3>
       <p class="muted"><i class="presence ${p.online ? 'on' : ''}"></i>${p.online ? (p.where ? `Playing at ${esc(p.where.tableName)}` : 'Online') : 'Offline'} · Member since ${new Date(p.memberSince).toLocaleDateString([], { month: 'long', year: 'numeric' })} · ${p.friends} friend${p.friends === 1 ? '' : 's'}</p></div></div>
       ${statsTable(p.stats)}`;
   }
