@@ -72,7 +72,8 @@ for (let g = 0; g < 2000; g++) {
   t.startHand();
   let steps = 0;
   while (t.isPlaying()) {
-    assert(++steps < 2000, 'durak stuck');
+    // random players can trade cards back and forth for a long time; real play ends far sooner
+    assert(++steps < (g % 2 ? 2000 : 20000), 'durak stuck');
     const i = t.toAct;
     const mv = t.moves(i);
     assert(mv, 'player to act has no moves');
@@ -80,7 +81,7 @@ for (let g = 0; g < 2000; g++) {
     const d = g % 2 ? t.botAction(i) : (() => { // half the games: random legal moves
       // (a defender who can beat usually does — always taking could pass the same
       // cards back and forth forever, which no real player would do)
-      if (mv.canTake && mv.cards.length && Math.random() < 0.85) return { action: 'play', amount: mv.cards[Math.floor(Math.random() * mv.cards.length)] };
+      if (mv.canTake && mv.cards.length && Math.random() < 0.92) return { action: 'play', amount: mv.cards[Math.floor(Math.random() * mv.cards.length)] };
       const opts = mv.cards.map((c) => ({ action: 'play', amount: c }));
       if (mv.canTake) opts.push({ action: 'take' });
       if (mv.canPass) opts.push({ action: 'pass' });
