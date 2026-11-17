@@ -133,6 +133,7 @@
     else if (what === 'register') authModal('register');
     else if (what === 'lounge') openLounge();
     else if (what === 'bank') openBank();
+    else if (what === 'goldrush') openGoldRush();
     else if (what === 'shop') openLounge('shop');
     else if (what === 'friends') openLounge('friends');
     else if (what === 'leaderboard') openLeaderboard();
@@ -373,6 +374,18 @@
       art.appendChild(help);
       grid.appendChild(art);
     }
+    // Gold Rush: a solo game, no tables
+    const gr = h('article', 'room room-goldrush');
+    gr.innerHTML = `<div class="visual"><div class="gr-art"><span class="gr-pick">⛏</span><i></i><i></i><i></i></div></div>
+      <h3>Gold Rush</h3><p class="desc">Dig deeper — cash out before it caves in</p>
+      <div class="gr-tables"><div class="rt gr-row"><div class="rt-head"><b>The Mine</b><span class="rt-status">Solo</span></div><div class="rt-meta">Stakes 10 – 5,000 · members</div></div></div>`;
+    const play = h('button', 'btn room-btn', 'Play');
+    play.onclick = () => openGoldRush();
+    gr.querySelector('.gr-row').appendChild(play);
+    const help = h('button', 'room-help', 'How to play');
+    help.onclick = () => openHowTo('goldrush');
+    gr.appendChild(help);
+    grid.appendChild(gr);
   }
 
   async function loadTables() {
@@ -995,6 +1008,105 @@
     if (bk) bk.onclick = async () => { const r = await walletAction('/api/wallet/bankrupt'); if (r) { coinPop(r.amount, 'Your daily top-up', 'chip'); Sound.play('chips'); paintLounge(body); } };
   }
 
+  // ================= GOLD RUSH =================
+  let gr = { cfg: null, round: null, level: localStorage.getItem('cg.gr.level') || 'medium', stake: Number(localStorage.getItem('cg.gr.stake')) || 50, busy: false, flash: null };
+  async function openGoldRush() {
+    if (!App.account) { authModal('register', 'Gold Rush is played with your own chips — create a free account (5,000 chips).'); return; }
+    const r = await api('/api/goldrush');
+    if (!r.ok) { toast(r.data.error || 'Gold Rush is not available', { kind: 'bad' }); return; }
+    gr.cfg = r.data.config; gr.round = r.data.round; gr.flash = null;
+    if (gr.round) gr.level = gr.round.level;
+    openModal((card) => {
+      modalHead(card, 'Solo game', 'Gold <em>Rush</em>');
+      const body = h('div', 'gr');
+      card.appendChild(body);
+      paintGoldRush(body);
+    }, { wide: true, theme: 'gr-modal' });
+  }
+  App.openGoldRush = openGoldRush;
+
+  function paintGoldRush(body) {
+    const cfg = gr.cfg, R = gr.round;
+    const level = R ? R.level : gr.level;
+    const L = cfg.levels[level];
+    const step = R ? R.step : (gr.flash ? gr.flash.step : 0);
+    const chips = App.wallet ? App.wallet.chips : 0;
+    const rows = L.ladder.map((m, i) => {
+      const k = i + 1;
+      const cls = gr.flash && gr.flash.collapsed && k === gr.flash.step ? 'cave' : k < step || (k === step && (R || (gr.flash && !gr.flash.collapsed))) ? 'done' : k === step + 1 && R ? 'next' : '';
+      return `<li class="${cls}" data-k="${k}"><span class="depth">${k * 10} m</span><span class="mult">${m.toFixed(2)}×</span>${cls === 'done' && k === step ? '<span class="miner">⛏</span>' : ''}${cls === 'cave' ? '<span class="rocks">💥</span>' : ''}</li>`;
+    }).join('');
+    const flash = gr.flash ? (gr.flash.collapsed ? `<p class="gr-flash bad">Cave-in at ${gr.flash.step * 10} m — the stake of ${fmt(gr.flash.lost)} is lost.</p>`
+      : `<p class="gr-flash good">${gr.flash.bottom ? 'You reached the bottom! ' : ''}Cashed out ${fmt(gr.flash.payout)} chips at ${gr.flash.multiplier.toFixed(2)}× (+${fmt(gr.flash.payout - gr.flash.stake)})</p>`) : '';
+    body.innerHTML = `
+      <div class="gr-top"><span>Chips <b>${fmt(chips)}</b></span><span>Risk per tunnel <b>${L.risk} %</b></span></div>
+      <ol class="gr-shaft"><li class="surface"><span class="depth">Surface</span><span class="mult">1.00×</span>${!step && !gr.flash ? '<span class="miner">⛏</span>' : ''}</li>${rows}</ol>
+      ${flash}
+      ${R ? `
+        <div class="gr-live">
+          <div><small>Stake</small><b>${fmt(R.stake)}</b></div>
+          <div><small>Now</small><b>${R.multiplier.toFixed(2)}×</b></div>
+          <div><small>Cash-out</small><b class="gold">${fmt(R.cashout)}</b></div>
+        </div>
+        <div class="gr-actions">
+          <button class="btn btn-gold" data-gr-dig ${R.next ? '' : 'disabled'}>Dig deeper → ${R.next ? R.next.toFixed(2) + '×' : ''}</button>
+          <button class="btn btn-outline" data-gr-cash>${R.step ? `Cash out ${fmt(R.cashout)}` : 'Take my stake back'}</button>
+        </div>` : `
+        <div class="gr-levels">${Object.entries(cfg.levels).map(([k, l]) => `<button data-gr-level="${k}" class="${k === level ? 'on' : ''}"><b>${l.name}</b><small>${l.risk} % · up to ${l.ladder[l.ladder.length - 1].toFixed(0)}×</small></button>`).join('')}</div>
+        <div class="gr-stake">
+          <label>Stake<input type="number" inputmode="numeric" min="${cfg.minStake}" max="${cfg.maxStake}" value="${gr.stake}" data-gr-stake></label>
+          <div class="gr-quick"><button data-q="half">½</button><button data-q="double">×2</button><button data-q="10">10</button><button data-q="100">100</button><button data-q="500">500</button><button data-q="max">Max</button></div>
+        </div>
+        <button class="btn btn-gold wide" data-gr-start>Start digging</button>
+        <p class="fine">Each tunnel raises the multiplier — and may cave in. Cash out whenever you like. Play money only.</p>`}`;
+    const sh = body.querySelector('.gr-shaft');
+    const cur = sh.querySelector('.miner, .rocks');
+    if (cur) cur.closest('li').scrollIntoView({ block: 'center' });
+    const stakeIn = body.querySelector('[data-gr-stake]');
+    const setStake = (v) => { gr.stake = Math.max(cfg.minStake, Math.min(cfg.maxStake, Math.floor(v) || cfg.minStake)); if (stakeIn) stakeIn.value = gr.stake; localStorage.setItem('cg.gr.stake', gr.stake); };
+    if (stakeIn) stakeIn.oninput = () => { gr.stake = Number(stakeIn.value) || 0; };
+    body.querySelectorAll('[data-q]').forEach((b) => { b.onclick = () => {
+      const q = b.dataset.q;
+      setStake(q === 'half' ? gr.stake / 2 : q === 'double' ? gr.stake * 2 : q === 'max' ? Math.min(cfg.maxStake, chips) : Number(q));
+    }; });
+    body.querySelectorAll('[data-gr-level]').forEach((b) => { b.onclick = () => { gr.level = b.dataset.grLevel; localStorage.setItem('cg.gr.level', gr.level); gr.flash = null; paintGoldRush(body); }; });
+    const act = async (path, payload) => {
+      if (gr.busy) return null;
+      gr.busy = true;
+      const r = await api(path, payload || {});
+      gr.busy = false;
+      if (!r.ok) { toast(r.data.error, { kind: 'bad' }); return null; }
+      if (r.data.wallet) { App.wallet = { ...App.wallet, ...r.data.wallet }; renderAccount(); }
+      return r.data;
+    };
+    const start = body.querySelector('[data-gr-start]');
+    if (start) start.onclick = async () => {
+      setStake(Number(stakeIn.value));
+      const d = await act('/api/goldrush/start', { stake: gr.stake, level: gr.level });
+      if (d) { gr.round = d.round; gr.flash = null; Sound.play('chips'); paintGoldRush(body); }
+    };
+    const dig = body.querySelector('[data-gr-dig]');
+    if (dig) dig.onclick = async () => {
+      dig.classList.add('digging');
+      const d = await act('/api/goldrush/dig');
+      if (!d) { dig.classList.remove('digging'); return; }
+      const stake = gr.round ? gr.round.stake : 0;
+      if (d.collapsed) { gr.flash = { collapsed: true, step: d.step, lost: d.lost }; gr.round = null; Sound.play('fold'); body.classList.add('shake'); setTimeout(() => body.classList.remove('shake'), 500); }
+      else if (d.bottom) { gr.flash = { bottom: true, step: d.step, payout: d.payout, multiplier: d.multiplier, stake }; gr.round = null; Sound.play('win'); coinPop(d.payout, 'Gold Rush', 'chip'); }
+      else { gr.round = d.round; Sound.play('deal'); }
+      paintGoldRush(body);
+    };
+    const cash = body.querySelector('[data-gr-cash]');
+    if (cash) cash.onclick = async () => {
+      const d = await act('/api/goldrush/cashout');
+      if (!d) return;
+      gr.flash = d.step ? { step: d.step, payout: d.payout, multiplier: d.multiplier, stake: gr.round ? gr.round.stake : 0 } : null;
+      gr.round = null;
+      if (d.step) { Sound.play('win'); coinPop(d.payout, `${d.multiplier.toFixed(2)}× at ${d.step * 10} m`, 'chip'); }
+      paintGoldRush(body);
+    };
+  }
+
   // ================= THE BANK =================
   async function openBank() {
     if (!App.account) { authModal('login', 'The Bank is for members — sign in to exchange chips and coins.'); return; }
@@ -1333,7 +1445,7 @@
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pollPresence(); });
 
   // ----- profiles -----
-  const MODE_NAMES = { friends: "Hold'em with friends", bots: "Hold'em with bots", blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette' };
+  const MODE_NAMES = { friends: "Hold'em with friends", bots: "Hold'em with bots", blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette', flamingo: 'Flamingo', goldrush: 'Gold Rush' };
   function statsTable(stats) {
     if (!stats.length) return '<p class="muted">No hands played yet.</p>';
     return `<table class="stats"><thead><tr><th>Game</th><th>Hands</th><th>Won</th><th>${'Result'}</th></tr></thead><tbody>
@@ -1386,6 +1498,7 @@
         durak: 'Durak: +1 point for escaping, −1 for being the durak.',
         roulette: 'Roulette spins. Ranked by chips won.',
         flamingo: 'Flamingo: +1 point for every game you win.',
+        goldrush: 'Gold Rush digs. Ranked by chips won.',
       };
       const load = async (m) => {
         note.textContent = NOTES[m];
@@ -1400,7 +1513,7 @@
         body.querySelectorAll('[data-prof]').forEach((b) => { b.onclick = () => openProfile(b.dataset.prof); });
         if (!r.data.persistent) body.appendChild(h('p', 'fine warn', 'Test mode: no database is connected, so results are temporary.'));
       };
-      tabs(card, [['friends', 'Hold\'em'], ['bots', 'vs Bots'], ['blackjack', 'Blackjack'], ['durak', 'Durak'], ['roulette', 'Roulette'], ['flamingo', 'Flamingo']], load, mode);
+      tabs(card, [['friends', 'Hold\'em'], ['bots', 'vs Bots'], ['blackjack', 'Blackjack'], ['durak', 'Durak'], ['roulette', 'Roulette'], ['flamingo', 'Flamingo'], ['goldrush', 'Gold Rush']], load, mode);
       card.append(note, body);
       load(mode);
     }, { wide: true });
@@ -1471,6 +1584,12 @@
       <li><b>⊘ Skip</b>: the next player misses a turn. <b>⇄ Reverse</b>: play changes direction. <b>+2</b>: the next player draws two and misses a turn.</li>
       <li><b>Wild</b>: play on anything and choose the next colour. <b>Wild +4</b>: the same, and the next player draws four and misses a turn.</li>
       <li>Down to one card? Everyone sees “Last card!”. The first player with an empty hand wins 10 coins.</li></ol>`;
+  RULES.goldrush = `<ol class="rules-list">
+      <li><b>Goal:</b> dig as deep as you dare and cash out before the tunnel caves in. A solo game with your own chips.</li>
+      <li>Choose a level and a stake (10–5,000 chips), then <b>Start digging</b>.</li>
+      <li>Every <b>Dig deeper</b> takes the miner one tunnel down and raises the multiplier — but the tunnel may cave in: Easy 8 %, Medium 16 %, Hard 28 %, Extreme 45 % per tunnel.</li>
+      <li><b>Cash out</b> whenever you like: you get stake × multiplier. Reach the bottom and you are paid automatically.</li>
+      <li>A cave-in loses the stake. Every dig is decided by the server; the house keeps 3 % on average.</li></ol>`;
   const RANKINGS = [
     ['Royal Flush', 'As Ks Qs Js Ts', 'A, K, Q, J, 10 of one suit.'], ['Straight Flush', '9h 8h 7h 6h 5h', 'Five in a row, one suit.'],
     ['Four of a Kind', 'Qc Qd Qh Qs 4d', 'Four of one rank.'], ['Full House', 'Kh Kd Ks 7c 7h', 'Three of a kind and a pair.'],
@@ -1493,7 +1612,7 @@
           });
         }
       };
-      tabs(card, [['holdem', "Hold'em"], ['blackjack', 'Blackjack'], ['durak', 'Durak'], ['roulette', 'Roulette'], ['flamingo', 'Flamingo']], paint, game);
+      tabs(card, [['holdem', "Hold'em"], ['blackjack', 'Blackjack'], ['durak', 'Durak'], ['roulette', 'Roulette'], ['flamingo', 'Flamingo'], ['goldrush', 'Gold Rush']], paint, game);
       card.appendChild(body);
       paint(game);
     }, { wide: true });

@@ -8,7 +8,8 @@ const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
 const { openStore } = require('./store');
-const { makeCoins } = require('./coins');
+const { makeCoins, rewardFor } = require('./coins');
+const { createGoldRush } = require('./goldrush');
 const { createLobby } = require('./tables');
 const { createApi } = require('./api');
 
@@ -31,6 +32,9 @@ let coins = null;
 let databaseError = null;
 const ctx = { store: () => store, coins: () => coins, databaseError: () => databaseError, owners };
 ctx.lobby = createLobby(ctx);
+// Coins for a win outside the tables (Gold Rush), with the same daily cap.
+ctx.reward = (userId, result) => { const n = rewardFor(result); return n ? coins.earn(userId, n) : null; };
+ctx.goldrush = createGoldRush(ctx);
 const api = createApi(ctx);
 
 const SECURITY_HEADERS = {
@@ -127,7 +131,7 @@ async function shutdown(signal) {
   if (stopping) return;
   stopping = true;
   console.log(`${signal}: returning table chips to bankrolls…`);
-  try { if (coins) await Promise.race([ctx.lobby.cashOutAll(), new Promise((r) => setTimeout(r, 8000))]); } catch (e) { console.error(e); }
+  try { if (coins) await Promise.race([Promise.all([ctx.lobby.cashOutAll(), ctx.goldrush.cashOutAll()]), new Promise((r) => setTimeout(r, 8000))]); } catch (e) { console.error(e); }
   process.exit(0);
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));

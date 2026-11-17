@@ -220,6 +220,23 @@ function createApi(ctx) {
       return json(res, 200, { ...r, wallet: await coins.getStatus(user.id) });
     }
 
+    // ----- Gold Rush (solo game, members only) -----
+    if (url.startsWith('/api/goldrush')) {
+      if (!user) return json(res, 401, { error: 'Sign in to play Gold Rush' });
+      const g = ctx.goldrush;
+      if (method === 'GET' && url === '/api/goldrush') return json(res, 200, g.state(user.id));
+      if (method !== 'POST') return json(res, 404, { error: 'Not found' });
+      if (limited(`goldrush:${user.id}`, 120, 60 * 1000)) return json(res, 429, { error: 'Slow down a little' });
+      const body = await readBody(req);
+      let r;
+      if (url === '/api/goldrush/start') r = await g.start(user.id, body.stake, String(body.level || ''));
+      else if (url === '/api/goldrush/dig') r = await g.dig(user.id);
+      else if (url === '/api/goldrush/cashout') r = await g.cashout(user.id);
+      else return json(res, 404, { error: 'Not found' });
+      if (r.error) return json(res, 400, r);
+      return json(res, 200, { ...r, wallet: await coins.getStatus(user.id) });
+    }
+
     // ----- presence: heartbeat + invites + pending requests -----
     if (url === '/api/presence') {
       const friends = await store.listFriends(user.id);

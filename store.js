@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const MODES = ['friends', 'bots', 'blackjack', 'durak', 'roulette', 'flamingo'];
+const MODES = ['friends', 'bots', 'blackjack', 'durak', 'roulette', 'flamingo', 'goldrush'];
 const FEEDBACK_CATEGORIES = ['bug', 'suggestion', 'feature', 'general'];
 const FEEDBACK_STATUSES = ['new', 'read', 'resolved'];
 

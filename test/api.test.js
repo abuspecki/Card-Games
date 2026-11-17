@@ -226,6 +226,19 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const readNow = (await call('GET', '/api/admin/feedback?status=read', to)).data.feedback;
   assert(crash.ids.every((x) => readNow.some((f) => f.id === x)), 'turned-into-task feedback is marked read');
 
+  // ----- Gold Rush through the API: stake held, then paid out -----
+  assert.strictEqual((await call('POST', '/api/goldrush/start', null, { stake: 50, level: 'easy' })).status, 401, 'members only');
+  const gw0 = (await call('GET', '/api/wallet', ta)).data.chips;
+  let gres = await call('POST', '/api/goldrush/start', ta, { stake: 50, level: 'easy' });
+  assert.strictEqual(gres.status, 200, JSON.stringify(gres.data));
+  assert.strictEqual(gres.data.wallet.chips, gw0 - 50);
+  assert.strictEqual(gres.data.wallet.inPlay, 50, 'stake held like table chips');
+  assert.strictEqual((await call('GET', '/api/goldrush', ta)).data.round.stake, 50);
+  gres = await call('POST', '/api/goldrush/cashout', ta);
+  assert.strictEqual(gres.data.payout, 50, 'cash out before digging returns the stake');
+  assert.strictEqual(gres.data.wallet.chips, gw0);
+  assert.strictEqual((await call('POST', '/api/goldrush/dig', ta)).status, 400, 'no dig without a round');
+
   // ----- owners can watch a table without a seat -----
   const watch = (session) => new Promise((resolve) => {
     const ws = new WebSocket(`ws://localhost:${PORT}`);
