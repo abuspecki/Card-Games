@@ -134,6 +134,9 @@ async function shutdown(signal) {
   console.log(`${signal}: returning table chips to bankrolls…`);
   try {
     if (coins) {
+      // Let running hands finish first (Render waits ~30 s after SIGTERM).
+      const calm = await ctx.lobby.drain(Number(process.env.DRAIN_MS) || 20000);
+      console.log(calm ? 'All hands finished — shutting down' : 'Some hands still running — calling them off');
       // Everyone playing right now gets a thank-you for the interruption.
       const playing = new Set([...ctx.lobby.seatedAccounts(), ...ctx.goldrush._rounds.keys()]);
       const work = Promise.all([ctx.lobby.cashOutAll(), ctx.goldrush.cashOutAll()])

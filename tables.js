@@ -98,20 +98,52 @@ function createLobby(ctx) {
       scheduleTimers(room);
       const t = room.table;
       for (const [pid, ws] of [...room.clients, ...room.watchers]) {
-        send(ws, { t: 'state', room: room.code, tableName: room.name, highRoller: !!room.highRoller, usesChips: usesChips(room), state: t.view(pid), watching: room.watchers.has(pid), turn: room.turn ? { key: room.turn.key, seat: room.turn.seat, msLeft: Math.max(0, room.turn.endsAt - Date.now()) } : null });
+        send(ws, { t: 'state', room: room.code, tableName: room.name, highRoller: !!room.highRoller, usesChips: usesChips(room), state: t.view(pid), watching: room.watchers.has(pid), maintenance: maintenanceInfo(), turn: room.turn ? { key: room.turn.key, seat: room.turn.seat, msLeft: Math.max(0, room.turn.endsAt - Date.now()) } : null });
       }
     } catch (e) {
       console.error('pushState error', e);
     }
   }
 
+  // ----- maintenance: an announced update stops new hands at a set time -----
+  const maint = { at: 0, draining: false };
+  const paused = () => maint.draining || (maint.at && Date.now() >= maint.at);
+  function maintenanceInfo() {
+    if (!maint.at && !maint.draining) return null;
+    return { msLeft: maint.draining ? 0 : Math.max(0, maint.at - Date.now()), paused: paused(), draining: maint.draining };
+  }
+  function announceAll() {
+    for (const room of rooms.values()) pushState(room);
+  }
+  function setMaintenance(minutes) {
+    maint.at = minutes > 0 ? Date.now() + minutes * 60000 : 0;
+    clearTimeout(maint.timer);
+    // when the time is up, refresh everyone so the "no new hands" notice shows
+    if (maint.at) maint.timer = setTimeout(announceAll, maint.at - Date.now() + 50);
+    announceAll();
+    return maintenanceInfo();
+  }
+  // Roulette waiting for bets that nobody has placed counts as idle.
+  const roomIdle = (r) => !r.table.isPlaying()
+    || (r.game === 'roulette' && r.table.stage === 'betting' && !r.table.seats.some((s) => s && !s.isBot && s.bets && s.bets.length));
+  const isIdle = () => [...rooms.values()].every(roomIdle);
+  const playerCount = () => [...rooms.values()].reduce((a, r) => a + r.table.seats.filter((s) => s && !s.isBot).length, 0);
+  // Server shutting down: no new hands; wait (up to maxMs) for running hands to finish.
+  async function drain(maxMs) {
+    maint.draining = true;
+    announceAll();
+    const until = Date.now() + maxMs;
+    while (!isIdle() && Date.now() < until) await new Promise((r) => setTimeout(r, 250));
+    return isIdle();
+  }
+
   function scheduleTimers(room) {
     const t = room.table;
     // Deal automatically once enough players are seated (no host needed).
-    if (t.stage === 'waiting' && !room.startTimer && hasHuman(room) && t.canStart()) {
+    if (t.stage === 'waiting' && !room.startTimer && hasHuman(room) && t.canStart() && !paused()) {
       room.startTimer = setTimeout(() => {
         room.startTimer = null;
-        if (t.stage === 'waiting' && hasHuman(room)) { rebuyBots(t); if (t.canStart()) t.startHand(); }
+        if (t.stage === 'waiting' && hasHuman(room) && !paused()) { rebuyBots(t); if (t.canStart()) t.startHand(); }
         pushState(room);
       }, AUTO_START_DELAY);
     }
@@ -121,7 +153,8 @@ function createLobby(ctx) {
         room.nextTimer = null;
         if (t.stage !== 'showdown') return;
         await removeAwayPlayers(room);
-        if (hasHuman(room)) { rebuyBots(t); if (t.canStart()) t.startHand(); else t.stage = 'waiting'; }
+        if (paused()) t.stage = 'waiting';
+        else if (hasHuman(room)) { rebuyBots(t); if (t.canStart()) t.startHand(); else t.stage = 'waiting'; }
         else t.stage = 'waiting';
         pushState(room);
       }, t.game === 'durak' || t.game === 'flamingo' ? NEXT_HAND_DELAY + 2000 : NEXT_HAND_DELAY);
@@ -132,7 +165,11 @@ function createLobby(ctx) {
     if (t.tick && t.isPlaying() && t.deadline) {
       room.phaseTimer = setTimeout(() => {
         room.phaseTimer = null;
-        if (t.tick(Date.now())) pushState(room);
+        if (t.tick(Date.now())) {
+          // update announced: an empty betting round closes instead of reopening
+          if (paused() && roomIdle(room) && t.stage === 'betting') { t.stage = 'waiting'; t.deadline = 0; for (const s of t.seats) if (s) s.bets = []; }
+          pushState(room);
+        }
         else scheduleTimers(room);
       }, Math.max(0, t.deadline - Date.now()) + 30);
     }
@@ -562,7 +599,7 @@ function createLobby(ctx) {
     return { humans, bots: botsN, tablesPlaying: playing, tables: [...rooms.values()].map(tableSummary) };
   }
 
-  return { rooms, tableSummary, handleConnection, locate, leaveBy, seatedAccounts, refreshLook, kick, cashOutAll, liveStats, GAMES };
+  return { rooms, tableSummary, handleConnection, locate, leaveBy, seatedAccounts, refreshLook, kick, cashOutAll, liveStats, GAMES, setMaintenance, maintenanceInfo, drain, isIdle, playerCount };
 }
 
 module.exports = { createLobby, TABLES, GAMES };

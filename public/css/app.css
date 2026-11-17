@@ -889,3 +889,8 @@ html[data-theme="dark"] .principle li::before { background: #DCC07A; color: #141
 body.spectating .controls, body.spectating [data-act=gesture], body.spectating .turn-clock,
 body.spectating #addBotBtn, body.spectating #removeBotBtn, body.spectating .chat-form { display: none !important; }
 body.spectating .tbar .tb-center small::after { content: ' · 👁 watching'; color: #F2C14E; }
+
+/* ================= UPDATE NOTICE ================= */
+.maint-bar { position: fixed; left: 50%; top: 10px; transform: translateX(-50%); z-index: 300; max-width: 92vw; padding: 8px 16px; border-radius: 999px; white-space: nowrap;
+  background: #F2C14E; color: #231A02; font: 600 14px/1.35 'Montserrat', system-ui, sans-serif; box-shadow: 0 10px 30px rgba(0, 0, 0, .45); text-align: center; pointer-events: none; }
+@media (max-width: 760px) { .maint-bar { top: auto; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); font-size: 13px; } body.game .maint-bar { bottom: auto; top: 6px; } }

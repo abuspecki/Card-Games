@@ -45,6 +45,12 @@
 
     <section data-section="overview" class="hidden">
       <div class="admin-head"><div><p class="eyebrow">The Ledger</p><h1>Overview</h1></div><button class="btn btn-outline" id="refresh">Refresh</button></div>
+      <div class="panel maint-panel">
+        <h2>Update notice</h2>
+        <p class="sub">Warn everyone before an update: a countdown appears for all players, hands in progress finish, and no new hands start once it runs out.</p>
+        <div class="row-gap"><select id="maintMin"><option value="2">in 2 minutes</option><option value="5" selected>in 5 minutes</option><option value="10">in 10 minutes</option><option value="15">in 15 minutes</option></select>
+          <button class="btn btn-navy" id="maintGo">Announce update</button><button class="btn btn-outline" id="maintStop">Cancel notice</button><span id="maintState" class="sub"></span></div>
+      </div>
       <div class="kpis" id="kpis"></div>
       <div class="admin-grid">
         <div class="panel">

@@ -391,7 +391,7 @@
   async function loadTables() {
     if (!$('hub').classList.contains('hidden') || !App.tables.length) {
       const r = await api('/api/tables');
-      if (r.ok) { App.tables = r.data.tables; renderTables(); }
+      if (r.ok) { App.tables = r.data.tables; renderTables(); showMaintenance(r.data.maintenance); }
     }
   }
 
@@ -434,6 +434,27 @@
     $('onlineLine').innerHTML = people ? `<i class="live-dot"></i>${people} playing now` : '<i class="live-dot"></i>Tables open — be the first';
   }
   setInterval(() => { if (!$('hub').classList.contains('hidden') && document.visibilityState === 'visible') loadTables(); }, 4000);
+
+  // ================= UPDATE NOTICE (maintenance) =================
+  let maintEnds = 0, maintTimer = null, maintInfo = null;
+  function showMaintenance(info) {
+    let bar = $('maintBar');
+    if (!info) { if (bar) bar.remove(); clearInterval(maintTimer); maintInfo = null; document.body.classList.remove('has-maint'); return; }
+    if (!bar) { bar = h('div', 'maint-bar'); bar.id = 'maintBar'; bar.setAttribute('role', 'status'); document.body.appendChild(bar); }
+    maintInfo = info;
+    maintEnds = Date.now() + (info.msLeft || 0);
+    document.body.classList.add('has-maint');
+    const paint = () => {
+      const left = Math.max(0, Math.ceil((maintEnds - Date.now()) / 1000));
+      const mm = Math.floor(left / 60), ss = String(left % 60).padStart(2, '0');
+      bar.textContent = maintInfo.draining ? '🔧 Updating — back in a moment, chips are safe'
+        : left > 0 ? `🔧 Update in ${mm}:${ss} · current hands finish`
+          : '🔧 Short update break · chips are safe';
+    };
+    paint();
+    clearInterval(maintTimer);
+    maintTimer = setInterval(paint, 1000);
+  }
 
   // ================= HOME LEADERBOARD =================
   // Poker against real people (no bots), Blackjack and Roulette — chips won.
@@ -522,6 +543,7 @@
     }
     if (m.t === 'state') {
       App.S = m;
+      showMaintenance(m.maintenance);
       if ($('tableScreen').classList.contains('hidden')) showTable();
       renderTable();
       return;

@@ -149,11 +149,13 @@ function createApi(ctx) {
       const limit = Math.max(1, Math.min(50, Number(new URL(req.url, 'http://x').searchParams.get('limit')) || 50));
       return json(res, 200, { mode: m, persistent: store.kind === 'postgres', databaseError: ctx.databaseError(), rows: await store.leaderboard(m === 'overall' ? OVERALL : m, limit) });
     }
-    if (method === 'GET' && url === '/api/tables') return json(res, 200, { tables: [...ctx.lobby.rooms.values()].map(ctx.lobby.tableSummary) });
+    if (method === 'GET' && url === '/api/tables') return json(res, 200, { tables: [...ctx.lobby.rooms.values()].map(ctx.lobby.tableSummary), maintenance: ctx.lobby.maintenanceInfo() });
     if (method === 'GET' && url === '/api/status') {
       return json(res, 200, {
         database: store.kind === 'postgres' ? 'connected' : (process.env.DATABASE_URL ? 'failed' : 'not configured'),
         databaseError: ctx.databaseError(),
+        // for deploys: safe to restart when idle (no hand running anywhere)
+        idle: ctx.lobby.isIdle(), players: ctx.lobby.playerCount(), maintenance: ctx.lobby.maintenanceInfo(),
       });
     }
     if (method === 'GET' && url === '/api/shop') {
@@ -334,6 +336,13 @@ function createApi(ctx) {
         return json(res, 200, { ok: true, url: taskboard.links({ title: lead.title, beschreibung }).newTask });
       }
 
+      // Announce an update: countdown for everyone, no new hands once it runs out.
+      if (method === 'POST' && url === '/api/admin/maintenance') {
+        const body = await readBody(req);
+        const minutes = Math.max(0, Math.min(60, Number(body.minutes) || 0));
+        console.log(`[admin] ${user.username} ${minutes ? `announced an update in ${minutes} min` : 'cancelled the update notice'}`);
+        return json(res, 200, { ok: true, maintenance: ctx.lobby.setMaintenance(minutes) });
+      }
       if (method === 'GET' && url === '/api/admin/overview') {
         const since = dayString(now - 13 * 86400000);
         return json(res, 200, {

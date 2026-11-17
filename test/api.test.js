@@ -15,6 +15,7 @@ const env = {
   ...process.env, PORT: String(PORT), OWNER_USERNAMES: OWNER,
   DATABASE_URL: process.env.TEST_DATABASE_URL || '',
   DATA_FILE: path.join(os.tmpdir(), `api-test-${tag}.json`),
+  DRAIN_MS: '1500',   // don't wait the full 20 s for running hands on shutdown
 };
 
 let proc;
@@ -238,6 +239,17 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   assert.strictEqual(gres.data.payout, 50, 'cash out before digging returns the stake');
   assert.strictEqual(gres.data.wallet.chips, gw0);
   assert.strictEqual((await call('POST', '/api/goldrush/dig', ta)).status, 400, 'no dig without a round');
+
+  // ----- announced update: countdown, then no new hands; status tells when it is safe -----
+  assert.strictEqual((await call('POST', '/api/admin/maintenance', ta, { minutes: 5 })).status, 403, 'owners only');
+  let mt = await call('POST', '/api/admin/maintenance', to, { minutes: 5 });
+  assert(mt.data.maintenance.msLeft > 4 * 60000 && !mt.data.maintenance.paused);
+  assert((await call('GET', '/api/tables', null)).data.maintenance, 'lobby sees the notice');
+  mt = await call('POST', '/api/admin/maintenance', to, { minutes: 0 });
+  assert.strictEqual(mt.data.maintenance, null, 'cancelled');
+  const st0 = (await call('GET', '/api/status', null)).data;
+  assert.strictEqual(typeof st0.idle, 'boolean');
+  assert.strictEqual(typeof st0.players, 'number');
 
   // ----- owners can watch a table without a seat -----
   const watch = (session) => new Promise((resolve) => {

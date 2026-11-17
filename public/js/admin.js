@@ -248,6 +248,19 @@
     if (r.ok) { $('fbCount').textContent = r.data.feedback.length; $('fbCount').classList.toggle('hidden', !r.data.feedback.length); }
   }
 
+  // ---------- update notice ----------
+  async function paintMaint() {
+    const r = await fetch('/api/status').then((x) => x.json()).catch(() => null);
+    const m = r && r.maintenance;
+    const el = $('maintState');
+    if (!el) return;
+    el.textContent = !r ? '' : m ? (m.paused ? `Paused — ${r.idle ? 'all tables are quiet, safe to update' : 'hands still finishing…'} (${r.players} at tables)` : `Countdown: ${Math.ceil(m.msLeft / 60000)} min left`) : `No notice · ${r.players} at tables · ${r.idle ? 'all quiet' : 'hands in play'}`;
+  }
+  $('maintGo').onclick = async () => { const x = await api('/api/admin/maintenance', { minutes: Number($('maintMin').value) }); toast(x.ok ? 'Update announced to all players.' : x.data.error, !x.ok); paintMaint(); };
+  $('maintStop').onclick = async () => { const x = await api('/api/admin/maintenance', { minutes: 0 }); toast(x.ok ? 'Update notice cancelled.' : x.data.error, !x.ok); paintMaint(); };
+  setInterval(paintMaint, 10000);
+  paintMaint();
+
   // ---------- gate ----------
   (async () => {
     const gate = $('gate');
