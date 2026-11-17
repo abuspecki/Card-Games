@@ -39,8 +39,13 @@
     const t = resolve(mode());
     document.documentElement.dataset.theme = t;
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', t === 'dark' ? '#0A1F15' : '#0F3B26');
+    if (meta) meta.setAttribute('content', t === 'dark' ? '#0B1410' : '#F2F5F2');
     listeners.forEach((f) => f(t, mode()));
+  }
+
+  // Installable app (PWA): register the service worker once the page has loaded.
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
   }
 
   function set(m) {

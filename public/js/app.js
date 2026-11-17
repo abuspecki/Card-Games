@@ -134,6 +134,7 @@
     else if (what === 'lounge') openLounge();
     else if (what === 'bank') openBank();
     else if (what === 'goldrush') openGoldRush();
+    else if (what === 'install') installApp();
     else if (what === 'shop') openLounge('shop');
     else if (what === 'friends') openLounge('friends');
     else if (what === 'leaderboard') openLeaderboard();
@@ -434,6 +435,28 @@
     $('onlineLine').innerHTML = people ? `<i class="live-dot"></i>${people} playing now` : '<i class="live-dot"></i>Tables open — be the first';
   }
   setInterval(() => { if (!$('hub').classList.contains('hidden') && document.visibilityState === 'visible') loadTables(); }, 4000);
+
+  // ================= INSTALL AS AN APP (PWA) =================
+  let installEvent = null;
+  const standalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvent = e; });
+  window.addEventListener('appinstalled', () => { installEvent = null; document.body.classList.add('is-app'); toast('CardGames is now on your home screen.', { kind: 'good' }); });
+  if (standalone()) document.body.classList.add('is-app');
+  async function installApp() {
+    if (standalone()) { toast('You are already using the app.'); return; }
+    if (installEvent) { installEvent.prompt(); await installEvent.userChoice.catch(() => {}); installEvent = null; return; }
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    openModal((card) => {
+      modalHead(card, 'App', 'Install CardGames');
+      card.appendChild(h('ol', 'install-steps', ios
+        ? '<li>Tap the <b>Share</b> button <span class="ib">⬆︎</span> in Safari (top right on iPad, bottom on iPhone).</li><li>Choose <b>Add to Home Screen</b>.</li><li>Tap <b>Add</b> — CardGames opens full-screen like an app.</li>'
+        : '<li>Open the browser menu <span class="ib">⋮</span>.</li><li>Choose <b>Install app</b> or <b>Add to Home screen</b>.</li><li>CardGames opens full-screen like an app.</li>'));
+      const ok = h('button', 'btn btn-navy wide', 'Got it');
+      ok.onclick = closeModal;
+      card.appendChild(ok);
+    });
+  }
+  App.installApp = installApp;
 
   // ================= UPDATE NOTICE (maintenance) =================
   let maintEnds = 0, maintTimer = null, maintInfo = null;

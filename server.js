@@ -110,6 +110,14 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify(list));
   }
+  // The service worker must not be cached for long, or updates would be slow to arrive.
+  if (url === '/sw.js') {
+    return fs.readFile(path.join(PUBLIC, 'sw.js'), (err, data) => {
+      if (err) { res.writeHead(404); return res.end(); }
+      res.setHeader('Service-Worker-Allowed', '/');
+      sendFile(req, res, data, 'text/javascript; charset=utf-8', 'no-cache');
+    });
+  }
   if (bundles[url]) return sendFile(req, res, bundles[url].data, bundles[url].type, 'public, max-age=31536000, immutable');
   if ((url === '/' || url === '/index.html') && indexHtml) return sendFile(req, res, indexHtml, 'text/html; charset=utf-8', 'no-cache');
   const route = { '/': 'index.html', '/admin': 'admin.html' }[url] || url;

@@ -3,10 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0F3B26">
+  <meta name="theme-color" content="#0B1410">
   <title>CardGames — A Private Card Room</title>
   <meta name="description" content="Play Texas Hold'em, Blackjack, Durak, Roulette and Flamingo with friends at CardGames — a private card room for the discerning player.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="CardGames">
   <script src="js/theme.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -61,6 +67,7 @@
       <a href="#" data-open="friends">Friends</a>
       <a href="#" data-open="howto">How to play</a>
       <a href="#" data-open="feedback">Feedback</a>
+      <a href="#" data-open="install" class="install-link">📲 Install the app</a>
       <a href="/admin" class="owner-only hidden nav-owner">♛ Owner dashboard</a>
       <div class="appearance" role="group" aria-label="Appearance"><span>Appearance</span>
         <button data-set-theme="light">Light</button><button data-set-theme="dark">Dark</button><button data-set-theme="system">Automatic</button></div>
@@ -97,6 +104,7 @@
         <a href="#" data-open="howto">How to play</a>
         <a href="#" data-open="leaderboard">Ranks</a>
         <a href="#" data-open="feedback">Feedback</a>
+        <a href="#" data-open="install" class="install-link">📲 Install the app</a>
         <a href="/admin" class="owner-only hidden">Owner dashboard</a>
         <span>Play money only.</span>
       </footer>

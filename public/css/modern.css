@@ -297,3 +297,11 @@ html[data-theme="dark"] .modal-card .merror { color: #FF9C9C; font-weight: 600; 
 @media (max-width: 760px) { .gr-levels { grid-template-columns: repeat(2, 1fr); } .gr-shaft { max-height: 34vh; } }
 #hub .room .gr-tables { display: flex; flex-direction: column; gap: 8px; padding: 12px 12px 4px; }
 @media (max-width: 760px) { #hub .room .gr-tables { padding: 8px 10px 4px 4px; } }
+
+/* ---------- install as an app ---------- */
+body.is-app .install-link { display: none !important; }
+.install-steps { margin: 14px 0 18px; padding-left: 22px; display: flex; flex-direction: column; gap: 10px; font-size: 15px; }
+.install-steps .ib { display: inline-block; padding: 0 6px; border-radius: 6px; background: var(--a-surface2); }
+/* full-screen app: keep clear of the notch / home indicator */
+body.is-app #hub > .nav { padding-top: max(12px, env(safe-area-inset-top, 0px)); }
+body.is-app .tbar { padding-top: max(6px, env(safe-area-inset-top, 0px)); }
