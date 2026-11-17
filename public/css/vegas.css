@@ -222,3 +222,7 @@ html[data-theme="dark"] .modal-card .lounge-foot { background: linear-gradient(1
   #hub .room { box-shadow: 0 12px 28px rgba(0, 0, 0, .4); }
 }
 @media (max-width: 760px) { .hero-fx { display: none; } }
+
+/* error messages readable on the dark windows */
+html[data-theme="dark"] .modal-card .merror { color: #FF9C9C; font-style: normal; font-weight: 600; }
+html[data-theme="dark"] .modal-card .merror:not(:empty)::before { content: '⚠ '; }

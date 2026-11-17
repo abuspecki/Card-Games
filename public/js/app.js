@@ -173,7 +173,7 @@
       tabs(card, [['login', 'Sign in'], ['register', 'Become a member']], (k) => { mode = k; paint(); }, mode);
       const form = h('form', 'mform');
       form.innerHTML = `
-        <label>Username<input name="u" maxlength="16" autocomplete="username" required></label>
+        <label>Username<input name="u" maxlength="16" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>
         <label>Password<input name="p" type="password" maxlength="100" required></label>
         <p class="merror" role="alert"></p>
         <button class="btn btn-navy wide" type="submit"></button>
@@ -185,7 +185,7 @@
         form.p.autocomplete = mode === 'login' ? 'current-password' : 'new-password';
         form.querySelector('.fine').textContent = mode === 'login'
           ? 'Forgotten your details? Send us a note via Feedback.'
-          : 'Members receive 5,000 chips and 200 coins, keep their winnings and appear on the leaderboard. 3–16 letters, numbers, _ or -; password of 6+ characters.';
+          : 'Members receive 5,000 chips and 200 coins, keep their winnings and appear on the leaderboard. 3–16 characters (letters incl. ä ö ü, numbers, spaces); password of 6+ characters.';
         form.querySelector('.merror').textContent = '';
       };
       paint();
@@ -1141,7 +1141,7 @@
     const list = r.data.friends;
     body.replaceChildren();
     const form = h('form', 'add-friend');
-    form.innerHTML = '<input name="u" maxlength="16" placeholder="Add a friend by username" aria-label="Friend\'s username"><button class="btn btn-navy" type="submit">Send request</button>';
+    form.innerHTML = '<input name="u" maxlength="16" placeholder="Add a friend by username" aria-label="Friend\'s username" autocapitalize="none" autocorrect="off" spellcheck="false"><button class="btn btn-navy" type="submit">Send request</button>';
     form.onsubmit = async (e) => {
       e.preventDefault();
       const u = form.u.value.trim();

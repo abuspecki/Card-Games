@@ -83,6 +83,18 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   assert.strictEqual(g2.first.t, 'joined');
   g2.ws.close();
 
+  // ----- names with umlauts and spaces; failed attempts do not use up the network's quota -----
+  let reg = await call('POST', '/api/register', null, { username: '  Jörg   Müller ', password: 'secret123' });
+  assert.strictEqual(reg.status, 200, JSON.stringify(reg.data));
+  assert.strictEqual(reg.data.username, 'Jörg Müller', 'spaces tidied');
+  assert.strictEqual((await call('POST', '/api/login', null, { username: 'jörg müller', password: 'secret123' })).status, 200, 'login ignores case');
+  assert.strictEqual((await call('GET', '/api/players/' + encodeURIComponent('Jörg Müller'), null)).status, 200, 'profile with umlauts');
+  assert.strictEqual((await call('POST', '/api/register', null, { username: 'ab', password: 'secret123' })).status, 400, 'too short');
+  assert.strictEqual((await call('POST', '/api/register', null, { username: 'bad<name>', password: 'secret123' })).status, 400, 'no symbols');
+  for (let k = 0; k < 8; k++) assert.strictEqual((await call('POST', '/api/register', null, { username: 'Jörg Müller', password: 'secret123' })).status, 409, 'taken');
+  reg = await call('POST', '/api/register', null, { username: 'Zoë', password: 'secret123' });
+  assert.strictEqual(reg.status, 200, 'failed attempts did not block the network');
+
   // ----- wallet endpoints -----
   let r = await call('POST', '/api/wallet/convert', ta, { coins: 5 });
   assert.strictEqual(r.data.spentChips, 550, '5 coins cost 550 chips (100 each + 10 % fee)');

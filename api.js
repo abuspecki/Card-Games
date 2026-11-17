@@ -88,20 +88,28 @@ function createApi(ctx) {
 
     // ===== accounts =====
     if (method === 'POST' && (url === '/api/register' || url === '/api/login')) {
-      if (limited(`auth:${ip}`, 15, 10 * 60 * 1000)) return json(res, 429, { error: 'Too many attempts. Try again in a few minutes.' });
+      // Only failed attempts count (wrong password, name taken, …): 30 per network in 10 minutes.
+      const fails = buckets.get(`auth:${ip}`);
+      if (fails && Date.now() <= fails.reset && fails.count >= 30) return json(res, 429, { error: 'Too many failed attempts. Try again in a few minutes.' });
+      const failed = (status, body) => { limited(`auth:${ip}`, 30, 10 * 60 * 1000); return json(res, status, body); };
       const body = await readBody(req);
-      const username = String(body.username || '').trim();
+      // Names may use any letters (ä, ö, ü, é, …), numbers, _ - . and single spaces.
+      const username = String(body.username || '').normalize('NFC').trim().replace(/\s+/g, ' ');
       const password = String(body.password || '');
       if (url === '/api/register') {
-        if (!/^[A-Za-z0-9_-]{3,16}$/.test(username)) return json(res, 400, { error: 'Username: 3–16 letters, numbers, _ or -' });
-        if (password.length < 6 || password.length > 100) return json(res, 400, { error: 'Password must be at least 6 characters' });
-        if (limited(`register:${ip}`, 5, 60 * 60 * 1000)) return json(res, 429, { error: 'Too many new accounts from your network. Try again later.' });
+        if ([...username].length < 3 || [...username].length > 16) return failed(400, { error: 'Your name needs 3–16 characters' });
+        if (!/^[\p{L}\p{N}_.-]+(?: [\p{L}\p{N}_.-]+)*$/u.test(username)) return failed(400, { error: 'Use letters (ä, ö, ü are fine), numbers, spaces, _ - or . in your name' });
+        if (password.length < 6 || password.length > 100) return failed(400, { error: 'Password must be at least 6 characters' });
+        // Only accounts actually created count: 20 per network and hour (friends often share one Wi-Fi).
+        const made = buckets.get(`register:${ip}`);
+        if (made && Date.now() <= made.reset && made.count >= 20) return json(res, 429, { error: 'Many new accounts were just made from your network. Please try again in an hour.' });
         const user = await store.createUser(username, hashPassword(password));
-        if (!user) return json(res, 409, { error: 'That username is taken' });
+        if (!user) return failed(409, { error: `The name “${username}” is already taken — try another` });
+        limited(`register:${ip}`, 20, 60 * 60 * 1000);
         return json(res, 200, await newSession(user));
       }
       const user = await store.getUserByName(username);
-      if (!user || !checkPassword(password, user.pass)) return json(res, 401, { error: 'Wrong username or password' });
+      if (!user || !checkPassword(password, user.pass)) return failed(401, { error: 'Wrong username or password' });
       if (user.banned) return json(res, 403, { error: `This account has been suspended${user.ban_reason ? `: ${user.ban_reason}` : ''}` });
       return json(res, 200, await newSession(user));
     }
@@ -140,7 +148,7 @@ function createApi(ctx) {
     if (method === 'GET' && url === '/api/shop') {
       return json(res, 200, { items: CATALOG, slots: SHOP_TABS, rules: { chipsPerCoin: CHIPS_PER_COIN, fee: EXCHANGE_FEE, convertRate: CONVERT_RATE, coinToChips: COIN_TO_CHIPS, topUpTo: TOPUP_TO } });
     }
-    const profileMatch = url.match(/^\/api\/players\/([A-Za-z0-9_-]{1,16})$/);
+    const profileMatch = url.match(/^\/api\/players\/([^/]{1,64})$/);
     if (method === 'GET' && profileMatch) {
       const viewer = await currentUser(req);
       const u = await store.getUserByName(profileMatch[1]);
