@@ -3,17 +3,17 @@
    Midnight navy, silver, ivory. Prata + EB Garamond.
    ========================================================= */
 body.durak {
-  --silver: #C9CED6;
+  --silver: #E2C98A;
   --ivory: #F2EEE6;
-  --frost: #8FB0DA;
+  --frost: #CFE0B4;
   --gilt: #C9A45C;
-  --night: #0C1529;
-  background: #070D1C;
+  --night: #0B2214;
+  background: #04140C;
   color: var(--ivory);
 }
-.durak .stage { background: radial-gradient(ellipse at 50% 45%, #1E3360, #101D3A 60%, #070D1C); }
+.durak .stage { background: radial-gradient(ellipse at 50% 45%, #1F4A33, #10301F 60%, #04140C); }
 
-.durak .frame { position: absolute; inset: 20px; border: 1px solid rgba(201, 206, 214, .28); pointer-events: none; }
+.durak .frame { position: absolute; inset: 20px; border: 1px solid rgba(226, 201, 138, .28); pointer-events: none; }
 .durak .frame i { position: absolute; width: 10px; height: 10px; background: var(--silver); transform: rotate(45deg); }
 .durak .frame i:nth-child(1) { left: -5px; top: -5px; }
 .durak .frame i:nth-child(2) { right: -5px; top: -5px; }
@@ -34,7 +34,7 @@ body.durak {
 }
 .durak .trump > span {
   display: inline-flex; align-items: center; gap: 10px; padding: 8px 16px; border-radius: 999px;
-  background: rgba(12, 21, 41, .6); border: 1px solid rgba(201, 206, 214, .5);
+  background: rgba(8, 34, 21, .6); border: 1px solid rgba(226, 201, 138, .5);
 }
 .durak .trump small { font: 400 11px 'Prata', serif; letter-spacing: .25em; color: var(--silver); }
 .durak .trump svg { width: 18px; height: 18px; }
@@ -44,17 +44,17 @@ body.durak {
 /* ---------- Table ---------- */
 .durak .table { position: absolute; left: 160px; top: 130px; width: 1120px; height: 600px; }
 .durak .table > div { position: absolute; border-radius: 50%; }
-.durak .rail { inset: 0; background: linear-gradient(180deg, #1A2A4A, #070D1C); box-shadow: 0 30px 60px rgba(0, 0, 0, .6); }
-.durak .edge { left: 18px; top: 18px; right: 18px; bottom: 18px; border: 1.5px solid rgba(201, 206, 214, .6); }
-.durak .felt { left: 22px; top: 22px; right: 22px; bottom: 22px; background: radial-gradient(ellipse at 50% 50%, #2A4677, #1B3058 60%, #111F3D); box-shadow: inset 0 6px 30px rgba(0, 0, 0, .5); }
-.durak .ring { left: 80px; top: 70px; right: 80px; bottom: 70px; border: 1px solid rgba(201, 206, 214, .18); }
+.durak .rail { inset: 0; background: linear-gradient(180deg, #1E3A2A, #04140C); box-shadow: 0 30px 60px rgba(0, 0, 0, .6); }
+.durak .edge { left: 18px; top: 18px; right: 18px; bottom: 18px; border: 1.5px solid rgba(226, 201, 138, .6); }
+.durak .felt { left: 22px; top: 22px; right: 22px; bottom: 22px; background: radial-gradient(ellipse at 50% 50%, #2F6A48, #1E4D33 60%, #103020); box-shadow: inset 0 6px 30px rgba(0, 0, 0, .5); }
+.durak .ring { left: 80px; top: 70px; right: 80px; bottom: 70px; border: 1px solid rgba(226, 201, 138, .18); }
 .durak .watermark { left: 0; right: 0; top: 230px; text-align: center; font: 400 110px 'Prata', serif; color: var(--silver); opacity: .06; border-radius: 0 !important; }
 
 /* ---------- Players ---------- */
 .durak .plate {
   position: absolute; transform: translate(-50%, -50%);
   display: flex; align-items: center; gap: 12px; padding: 8px 20px 8px 8px; border-radius: 4px;
-  background: linear-gradient(180deg, #1D2E52, #0E1830); border: 1px solid rgba(201, 206, 214, .6);
+  background: linear-gradient(180deg, #1D4A33, #0D2A1B); border: 1px solid rgba(226, 201, 138, .6);
   box-shadow: 0 8px 20px rgba(0, 0, 0, .5); white-space: nowrap;
 }
 .durak .plate .avatar {
@@ -68,7 +68,7 @@ body.durak {
 .durak .role-waiting { color: var(--silver); opacity: .7; }
 .durak .role-can-add { color: var(--frost); }
 .durak .role-out { color: var(--silver); opacity: .5; }
-.durak .plate.me { border-color: var(--frost); box-shadow: 0 0 20px rgba(143, 176, 218, .7); }
+.durak .plate.me { border-color: var(--frost); box-shadow: 0 0 20px rgba(207, 224, 180, .7); }
 .durak .plate.out { opacity: .5; }
 .durak .count { position: absolute; transform: translateX(-50%); font: 400 12px 'Prata', serif; color: var(--silver); }
 
@@ -76,16 +76,16 @@ body.durak {
 .durak .pile-label { position: absolute; transform: translateX(-50%); font: 400 12px 'Prata', serif; color: var(--silver); white-space: nowrap; }
 
 /* Battlefield */
-.durak .open-card { box-shadow: 0 0 26px rgba(143, 176, 218, .9); }
+.durak .open-card { box-shadow: 0 0 26px rgba(207, 224, 180, .9); }
 .durak .beat-tag {
   position: absolute; transform: translateX(-50%); padding: 4px 12px; border-radius: 999px; white-space: nowrap;
-  background: rgba(12, 21, 41, .8); border: 1px solid rgba(143, 176, 218, .7); font-style: italic; font-size: 13px; color: var(--frost);
+  background: rgba(8, 34, 21, .8); border: 1px solid rgba(207, 224, 180, .7); font-style: italic; font-size: 13px; color: var(--frost);
 }
 
 .durak .hint {
   position: absolute; left: 720px; top: 540px; transform: translateX(-50%);
   padding: 8px 18px; border-radius: 999px; white-space: nowrap;
-  background: rgba(12, 21, 41, .85); border: 1px solid rgba(143, 176, 218, .5); font-style: italic; font-size: 15px;
+  background: rgba(8, 34, 21, .85); border: 1px solid rgba(207, 224, 180, .5); font-style: italic; font-size: 15px;
 }
 .durak .hint:empty { display: none; }
 
@@ -95,13 +95,13 @@ body.durak {
   transform-origin: 50% 540px;
   transition: transform .2s ease, box-shadow .2s ease;
 }
-.durak #hand .card.selected { box-shadow: 0 0 22px rgba(201, 206, 214, .9); }
-.durak #hand .card.playable:hover:not(.selected) { box-shadow: 0 0 14px rgba(201, 206, 214, .5); }
+.durak #hand .card.selected { box-shadow: 0 0 22px rgba(226, 201, 138, .9); }
+.durak #hand .card.playable:hover:not(.selected) { box-shadow: 0 0 14px rgba(226, 201, 138, .5); }
 
 /* Actions */
 .durak .actions { position: absolute; right: 64px; bottom: 56px; width: 260px; display: flex; flex-direction: column; gap: 10px; }
 .durak .actions button { padding: 14px 24px; border-radius: 4px; font: 400 15px 'Prata', serif; transition: background .2s, filter .2s; }
-.durak .btn-silver { background: linear-gradient(180deg, #EEF1F5, #B9C0CC); color: var(--night); }
+.durak .btn-silver { background: linear-gradient(180deg, #F6EBC4, #C9A75A); color: var(--night); }
 .durak .btn-silver:hover:not(:disabled) { filter: brightness(1.07); }
 .durak .btn-outline { border: 1px solid var(--silver); color: var(--ivory); }
-.durak .btn-outline:hover:not(:disabled) { background: rgba(201, 206, 214, .1); }
+.durak .btn-outline:hover:not(:disabled) { background: rgba(226, 201, 138, .1); }

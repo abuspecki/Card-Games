@@ -6,12 +6,12 @@
 body.blackjack {
   --gold: #C9A45C;
   --gold-l: #E6CC8F;
-  --cream: #F3E9D7;
-  --dark: #2E0A10;
-  background: #120304;
+  --cream: #EEF0DD;
+  --dark: #0A2418;
+  background: #03120B;
   color: var(--cream);
 }
-.blackjack .stage { background: radial-gradient(ellipse at 50% 40%, #4A1219, #250709 65%, #120304); }
+.blackjack .stage { background: radial-gradient(ellipse at 50% 40%, #145238, #0A2E1F 65%, #03120B); }
 
 /* Art-deco frame with corner lozenges */
 .blackjack .deco-frame { position: absolute; inset: 20px; border: 1px solid rgba(201, 164, 92, .35); outline: 1px solid rgba(201, 164, 92, .15); outline-offset: -5px; pointer-events: none; }
@@ -38,7 +38,7 @@ body.blackjack {
 .blackjack .table > div, .blackjack .table > span { position: absolute; }
 .blackjack .rail  { left: 0; top: -600px; width: 1240px; height: 1200px; border-radius: 50%; background: linear-gradient(180deg, #2A2022, #1A1314 50%, #0B0809); }
 .blackjack .edge  { left: 22px; top: -578px; width: 1196px; height: 1156px; border-radius: 50%; border: 1.5px solid var(--gold); }
-.blackjack .felt  { left: 26px; top: -574px; width: 1188px; height: 1148px; border-radius: 50%; background: radial-gradient(ellipse at 50% 50%, #8A2A36, #5E1822 60%, #3A0D14); box-shadow: inset 0 -6px 30px rgba(0, 0, 0, .5); }
+.blackjack .felt  { left: 26px; top: -574px; width: 1188px; height: 1148px; border-radius: 50%; background: radial-gradient(ellipse at 50% 50%, #1F7A52, #135C3D 60%, #0A3624); box-shadow: inset 0 -6px 30px rgba(0, 0, 0, .5); }
 .blackjack .arc   { border-radius: 50%; border: 1px solid var(--gold); }
 .blackjack .arc-outer { left: 100px; top: -380px; width: 1040px; height: 700px; opacity: .45; }
 .blackjack .arc-inner { left: 240px; top: -220px; width: 760px; height: 420px; opacity: .3; }
@@ -46,12 +46,12 @@ body.blackjack {
 .blackjack .tray {
   left: 50%; top: 0; transform: translateX(-50%);
   display: flex; gap: 4px; padding: 6px 14px;
-  background: linear-gradient(180deg, #0E0A0B, #1E1416);
+  background: linear-gradient(180deg, #04140C, #0A2418);
   border: 1px solid rgba(201, 164, 92, .5); border-top: 0; border-radius: 0 0 10px 10px;
 }
 .blackjack .shoe {
   left: 1010px; top: 50px; width: 130px; height: 86px; border-radius: 6px;
-  background: linear-gradient(180deg, #3A1F14, #1E0F09); border: 1px solid rgba(201, 164, 92, .6);
+  background: linear-gradient(180deg, #1A4A30, #0B2A1A); border: 1px solid rgba(201, 164, 92, .6);
 }
 .blackjack .shoe .card-back { position: absolute; left: 20px; top: -14px; transform: rotate(62deg); }
 .blackjack .discard { left: 140px; top: 44px; width: 60px; height: 84px; }
@@ -62,7 +62,7 @@ body.blackjack {
 .blackjack .dealer-shows {
   left: 50%; top: 186px; transform: translateX(-50%);
   padding: 3px 12px; border-radius: 999px; white-space: nowrap;
-  background: rgba(26, 5, 7, .6); border: 1px solid rgba(201, 164, 92, .5);
+  background: rgba(5, 26, 16, .6); border: 1px solid rgba(201, 164, 92, .5);
   font-style: italic; font-size: 13px;
 }
 .blackjack .dealer-shows:empty { display: none; }
@@ -108,12 +108,12 @@ body.blackjack {
 .blackjack .actions[hidden] { display: none; }
 .blackjack .plaque {
   display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 12px 30px; border-radius: 2px; background: #1E0A0D; border: 1px solid var(--gold);
+  padding: 12px 30px; border-radius: 2px; background: #0A2418; border: 1px solid var(--gold);
   transition: background .2s, transform .15s;
 }
 .blackjack .plaque b { font: 700 15px 'Bodoni Moda', serif; letter-spacing: .25em; text-transform: uppercase; color: var(--gold); margin-right: -.25em; }
 .blackjack .plaque em { font-size: 12px; opacity: .7; }
-.blackjack .plaque:hover:not(:disabled) { background: #2E1015; transform: translateY(-2px); }
+.blackjack .plaque:hover:not(:disabled) { background: #123A26; transform: translateY(-2px); }
 .blackjack .plaque.gold { background: linear-gradient(180deg, #E6CC8F, #B48E45); }
 .blackjack .plaque.gold b, .blackjack .plaque.gold em { color: var(--dark); }
 .blackjack .plaque.gold:hover:not(:disabled) { filter: brightness(1.06); }

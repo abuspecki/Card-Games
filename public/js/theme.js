@@ -16,7 +16,7 @@
     const t = resolve(mode());
     document.documentElement.dataset.theme = t;
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', t === 'dark' ? '#0D1220' : '#14213D');
+    if (meta) meta.setAttribute('content', t === 'dark' ? '#0A1F15' : '#0F3B26');
     listeners.forEach((f) => f(t, mode()));
   }
 

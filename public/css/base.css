@@ -119,8 +119,8 @@ svg { display: block; }
 .card-back.holdem .deco::before { width: 48%; aspect-ratio: 1; }
 .card-back.holdem .deco::after  { width: 37%; aspect-ratio: 1; opacity: .5; }
 
-/* Blackjack: oxblood + gold, art-deco sunburst */
-.card-back.blackjack { --acc: #C9A45C; --bg1: #5A1A22; --bg2: #3E1016; --mono-font: 'Bodoni Moda', Georgia, serif; }
+/* Blackjack: emerald + gold, art-deco sunburst */
+.card-back.blackjack { --acc: #C9A45C; --bg1: #1B5E40; --bg2: #0E3A27; --mono-font: 'Bodoni Moda', Georgia, serif; }
 .card-back.blackjack .mono { margin-top: -22%; }
 .card-back.blackjack .deco {
   background: repeating-conic-gradient(from 0deg at 50% 90%, rgba(201, 164, 92, .4) 0 .7deg, transparent .7deg 10deg);
@@ -129,11 +129,11 @@ svg { display: block; }
 .card-back.blackjack .deco::after {
   content: ''; position: absolute; left: 50%; top: 90%; width: 36%; aspect-ratio: 1;
   transform: translate(-50%, -50%); border-radius: 50%;
-  background: #5A1A22; border: 1px solid var(--acc);
+  background: #1B5E40; border: 1px solid var(--acc);
 }
 
-/* Durak: navy + silver, lozenge */
-.card-back.durak { --acc: #C9CED6; --bg1: #14213D; --bg2: #0C1529; --mono-font: 'Prata', Georgia, serif; }
+/* Durak: forest + pale gold, lozenge */
+.card-back.durak { --acc: #E2C98A; --bg1: #22462E; --bg2: #10281A; --mono-font: 'Prata', Georgia, serif; }
 .card-back.durak .mono { font-weight: 400; }
 .card-back.durak .deco::before {
   content: ''; position: absolute; left: 50%; top: 50%; width: 52%; aspect-ratio: 1;

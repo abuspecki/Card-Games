@@ -1,13 +1,13 @@
 /* =========================================================
-   CardGames — Hub / homepage (old-money ivory & navy)
+   CardGames — Hub / homepage (old-money green & gold)
    ========================================================= */
 :root {
-  --ivory: #F4EFE3;
-  --paper: #FBF8F0;
-  --sand: #E9E2D1;
-  --navy: #14213D;
-  --oxblood: #6B1E24;
-  --gold: #B08D57;
+  --ivory: #EFF1E4;
+  --paper: #F9FAF2;
+  --sand: #E0E6D2;
+  --navy: #0F3B26;
+  --oxblood: #9A7322;
+  --gold: #B8902F;
   --ink: #2E2B26;
   --pad: clamp(20px, 8.3vw, 120px);
 }
@@ -71,7 +71,7 @@ body.hub { background: var(--ivory); color: var(--ink); }
 .links a:hover::after { right: 0; }
 .actions { display: flex; align-items: center; gap: 28px; }
 .signin { font-size: 16px; }
-.double-rule { margin: 0 var(--pad); height: 4px; border-top: 1px solid rgba(20, 33, 61, .3); border-bottom: 1px solid rgba(20, 33, 61, .12); }
+.double-rule { margin: 0 var(--pad); height: 4px; border-top: 1px solid rgba(15,59,38, .3); border-bottom: 1px solid rgba(15,59,38, .12); }
 
 /* ---------- Hero ---------- */
 .hero {
@@ -95,7 +95,7 @@ body.hub { background: var(--ivory); color: var(--ink); }
 .trio .card-back {
   position: absolute; left: 50%; top: 10px;
   transform: translateX(-50%) rotate(var(--rot));
-  box-shadow: 0 20px 40px rgba(20, 33, 61, .25);
+  box-shadow: 0 20px 40px rgba(15,59,38, .25);
   transition: transform .35s ease;
 }
 .trio .trio-holdem { top: 34px; margin-left: -120px; }
@@ -112,7 +112,7 @@ body.hub { background: var(--ivory); color: var(--ink); }
 .room-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
 
 .room {
-  --acc: #B08D57; --fg: #F2EBDD;
+  --acc: #B8902F; --fg: #ECEFDF;
   display: flex; flex-direction: column; gap: 16px;
   padding: 28px 28px 30px;
   border-radius: 6px;
@@ -140,21 +140,21 @@ body.hub { background: var(--ivory); color: var(--ink); }
 
 .room-holdem {
   background: radial-gradient(circle at 50% 40%, #2E6046, #1E4632 60%, #13301F);
-  border: 10px solid #4A2418;
+  border: 10px solid #5C4416;
 }
 .room-holdem h3 { font-family: 'Cormorant Garamond', serif; }
 .room-holdem .tag { font-weight: 500; }
-.room-holdem .room-btn { background: linear-gradient(90deg, #D8BC84, #A07C45); color: #1A1208; }
+.room-holdem .room-btn { background: linear-gradient(90deg, #DCC07A, #A07C45); color: #1A1208; }
 .room-holdem .room-btn:hover { filter: brightness(1.08); }
 
 .room-blackjack {
-  --acc: #C9A45C; --fg: #F3E9D7;
-  background: radial-gradient(circle at 50% 40%, #7A2430, #4E141B 70%, #2E0A10);
-  border: 1.5px solid #C9A45C;
+  --acc: #D4AF4F; --fg: #EEF0DD;
+  background: radial-gradient(circle at 50% 40%, #1F7A52, #0F4A32 70%, #072A1C);
+  border: 1.5px solid #D4AF4F;
 }
 .room-blackjack h3 { font-family: 'Bodoni Moda', serif; font-size: 36px; }
 .room-blackjack .tag { font-family: 'Italiana', serif; }
-.room-blackjack .room-btn { background: #C9A45C; color: #2E0A10; font: 700 14px 'Bodoni Moda', serif; letter-spacing: .15em; }
+.room-blackjack .room-btn { background: #D4AF4F; color: #072A1C; font: 700 14px 'Bodoni Moda', serif; letter-spacing: .15em; }
 .room-blackjack .room-btn:hover { background: #E6CC8F; }
 .room-blackjack .rays {
   position: absolute; inset: -10px -28px 0;
@@ -163,20 +163,20 @@ body.hub { background: var(--ivory); color: var(--ink); }
 }
 
 .room-durak {
-  --acc: #C9CED6; --fg: #F2EEE6;
-  background: radial-gradient(circle at 50% 40%, #22385F, #14213D 70%, #0C1529);
-  border: 1px solid #C9CED6;
+  --acc: #E2C98A; --fg: #EEF1E6;
+  background: radial-gradient(circle at 50% 40%, #3D6B3A, #1D3F22 70%, #0C2112);
+  border: 1px solid #E2C98A;
 }
 .room-durak h3 { font-family: 'Prata', serif; font-weight: 400; }
 .room-durak h3 span { font-size: 22px; color: var(--acc); opacity: .8; }
 .room-durak .tag { font-family: 'Prata', serif; }
-.room-durak .room-btn { background: #E6E9EE; color: #0C1529; font-family: 'Prata', serif; }
-.room-durak .room-btn:hover { background: #fff; }
+.room-durak .room-btn { background: linear-gradient(180deg, #F6EBC4, #D9BE78); color: #08190F; font-family: 'Prata', serif; }
+.room-durak .room-btn:hover { filter: brightness(1.06); }
 
 /* ---------- House rules ---------- */
 .rules { background: var(--sand); padding: 96px var(--pad); display: flex; flex-direction: column; gap: 48px; }
 .rule-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; }
-.rule { border-top: 1px solid rgba(20, 33, 61, .25); padding-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.rule { border-top: 1px solid rgba(15,59,38, .25); padding-top: 10px; display: flex; flex-direction: column; gap: 10px; }
 .rule .num { font: italic 500 44px/1.2 'Cormorant Garamond', serif; color: var(--gold); }
 .rule h3 { font: 600 28px/1.2 'Cormorant Garamond', serif; color: var(--navy); }
 .rule p { font-size: 17px; line-height: 1.6; }
