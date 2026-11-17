@@ -1026,6 +1026,7 @@
       <button class="mb-stat" data-open="shop" title="The Shop"><small>Coins</small><b><i class="ico-coin"></i>${w ? fmt(w.coins) : '…'}</b></button>
       <button class="mb-stat" data-open="friends" title="Friends"><small>Friends online</small><b>${p.onlineFriends ?? '–'}${p.requests ? ` <em>· ${p.requests} new request${p.requests === 1 ? '' : 's'}</em>` : ''}</b></button>
       ${w && w.daily.ready ? `<button class="mb-bonus" data-mb-bonus>🎁 Collect ${w.daily.amount} coins</button>` : ''}
+      ${a.isOwner ? '<a class="mb-owner" href="/admin" title="Owner dashboard">♛ Owner</a>' : ''}
       <button class="btn btn-navy mb-play" data-mb-play>Quick seat</button>`;
     const bonus = bar.querySelector('[data-mb-bonus]');
     if (bonus) bonus.onclick = async () => {

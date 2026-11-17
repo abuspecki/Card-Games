@@ -226,3 +226,11 @@ html[data-theme="dark"] .modal-card .lounge-foot { background: linear-gradient(1
 /* error messages readable on the dark windows */
 html[data-theme="dark"] .modal-card .merror { color: #FF9C9C; font-style: normal; font-weight: 600; }
 html[data-theme="dark"] .modal-card .merror:not(:empty)::before { content: '⚠ '; }
+
+/* owner shortcuts */
+#hub .links a.nav-owner { color: #2A1E04; background: var(--v-gold); }
+#hub .links a.nav-owner:hover { color: #2A1E04; filter: brightness(1.08); }
+.mobile-menu a.nav-owner { color: #E8C468; font-weight: 700; }
+.mb-owner { padding: 10px 16px; border-radius: 999px; border: 1px solid #E8C468; color: #E8C468; font: 700 13px var(--v-body); letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; }
+.mb-owner:hover { background: rgba(232, 196, 104, .15); }
+@media (max-width: 480px) { body.member #hub .wordmark { display: none; } }
