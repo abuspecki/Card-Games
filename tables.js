@@ -5,12 +5,14 @@ const { Table } = require('./poker');
 const bots = require('./bots');
 const { Blackjack } = require('./games/blackjack');
 const { Durak } = require('./games/durak');
+const { Roulette } = require('./games/roulette');
 const { rewardFor, dayString, GESTURE_COOLDOWN } = require('./coins');
 
 const GAMES = {
   holdem: { name: "Texas Hold'em", make: (settings) => new Table({ ...settings, variant: 'holdem', rotate: false }) },
   blackjack: { name: 'Blackjack', make: (settings) => new Blackjack(settings) },
   durak: { name: 'Durak', make: (settings) => new Durak(settings) },
+  roulette: { name: 'Roulette', make: (settings) => new Roulette(settings) },
 };
 
 // Two tables per game. `buyIn` is the stack you bring (from your bankroll if
@@ -22,6 +24,8 @@ const TABLES = [
   { id: 'BLACKJACK-2', name: 'Blackjack · High Roller', game: 'blackjack', capacity: 7, highRoller: true, buyIn: 5000, minBuyIn: 1000, settings: { bigBlind: 50 } },
   { id: 'DURAK-1', name: 'Durak · Table 1', game: 'durak', capacity: 6 },
   { id: 'DURAK-2', name: 'Durak · High Roller', game: 'durak', capacity: 6, highRoller: true, minBankroll: 10000 },
+  { id: 'ROULETTE-1', name: 'Roulette · Table 1', game: 'roulette', capacity: 8, buyIn: 1000, minBuyIn: 100, settings: { bigBlind: 5 } },
+  { id: 'ROULETTE-2', name: 'Roulette · High Roller', game: 'roulette', capacity: 8, highRoller: true, buyIn: 5000, minBuyIn: 1000, settings: { bigBlind: 25 } },
 ];
 
 const NEXT_HAND_DELAY = 6000;
@@ -36,7 +40,7 @@ function createLobby(ctx) {
 
   for (const def of TABLES) {
     const settings = { ...(def.settings || {}), startingStack: def.buyIn || 1000 };
-    const room = { ...def, code: def.id, table: GAMES[def.game].make(settings), clients: new Map(), nextTimer: null, turnTimer: null, startTimer: null };
+    const room = { ...def, code: def.id, table: GAMES[def.game].make(settings), clients: new Map(), nextTimer: null, turnTimer: null, startTimer: null, phaseTimer: null };
     wireTable(room);
     rooms.set(def.id, room);
   }
@@ -70,7 +74,7 @@ function createLobby(ctx) {
       minBuyIn: room.minBuyIn || 0,
       minBankroll: room.minBankroll || 0,
       stakes: room.game === 'holdem' ? `Blinds ${s.smallBlind} / ${s.bigBlind}`
-        : room.game === 'blackjack' ? `Bets from ${s.bigBlind}` : '2–6 players',
+        : room.game === 'blackjack' || room.game === 'roulette' ? `Bets from ${s.bigBlind}` : '2–6 players',
     };
   }
 
@@ -106,6 +110,16 @@ function createLobby(ctx) {
         else t.stage = 'waiting';
         pushState(room);
       }, t.game === 'durak' ? NEXT_HAND_DELAY + 2000 : NEXT_HAND_DELAY);
+    }
+    // Games with a clock (roulette): move on when the betting / spinning time is up.
+    clearTimeout(room.phaseTimer);
+    room.phaseTimer = null;
+    if (t.tick && t.isPlaying() && t.deadline) {
+      room.phaseTimer = setTimeout(() => {
+        room.phaseTimer = null;
+        if (t.tick(Date.now())) pushState(room);
+        else scheduleTimers(room);
+      }, Math.max(0, t.deadline - Date.now()) + 30);
     }
     // Bots act after a short "thinking" pause; disconnected humans auto-play safely.
     clearTimeout(room.turnTimer);

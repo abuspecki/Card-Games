@@ -12,11 +12,12 @@
   const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
   window.TableUI = window.TableUI || {};
 
-  const GAME_NAMES = { holdem: "Texas Hold'em", blackjack: 'Blackjack', durak: 'Durak' };
+  const GAME_NAMES = { holdem: "Texas Hold'em", blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette' };
   const ROOM_INFO = {
     holdem: { tag: 'The Club Room', desc: 'The classic. Read the table, play your hand and outlast the room. No-Limit, up to eight players.', cards: [['A', 'spade'], ['K', 'spade']] },
     blackjack: { tag: 'Salon Privé', desc: 'You against the house. Hit, stand, double or split — and draw as close to twenty-one as you dare.', cards: [['A', 'heart'], ['K', 'club']] },
     durak: { tag: 'The Winter Palace', desc: 'The Russian classic. Attack, defend, and whatever you do — don\'t be the last one holding cards.', cards: [['6', 'heart'], ['Q', 'spade']] },
+    roulette: { tag: 'The Wheel Room', desc: 'One wheel, one zero, thirty-six numbers. Everyone bets at once — then the ball decides.' },
   };
 
   // ---------------- state ----------------
@@ -337,18 +338,21 @@
   function buildRooms() {
     const grid = $('roomGrid');
     grid.replaceChildren();
-    for (const game of ['holdem', 'blackjack', 'durak']) {
+    for (const game of ['holdem', 'blackjack', 'durak', 'roulette']) {
       const info = ROOM_INFO[game];
       const art = h('article', `room room-${game}`);
       const vis = h('div', 'visual');
       if (game === 'blackjack') vis.appendChild(h('div', 'rays'));
-      const fan = h('div', 'fan');
-      const b = CardUI.back(game, { size: 104, noOverride: true });
-      const r = CardUI.card(info.cards[1][0], info.cards[1][1], { size: 104 });
-      const m = CardUI.card(info.cards[0][0], info.cards[0][1], { size: 104 });
-      b.classList.add('f-left'); r.classList.add('f-right'); m.classList.add('f-mid');
-      fan.append(b, r, m);
-      vis.appendChild(fan);
+      if (game === 'roulette') vis.appendChild(h('div', 'mini-wheel'));
+      else {
+        const fan = h('div', 'fan');
+        const b = CardUI.back(game, { size: 104, noOverride: true });
+        const r = CardUI.card(info.cards[1][0], info.cards[1][1], { size: 104 });
+        const m = CardUI.card(info.cards[0][0], info.cards[0][1], { size: 104 });
+        b.classList.add('f-left'); r.classList.add('f-right'); m.classList.add('f-mid');
+        fan.append(b, r, m);
+        vis.appendChild(fan);
+      }
       art.appendChild(vis);
       art.appendChild(h('p', 'tag', esc(info.tag)));
       art.appendChild(h('h3', '', game === 'durak' ? 'Durak <span lang="ru">Дурак</span>' : esc(GAME_NAMES[game])));
@@ -483,7 +487,7 @@
     const S = App.S;
     const st = S && S.state;
     const me = st && st.mySeat !== -1 ? st.seats[st.mySeat] : null;
-    const playing = st && me && me.inHand && ['preflop', 'flop', 'turn', 'river', 'betting', 'playing'].includes(st.stage);
+    const playing = st && me && me.inHand && ['preflop', 'flop', 'turn', 'river', 'betting', 'playing', 'spinning'].includes(st.stage);
     if (playing && !confirm(st.game === 'durak' ? 'Leave in the middle of a game? You will be the durak.' : 'Leave in the middle of a hand? You lose what you have bet.')) return;
     send({ t: 'leave' });
     setTimeout(() => { if (App.tableId) backToHub(); }, 1500);
@@ -549,7 +553,7 @@
       ctx.topbar.replaceChildren();
       ui.build(ctx);
       buildTopbar(game);
-      $('oddsTab').classList.toggle('hidden', game === 'durak');
+      $('oddsTab').classList.toggle('hidden', game === 'durak' || game === 'roulette');
     }
     ctx.S = S;
     ctx.st = st;
@@ -562,7 +566,7 @@
     renderTableInfo(S, st);
     renderOdds(st);
     const title = document.querySelector('[data-tb-title]');
-    if (title) title.textContent = S.tableName.replace(/^[^·]*·\s*/, '') + (st.game === 'holdem' ? ` · Blinds ${st.settings.smallBlind} / ${st.settings.bigBlind}` : st.game === 'blackjack' ? ` · Bets from ${st.minBet}` : st.stage !== 'waiting' ? ` · Game ${st.handNo}` : '');
+    if (title) title.textContent = S.tableName.replace(/^[^·]*·\s*/, '') + (st.game === 'holdem' ? ` · Blinds ${st.settings.smallBlind} / ${st.settings.bigBlind}` : st.game === 'blackjack' || st.game === 'roulette' ? ` · Bets from ${st.minBet}` : st.stage !== 'waiting' ? ` · Game ${st.handNo}` : '');
     renderTopbarWallet();
     myTurnSound(st);
   }
@@ -587,7 +591,7 @@
   }
 
   // Top bar shared by every room (styled per room by its CSS).
-  const ROOM_TITLES = { holdem: ["Texas Hold'em", 'The Club Room'], blackjack: ['Blackjack', 'Salon Privé'], durak: ['Дурак', 'The Winter Palace'] };
+  const ROOM_TITLES = { holdem: ["Texas Hold'em", 'The Club Room'], blackjack: ['Blackjack', 'Salon Privé'], durak: ['Дурак', 'The Winter Palace'], roulette: ['Roulette', 'The Wheel Room'] };
   function buildTopbar(game) {
     const tb = ctx.topbar;
     const [title, room] = ROOM_TITLES[game];
@@ -733,7 +737,7 @@
   function renderTableInfo(S, st) {
     const g = st.game;
     const s = st.settings || {};
-    const info = g === 'holdem' ? `Blinds ${s.smallBlind} / ${s.bigBlind}` : g === 'blackjack' ? `Bets from ${st.minBet}` : 'Two to six players · 36 cards';
+    const info = g === 'holdem' ? `Blinds ${s.smallBlind} / ${s.bigBlind}` : g === 'blackjack' || g === 'roulette' ? `Bets from ${st.minBet}` : 'Two to six players · 36 cards';
     $('tableInfo').innerHTML = `<b>${esc(S.tableName)}</b><span>${esc(info)} · cards are dealt automatically once enough players are seated.</span>
       ${S.usesChips && App.account ? '<span>Your chips come from your bankroll and return to it when you leave.</span>' : S.usesChips ? '<span>As a guest you play with free table chips.</span>' : ''}`;
     const seated = st.seats.filter(Boolean).length;
@@ -1205,7 +1209,7 @@
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pollPresence(); });
 
   // ----- profiles -----
-  const MODE_NAMES = { friends: "Hold'em with friends", bots: "Hold'em with bots", blackjack: 'Blackjack', durak: 'Durak' };
+  const MODE_NAMES = { friends: "Hold'em with friends", bots: "Hold'em with bots", blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette' };
   function statsTable(stats) {
     if (!stats.length) return '<p class="muted">No hands played yet.</p>';
     return `<table class="stats"><thead><tr><th>Game</th><th>Hands</th><th>Won</th><th>${'Result'}</th></tr></thead><tbody>
@@ -1270,7 +1274,7 @@
         body.querySelectorAll('[data-prof]').forEach((b) => { b.onclick = () => openProfile(b.dataset.prof); });
         if (!r.data.persistent) body.appendChild(h('p', 'fine warn', 'Test mode: no database is connected, so results are temporary.'));
       };
-      tabs(card, [['friends', 'Hold\'em'], ['bots', 'vs Bots'], ['blackjack', 'Blackjack'], ['durak', 'Durak']], load, mode);
+      tabs(card, [['friends', 'Hold\'em'], ['bots', 'vs Bots'], ['blackjack', 'Blackjack'], ['durak', 'Durak'], ['roulette', 'Roulette']], load, mode);
       card.append(note, body);
       load(mode);
     }, { wide: true });
@@ -1328,6 +1332,12 @@
       <li>All beaten and nobody adds more: the cards are discarded (<i>бито</i>) and the defender attacks next. Cannot or will not beat: the defender <b>takes</b> everything and loses their turn to attack.</li>
       <li>Everyone draws back to six after each round. Once the deck is empty, players who run out of cards are safe.</li></ol>`,
   };
+  RULES.roulette = `<ol class="rules-list">
+      <li><b>Goal:</b> guess where the ball lands. The wheel has the numbers <b>0 to 36</b>; zero is green, the others red or black.</li>
+      <li>Pick a chip below the table, then tap the layout to bet — as many times and places as you like. <b>Undo</b>, <b>Clear</b>, <b>Repeat</b> and <b>×2</b> help.</li>
+      <li>Everyone bets at the same time until the clock runs out (or everybody pressed <b>Spin</b>). Then: <i>rien ne va plus</i> — the wheel spins.</li>
+      <li><b>Payouts:</b> a single number pays <b>35 to 1</b>; a dozen or a column pays <b>2 to 1</b>; red/black, even/odd, 1–18/19–36 pay <b>1 to 1</b>.</li>
+      <li>When the ball lands on <b>zero</b>, all bets except a bet on 0 are lost — that is the house's edge.</li></ol>`;
   const RANKINGS = [
     ['Royal Flush', 'As Ks Qs Js Ts', 'A, K, Q, J, 10 of one suit.'], ['Straight Flush', '9h 8h 7h 6h 5h', 'Five in a row, one suit.'],
     ['Four of a Kind', 'Qc Qd Qh Qs 4d', 'Four of one rank.'], ['Full House', 'Kh Kd Ks 7c 7h', 'Three of a kind and a pair.'],
@@ -1350,7 +1360,7 @@
           });
         }
       };
-      tabs(card, [['holdem', "Hold'em"], ['blackjack', 'Blackjack'], ['durak', 'Durak']], paint, game);
+      tabs(card, [['holdem', "Hold'em"], ['blackjack', 'Blackjack'], ['durak', 'Durak'], ['roulette', 'Roulette']], paint, game);
       card.appendChild(body);
       paint(game);
     }, { wide: true });

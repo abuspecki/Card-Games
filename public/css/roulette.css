@@ -1,0 +1,106 @@
+/* =========================================================
+   Roulette — "The Wheel Room"
+   Emerald felt, gilt lines, a walnut-and-brass wheel.
+   ========================================================= */
+body.roulette { --gilt: #D4AF4F; --gilt-l: #F0D98E; --cream: #F3EBD2; background: #03120B; color: var(--cream); }
+.roulette .stage { background: radial-gradient(ellipse at 40% 45%, #145238, #0A2E1F 60%, #03120B); }
+.roulette .stage > div { position: absolute; }
+.roulette .r-felt { inset: 0; background: repeating-linear-gradient(45deg, rgba(255,255,255,.012) 0 2px, transparent 2px 6px); pointer-events: none; }
+
+/* ---------- wheel ---------- */
+.roulette .r-wheel { border-radius: 50%; box-shadow: 0 30px 60px rgba(0,0,0,.55), 0 0 0 6px #2A1D0A, 0 0 0 8px var(--gilt); }
+.roulette .r-disc, .roulette .r-ballring { position: absolute; inset: 0; border-radius: 50%; }
+.roulette .r-disc svg { display: block; width: 100%; height: 100%; }
+.roulette .r-ballring i { position: absolute; left: 50%; width: 4.4%; aspect-ratio: 1; margin-left: -2.2%; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, #D9D9D9 50%, #8A8A8A); box-shadow: 0 2px 4px rgba(0,0,0,.6); }
+.roulette .r-pointer { position: absolute; left: 50%; top: -14px; width: 0; height: 0; margin-left: -10px;
+  border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 18px solid var(--gilt); filter: drop-shadow(0 2px 2px rgba(0,0,0,.6)); }
+.roulette .r-result { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 96px; height: 96px; border-radius: 50%;
+  border: 3px solid var(--gilt); box-shadow: 0 10px 30px rgba(0,0,0,.6); animation: r-pop .5s ease both; }
+.roulette .r-result b { font: 700 46px/1 'Cormorant Garamond', serif; color: #fff; }
+.roulette .r-result small { font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: var(--gilt-l); }
+.roulette .r-result.red { background: #A3202C; } .roulette .r-result.black { background: #121614; } .roulette .r-result.green { background: #1B7A47; }
+@keyframes r-pop { from { transform: translate(-50%,-50%) scale(.4); opacity: 0; } to { transform: translate(-50%,-50%) scale(1); opacity: 1; } }
+
+/* ---------- status & history ---------- */
+.roulette .r-status { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; white-space: nowrap; }
+.roulette .r-status small { font-size: 12px; letter-spacing: .32em; text-transform: uppercase; color: var(--gilt); }
+.roulette .r-status b { font: 600 30px/1.1 'Cormorant Garamond', serif; }
+.roulette .r-status b.soon { color: #F0A35A; }
+.roulette .r-history { display: flex; gap: 6px; align-items: center; height: 40px; }
+.roulette .r-history em { font-style: italic; opacity: .6; }
+.roulette .r-history .h { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; font: 700 17px 'Cormorant Garamond', serif; color: #fff; border: 1px solid rgba(212,175,79,.5); }
+.roulette .r-history .h.red { background: #A3202C; } .roulette .r-history .h.black { background: #121614; } .roulette .r-history .h.green { background: #1B7A47; }
+.roulette .r-history .h.last { box-shadow: 0 0 0 2px var(--gilt), 0 0 14px rgba(212,175,79,.8); transform: scale(1.12); }
+
+/* ---------- betting layout ---------- */
+.roulette .r-board { inset: 0; pointer-events: none; }
+.roulette .r-cell { position: absolute; pointer-events: auto; display: grid; place-items: center; border: 1px solid rgba(212,175,79,.7); background: transparent;
+  color: var(--cream); font: 700 22px 'Cormorant Garamond', serif; transition: background .15s, box-shadow .15s; }
+.roulette .r-cell span { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; }
+.roulette .r-cell.red span { background: #A3202C; }
+.roulette .r-cell.black span { background: #121614; }
+.roulette .r-cell.green { background: rgba(27,122,71,.55); }
+.roulette .r-cell.out { font: 600 16px 'EB Garamond', serif; letter-spacing: .08em; }
+.roulette .r-cell.out span { width: auto; height: auto; }
+.roulette .r-cell.red .diamond, .roulette .r-cell.black .diamond { width: 30px; height: 30px; border-radius: 3px; transform: rotate(45deg); border: 1px solid var(--gilt); }
+.roulette .r-cell.out.red .diamond { background: #A3202C; } .roulette .r-cell.out.black .diamond { background: #121614; }
+.roulette .r-cell:hover, .roulette .r-cell.lit { background: rgba(240,217,142,.16); }
+.roulette .r-cell.win { background: rgba(240,217,142,.32); box-shadow: inset 0 0 0 2px var(--gilt-l); }
+.roulette .r-cell.vert span { writing-mode: vertical-rl; transform: rotate(180deg); }
+.roulette .r-cell.vert .diamond { writing-mode: horizontal-tb; transform: rotate(45deg); }
+.roulette .layer { position: absolute; inset: 0; pointer-events: none; }
+.roulette .layer > * { position: absolute; }
+.roulette .r-other { opacity: .8; }
+.roulette .chip-stack.r-mine .stack-amt { font-size: 13px; padding: 0 6px; }
+.roulette .chip-stack.won .stack-amt { background: var(--gilt); color: #0A2418; }
+.roulette .chip-stack.lost { opacity: .35; transition: opacity 1.2s .6s; }
+
+/* ---------- players ---------- */
+.roulette .r-players { display: flex; flex-wrap: wrap; gap: 8px; max-width: 800px; pointer-events: auto; }
+.roulette .r-plate { display: flex; align-items: center; gap: 8px; padding: 5px 12px 5px 5px; border-radius: 999px; background: rgba(4,18,11,.75); border: 1px solid rgba(212,175,79,.35); }
+.roulette .r-plate.me { border-color: var(--gilt); }
+.roulette .r-plate.ready { box-shadow: 0 0 0 2px rgba(120,200,140,.6); }
+.roulette .r-plate.winner { box-shadow: 0 0 0 2px var(--gilt), 0 0 18px rgba(212,175,79,.6); }
+.roulette .r-plate .avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: #1E4A33; font-size: 13px; overflow: hidden; }
+.roulette .r-plate .col { display: flex; flex-direction: column; line-height: 1.1; }
+.roulette .r-plate .name { font-size: 14px; }
+.roulette .r-plate .chips { font-size: 12px; color: var(--gilt-l); font-style: italic; }
+
+/* ---------- controls ---------- */
+.roulette .controls { background: linear-gradient(0deg, #03120B, rgba(3,18,11,.94)); border-top: 1px solid rgba(212,175,79,.3); }
+.roulette .r-bar { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 12px 28px; flex-wrap: wrap; }
+.roulette .r-bar .info { display: flex; flex-direction: column; min-width: 120px; }
+.roulette .r-bar .info small { font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: var(--gilt); }
+.roulette .r-bar .info strong { font: 700 30px/1.1 'Cormorant Garamond', serif; }
+.roulette .r-bar .info em { font-size: 13px; opacity: .75; }
+.roulette .r-chips { display: flex; gap: 10px; }
+.roulette .r-chip { border-radius: 50%; transition: transform .15s, box-shadow .15s; }
+.roulette .r-chip.on { transform: translateY(-6px); box-shadow: 0 0 0 3px var(--gilt-l), 0 8px 18px rgba(0,0,0,.5); }
+.roulette .r-chip:disabled { opacity: .3; }
+.roulette .r-buttons { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.roulette .r-buttons .pill { padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(212,175,79,.55); color: var(--cream); }
+.roulette .r-buttons .pill:disabled { opacity: .35; }
+.roulette .r-spin { padding: 12px 28px; background: linear-gradient(180deg, #F0D98E, #B8902F); color: #0A2418; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; border-radius: 4px; }
+.roulette .r-spin:disabled { opacity: .45; }
+body.roulette .tbar { background: rgba(3,18,11,.92); border-bottom: 1px solid rgba(212,175,79,.3); color: var(--gilt); }
+
+/* ---------- phones ---------- */
+body.portrait.roulette .r-cell { font-size: 17px; }
+body.portrait.roulette .r-cell span { width: 28px; height: 28px; }
+body.portrait.roulette .r-cell.out { font-size: 13px; }
+body.portrait.roulette .r-cell .diamond { width: 18px; height: 18px; }
+body.portrait.roulette .r-status b { font-size: 22px; }
+body.portrait.roulette .r-history .h { width: 26px; height: 26px; font-size: 14px; }
+body.portrait.roulette .r-result { width: 70px; height: 70px; }
+body.portrait.roulette .r-result b { font-size: 32px; }
+body.portrait.roulette .r-players { max-width: 410px; }
+@media (max-width: 720px), (max-height: 500px) {
+  .roulette .r-bar { padding: 8px 10px; gap: 8px; justify-content: center; }
+  .roulette .r-bar .info { min-width: 0; }
+  .roulette .r-bar .info strong { font-size: 22px; }
+  .roulette .r-chips { gap: 6px; }
+  .roulette .r-chip .chip { --s: 38px !important; }
+  .roulette .r-buttons .pill { padding: 6px 10px; font-size: 13px; }
+  .roulette .r-spin { padding: 10px 18px; }
+}

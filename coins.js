@@ -336,6 +336,7 @@ function rewardFor(r, highRoller) {
   if (r.mode === 'friends' || r.mode === 'bots') coins = 10 + Math.min(40, Math.floor(Math.max(0, r.pot) / 100));
   else if (r.mode === 'blackjack') coins = 5 + Math.min(20, Math.floor(Math.max(0, r.net) / 50));
   else if (r.mode === 'durak') coins = 15;
+  else if (r.mode === 'roulette') coins = 3 + Math.min(20, Math.floor(Math.max(0, r.net) / 50));
   return highRoller ? coins * 2 : coins;
 }
 
