@@ -40,7 +40,7 @@ const seq = (vals) => { let i = 0; return () => vals[i++ % vals.length]; };
   r = await g.cashout(1);
   assert.strictEqual(r.payout, Math.floor(100 * multiplier('medium', 2)));
   assert.strictEqual(f.w.chips, 9900 + r.payout); assert.strictEqual(f.w.in_play, 0);
-  assert.deepStrictEqual(f.records[0].slice(1), ['goldrush', r.payout - 100, true, r.payout - 100]);
+  assert.deepStrictEqual(f.records[0].slice(1), ['goldrush', r.payout - 100, true, r.payout - 100, { depth: 2 }]);
   assert.strictEqual(f.rewards.length, 1, 'a win earns coins');
   assert((await g.dig(1)).error, 'round over');
 
