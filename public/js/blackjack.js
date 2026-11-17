@@ -3,7 +3,7 @@
    Half-moon table; seven spots on an arc, you in the centre.
    ========================================================= */
 (function () {
-  const { card, back, chip, chipsFor, fromCode, fmt, place } = CardUI;
+  const { card, back, chip, chipsFor, stack, fromCode, fmt, place } = CardUI;
 
   const L = {
     land: { W: 1440, H: 780, table: [100, 0, 1240, 660], dealerY: 66, dealer: 84, showsY: 194, printY: 232, arc: [620, 150, 540, 420], cards: 70, circle: 70, pays: true },
@@ -71,6 +71,7 @@
         </div>
         <div class="row actions hidden" id="bBetting">
           <div class="row bet-chips" id="bChips"></div>
+          <div class="quick-bets"><button id="bMin">Min</button><button id="bRepeat">Repeat</button><button id="bX2">×2</button></div>
           <button class="plaque" id="bClear"><b>Clear</b><em>Remove bet</em></button>
           <button class="plaque gold" id="bDeal"><b>Deal</b><em>Place your bet</em></button>
         </div>
@@ -83,10 +84,14 @@
       b.setAttribute('aria-label', `Add ${v} to your bet`);
       b.dataset.v = v;
       b.appendChild(chip(v, { size: ctx.layout === 'port' ? 44 : 52 }));
-      b.onclick = () => { pending += v; renderControls(ctx.st, ctx); };
+      b.onclick = () => { pending += v; redraw(); };
       return b;
     }));
-    $('bClear').onclick = () => { pending = 0; renderControls(ctx.st, ctx); };
+    const redraw = () => (lastRender ? render(...lastRender) : renderControls(ctx.st, ctx));
+    $('bClear').onclick = () => { pending = 0; redraw(); };
+    $('bMin').onclick = () => { const lim = ctx.st.limits; if (lim) { pending = lim.minBet; redraw(); } };
+    $('bRepeat').onclick = () => { if (lastBet) { pending = lastBet; redraw(); } };
+    $('bX2').onclick = () => { pending *= 2; redraw(); };
     $('bDeal').onclick = () => { lastBet = pending; ctx.send({ t: 'action', action: 'bet', amount: pending }); };
     ['Hit', 'Stand', 'Double', 'Split'].forEach((a) => { $('b' + a).onclick = () => ctx.send({ t: 'action', action: a.toLowerCase() }); });
     $('bRebuy').onclick = () => ctx.send({ t: 'rebuy' });
@@ -106,7 +111,9 @@
     pending = Math.min(pending, lim.maxBet);
   }
 
+  let lastRender = null;
   function render(st, S, ctx) {
+    lastRender = [st, S, ctx];
     preparePending(st);
     const G = L[ctx.layout];
     const port = ctx.layout === 'port';
@@ -145,8 +152,9 @@
       const active = st.toAct === i;
       const circ = el('div', 'spot-circle' + (active ? ' spot-active' : ''));
       Object.assign(circ.style, { width: G.circle + 'px', height: G.circle + 'px' });
-      const bet = (s.hands && s.hands.length ? s.hands.reduce((a, x) => a + x.bet, 0) : s.bet) || (isMe && st.stage === 'betting' && active ? pending : 0);
-      if (bet) chipsFor(bet).slice(0, 3).forEach((v, j) => { const c = chip(v, { size: G.circle * 0.5 }); c.style.margin = `${-G.circle * 0.25}px 0 0 ${-G.circle * 0.25}px`; c.style.transform = `translateY(${-j * 6}px)`; circ.appendChild(c); });
+      const building = isMe && st.limits && st.limits.phase === 'bet';
+      const bet = building ? pending : (s.hands && s.hands.length ? s.hands.reduce((a, x) => a + x.bet, 0) : s.bet) || 0;
+      if (bet) circ.appendChild(stack(bet, { size: G.circle * 0.5, maxPer: 6, maxCols: 3 }));
       else circ.appendChild(el('span', 'bet-word', 'BET'));
       place(circ, cx, cy).style.transform = 'translate(-50%,-50%)';
       layer.appendChild(circ);
@@ -226,6 +234,9 @@
       $('bChips').querySelectorAll('button').forEach((b) => { b.disabled = pending + Number(b.dataset.v) > lim.maxBet; });
       $('bDeal').disabled = pending < lim.minBet || pending > lim.maxBet;
       $('bClear').disabled = pending === 0;
+      $('bMin').disabled = lim.minBet > lim.maxBet;
+      $('bRepeat').disabled = !lastBet || lastBet > lim.maxBet || lastBet === pending;
+      $('bX2').disabled = !pending || pending * 2 > lim.maxBet;
     }
     $('bHit').disabled = !playing;
     $('bStand').disabled = !playing;

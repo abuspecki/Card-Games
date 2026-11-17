@@ -6,7 +6,7 @@
    upright (phone) layouts.
    ========================================================= */
 (function () {
-  const { card, back, chip, chipsFor, fromCode, fmt, place } = CardUI;
+  const { card, back, chip, chipsFor, stack, fromCode, fmt, place } = CardUI;
   const PLAYING = ['preflop', 'flop', 'turn', 'river'];
   // Upright layout: keep side seats clear of the board row.
   const PORT_ANGLES = [90, 140, 200, 238, 270, 302, 340, 40];
@@ -36,9 +36,14 @@
       <section class="action-panel" id="hPanel">
         <p class="panel-note" id="hNote"></p>
         <div class="row sizing" id="hSizing">
+          <button class="preset" data-preset="min">Min</button>
           <button class="preset" data-preset="half">½ Pot</button>
+          <button class="preset" data-preset="threeq">¾ Pot</button>
           <button class="preset" data-preset="pot">Pot</button>
-          <button class="preset" data-preset="allin">All-in</button>
+          <button class="preset allin" data-preset="allin">All-in</button>
+        </div>
+        <div class="row chip-row" id="hChipRow">
+          <span class="chip-adds" id="hAdds"></span>
           <input type="range" id="hSlider" aria-label="Raise amount">
         </div>
         <div class="row buttons">
@@ -56,7 +61,24 @@
       if (!lim) return;
       raiseTouched = true;
       const p = b.dataset.preset;
-      setRaise(ctx, p === 'half' ? st.currentBet + (st.pot + lim.toCall) / 2 : p === 'pot' ? st.currentBet + st.pot + lim.toCall : lim.maxTo);
+      const potAfterCall = st.pot + lim.toCall;
+      setRaise(ctx, p === 'min' ? lim.minTo : p === 'half' ? st.currentBet + potAfterCall / 2 : p === 'threeq' ? st.currentBet + potAfterCall * 0.75
+        : p === 'pot' ? st.currentBet + potAfterCall : lim.maxTo);
+    }));
+    // Chip buttons: each tap adds that chip to the raise.
+    $('hAdds').replaceChildren(...[5, 25, 100, 500].map((v) => {
+      const b = ctx.h('button', 'chip-add');
+      b.dataset.v = v;
+      b.setAttribute('aria-label', `Add ${v}`);
+      b.appendChild(chip(v, { size: ctx.layout === 'port' ? 34 : 42 }));
+      b.onclick = () => {
+        const lim = ctx.st.limits;
+        if (!lim) return;
+        const cur = raiseTouched ? +slider.value : lim.minTo - v;
+        raiseTouched = true;
+        setRaise(ctx, cur + v);
+      };
+      return b;
     }));
     $('hFold').onclick = () => ctx.send({ t: 'action', action: 'fold' });
     $('hCall').onclick = () => { const lim = ctx.st.limits; if (lim) ctx.send({ t: 'action', action: lim.toCall > 0 ? 'call' : 'check' }); };
@@ -101,9 +123,7 @@
     // Pot
     if (st.pot) {
       const pot = el('div', 'pot');
-      const stack = el('div', 'stack');
-      chipsFor(st.pot).slice(0, 3).forEach((v, i) => { const c = chip(v, { size: port ? 28 : 40 }); c.style.top = (12 - i * 6) + 'px'; stack.appendChild(c); });
-      pot.append(stack, el('div', '', `<small>POT</small><strong>${fmt(st.pot)}</strong>`));
+      pot.append(stack(st.pot, { size: port ? 28 : 46, maxPer: 8, maxCols: 4, label: false }), el('div', '', `<small>POT</small><strong>${fmt(st.pot)}</strong>`));
       place(pot, 0, G.potY).style.width = G.W + 'px';
       layer.appendChild(pot);
     }
@@ -150,7 +170,7 @@
       // bet in front of the seat
       if (s.bet > 0) {
         const b = el('div', 'bet');
-        b.append(chip(s.bet >= 100 ? 100 : s.bet >= 25 ? 25 : 5, { size: port ? 20 : 28 }), el('span', '', fmt(s.bet)));
+        b.append(stack(s.bet, { size: port ? 22 : 36, maxPer: 6, maxCols: 3 }));
         const [bx, by] = k === 0 ? [G.cx, G.board.y + G.board.size * 1.4 + (port ? 14 : 22)] : P.bet;
         place(b, bx, by).style.transform = 'translate(-50%,-50%)';
         layer.appendChild(b);
@@ -231,8 +251,9 @@
     $('hRebuy').classList.toggle('hidden', !canRebuy);
     ['hFold', 'hCall', 'hRaise'].forEach((id) => $(id).classList.toggle('hidden', !!canRebuy));
     $('hSizing').classList.toggle('hidden', !!canRebuy);
+    $('hChipRow').classList.toggle('hidden', !!canRebuy);
     $('hPanel').classList.toggle('my-turn', myTurn);
-    $('hPanel').querySelectorAll('#hSizing button, #hSizing input, #hFold, #hCall, #hRaise').forEach((b) => { b.disabled = !myTurn; });
+    $('hPanel').querySelectorAll('#hSizing button, #hChipRow button, #hChipRow input, #hFold, #hCall, #hRaise').forEach((b) => { b.disabled = !myTurn; });
     let note = '';
     if (canRebuy) note = App.account ? 'You are out of chips at this table. Rebuy from your bankroll.' : 'You are out of chips. Rebuy for a fresh stack.';
     else if (myTurn) note = 'Your move.';
@@ -245,7 +266,7 @@
     $('hCall').textContent = lim.toCall === 0 ? 'Check' : lim.toCall >= me.chips ? `All-in ${fmt(lim.toCall)}` : `Call ${fmt(lim.toCall)}`;
     const raiseOk = lim.canRaise && me.chips > lim.toCall;
     $('hRaise').disabled = !raiseOk;
-    $('hSizing').querySelectorAll('button, input').forEach((b) => { b.disabled = !raiseOk; });
+    $('hPanel').querySelectorAll('#hSizing button, #hChipRow button, #hChipRow input').forEach((b) => { b.disabled = !raiseOk; });
     if (raiseOk) setRaise(ctx, raiseTouched ? +$('hSlider').value : lim.minTo);
     else $('hRaise').textContent = 'Raise';
   }

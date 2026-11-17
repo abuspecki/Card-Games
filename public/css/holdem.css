@@ -1,23 +1,23 @@
 /* =========================================================
    Texas Hold'em — "The Club Room"
-   Mahogany, green felt, brass. Cormorant Garamond + EB Garamond.
+   Deep green, green felt, gold. Cormorant Garamond + EB Garamond.
    ========================================================= */
 body.holdem {
-  --brass: #B08D57;
-  --brass-l: #D8BC84;
+  --brass: #C9A040;
+  --brass-l: #E2C477;
   --ivory: #F2EBDD;
-  --leather: #1A0F0A;
-  background: #0E0805;
+  --leather: #06180F;
+  background: #03100A;
   color: var(--ivory);
 }
-.holdem .stage { background: radial-gradient(ellipse at 50% 50%, #3A2216, #1E120B 60%, #0E0805); }
+.holdem .stage { background: radial-gradient(ellipse at 50% 50%, #123726, #0A2418 60%, #03100A); }
 
 /* ---------- Top bar ---------- */
 .holdem .topbar {
   position: absolute; left: 0; top: 0; width: 1440px; height: 72px;
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 40px;
-  background: rgba(14, 8, 5, .6);
+  background: rgba(3, 16, 10, .6);
   border-bottom: 1px solid rgba(176, 141, 87, .3);
 }
 .holdem .tb-left { gap: 20px; }
@@ -40,8 +40,8 @@ body.holdem {
 .holdem .table > div { position: absolute; }
 .holdem .rail {
   inset: 0; border-radius: 280px;
-  background: linear-gradient(180deg, #6B3A24, #3E2014 50%, #2B140C);
-  box-shadow: 0 30px 60px rgba(0, 0, 0, .6), inset 0 0 0 4px rgba(224, 168, 120, .12);
+  background: linear-gradient(180deg, #1F4D35, #123322 50%, #0A2016);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, .6), inset 0 0 0 4px rgba(212, 175, 79, .18);
 }
 .holdem .trim { left: 28px; top: 28px; right: 28px; bottom: 28px; border-radius: 252px; border: 2px solid var(--brass); }
 .holdem .felt {
@@ -57,8 +57,6 @@ body.holdem {
 
 /* Pot */
 .holdem .pot { left: 0; right: 0; top: 118px; display: flex; justify-content: center; align-items: center; gap: 12px; }
-.holdem .pot .stack { position: relative; width: 40px; height: 52px; }
-.holdem .pot .stack .chip { position: absolute; left: 0; }
 .holdem .pot small { display: block; font-weight: 500; font-size: 11px; letter-spacing: .3em; color: var(--brass); }
 .holdem .pot strong { font: 700 28px/1 'Cormorant Garamond', serif; }
 
@@ -125,7 +123,7 @@ body.holdem {
 .holdem .action-panel {
   position: absolute; right: 40px; bottom: 36px;
   display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 14px;
-  background: rgba(26, 15, 10, .92); border: 1px solid rgba(176, 141, 87, .4);
+  background: rgba(5, 24, 15, .94); border: 1px solid rgba(212, 175, 79, .45);
   box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
 }
 .holdem .sizing { gap: 8px; }
@@ -144,7 +142,17 @@ body.holdem {
 .holdem .act { padding: 13px 22px; border-radius: 6px; font-weight: 600; font-size: 15px; letter-spacing: .04em; transition: filter .2s, background .2s; }
 .holdem .act-fold { border: 1px solid rgba(176, 141, 87, .6); color: var(--ivory); }
 .holdem .act-fold:hover:not(:disabled) { background: rgba(176, 141, 87, .12); }
-.holdem .act-call { background: #2E1C13; border: 1px solid var(--brass); color: var(--brass-l); }
-.holdem .act-call:hover:not(:disabled) { background: #3A2418; }
+.holdem .act-call { background: #0F3B26; border: 1px solid var(--brass); color: var(--brass-l); }
+.holdem .act-call:hover:not(:disabled) { background: #155234; }
 .holdem .act-raise { background: linear-gradient(90deg, #E2C68E, #A07C45); color: #1A1208; min-width: 150px; }
 .holdem .act-raise:hover:not(:disabled) { filter: brightness(1.08); }
+
+/* ---------- Chips in the foreground ---------- */
+.holdem .preset.allin { border-color: #D4AF4F; color: #F3DDA2; }
+.holdem .chip-row { gap: 10px; align-items: center; }
+.holdem .chip-adds { display: flex; gap: 6px; }
+.holdem .chip-add { border-radius: 50%; transition: transform .15s; }
+.holdem .chip-add:hover:not(:disabled) { transform: translateY(-4px); }
+.holdem .chip-add:active:not(:disabled) { transform: translateY(1px) scale(.96); }
+.holdem .chip-add:disabled { opacity: .35; }
+.holdem .bet { flex-direction: column; }

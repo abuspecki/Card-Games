@@ -71,6 +71,51 @@
     return out.length ? out : [5];
   }
 
+  /**
+   * A real-looking pile of chips for an amount: columns of stacked chips by
+   * denomination (biggest on the left), with the amount underneath.
+   */
+  function stack(amount, opts = {}) {
+    const size = opts.size || 34;
+    const maxPer = opts.maxPer || 7;          // chips per column
+    const maxCols = opts.maxCols || 4;
+    const cols = [];
+    let left = Math.max(0, Math.round(amount));
+    for (const v of [500, 100, 25, 5]) {
+      const n = Math.floor(left / v);
+      if (!n) continue;
+      left -= n * v;
+      cols.push({ v, n });
+    }
+    if (!cols.length) cols.push({ v: 5, n: 1 });
+    const shown = cols.slice(0, maxCols);
+    const step = size * 0.13;
+    const tallest = Math.min(maxPer, Math.max(...shown.map((c) => c.n)));
+    const el = document.createElement('div');
+    el.className = 'chip-stack';
+    const pile = document.createElement('div');
+    pile.className = 'pile';
+    pile.style.width = (shown.length * size * 0.86 + size * 0.14) + 'px';
+    pile.style.height = (size + (tallest - 1) * step) + 'px';
+    shown.forEach((c, ci) => {
+      const n = Math.min(maxPer, c.n);
+      for (let k = 0; k < n; k++) {
+        const ch = chip(c.v, { size });
+        ch.style.left = (ci * size * 0.86) + 'px';
+        ch.style.bottom = (k * step) + 'px';
+        pile.appendChild(ch);
+      }
+    });
+    el.appendChild(pile);
+    if (opts.label !== false) {
+      const lab = document.createElement('span');
+      lab.className = 'stack-amt';
+      lab.textContent = fmt(amount);
+      el.appendChild(lab);
+    }
+    return el;
+  }
+
   /** Scale a fixed-size stage so it fits its container (or the window). */
   function fitStage(stage, w = 1440, h = 900, box = null) {
     const W = box ? box.clientWidth : window.innerWidth;
@@ -120,5 +165,5 @@
     return el;
   }
 
-  window.CardUI = { card, back, chip, chipsFor, fitStage, emit, fmt, place, suitSvg, fromCode, nameOf, rankOf, suitOf, SUIT_NAMES, RANK_NAMES, backOverride: null, chipSet: null };
+  window.CardUI = { card, back, chip, chipsFor, stack, fitStage, emit, fmt, place, suitSvg, fromCode, nameOf, rankOf, suitOf, SUIT_NAMES, RANK_NAMES, backOverride: null, chipSet: null };
 })();
