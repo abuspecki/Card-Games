@@ -161,7 +161,7 @@ function createApi(ctx) {
       const limit = Math.max(1, Math.min(50, Number(new URL(req.url, 'http://x').searchParams.get('limit')) || 50));
       return json(res, 200, { mode: m, persistent: store.kind === 'postgres', databaseError: ctx.databaseError(), rows: await store.leaderboard(m === 'overall' ? OVERALL : m, limit) });
     }
-    if (method === 'GET' && url === '/api/tables') return json(res, 200, { tables: [...ctx.lobby.rooms.values()].map(ctx.lobby.tableSummary), maintenance: ctx.lobby.maintenanceInfo(), announcement: ctx.lobby.currentAnnouncement() });
+    if (method === 'GET' && url === '/api/tables') return json(res, 200, { tables: [...ctx.lobby.rooms.values()].filter((r) => !r.private).map(ctx.lobby.tableSummary), maintenance: ctx.lobby.maintenanceInfo(), announcement: ctx.lobby.currentAnnouncement() });
     if (method === 'GET' && url === '/api/status') {
       return json(res, 200, {
         database: store.kind === 'postgres' ? 'connected' : (process.env.DATABASE_URL ? 'failed' : 'not configured'),
@@ -232,6 +232,24 @@ function createApi(ctx) {
       } else return json(res, 404, { error: 'Not found' });
       if (r.error) return json(res, 400, r);
       return json(res, 200, { ...r, wallet: await coins.getStatus(user.id) });
+    }
+
+    // ----- private tables -----
+    if (method === 'POST' && url === '/api/private') {
+      if (!user) return json(res, 401, { error: 'Sign in to open a private table' });
+      if (limited(`private:${user.id}`, 10, 10 * 60 * 1000)) return json(res, 429, { error: 'Slow down a little' });
+      const body = await readBody(req);
+      const r = ctx.lobby.createPrivate(user.id, user.username, String(body.game || ''));
+      if (r.error) return json(res, 400, r);
+      return json(res, 200, r);
+    }
+    const privMatch = url.match(/^\/api\/private\/([A-Za-z0-9-]{3,12})$/);
+    if (method === 'GET' && privMatch) {
+      let code = privMatch[1].toUpperCase();
+      if (!code.startsWith('P-')) code = 'P-' + code;
+      const room = ctx.lobby.rooms.get(code);
+      if (!room || !room.private) return json(res, 404, { error: 'No private table with that code — check it with your friend' });
+      return json(res, 200, ctx.lobby.tableSummary(room));
     }
 
     // ----- Gold Rush (solo game, members only) -----

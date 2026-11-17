@@ -172,6 +172,12 @@
     'Test mode: no database is connected, so results are temporary.': 'Testmodus: keine Datenbank verbunden, Ergebnisse sind nur vorübergehend.',
     'The Club Room': 'Der Club-Raum', 'Salon Privé': 'Salon Privé', 'The Winter Palace': 'Der Winterpalast', 'The Wheel Room': 'Der Roulette-Saal', 'The Flamingo Lounge': 'Die Flamingo-Lounge',
     'Solo game': 'Einzelspiel', 'Gold': 'Gold', 'Rush': 'Rush',
+    '🔒 Private table': '🔒 Privater Tisch', 'Private table': 'Privater Tisch', 'Friends only': 'Nur für Freunde', 'Join with a code': 'Mit Code beitreten',
+    'Open your own': 'Eigenen Tisch eröffnen', 'Pick a game — you get a code to send to your friends. Only people with the code can sit down.': 'Wähl ein Spiel – du bekommst einen Code für deine Freunde. Nur wer den Code hat, kann sich setzen.',
+    'Members can open a private table.': 'Mitglieder können einen privaten Tisch eröffnen.', 'No private table with that code — check it with your friend': 'Kein privater Tisch mit diesem Code – frag nochmal bei deinem Freund nach',
+    'Code and link copied — send them to your friends.': 'Code und Link kopiert – schick sie deinen Freunden.', 'Share the code with your friends': 'Teile den Code mit deinen Freunden',
+    'All private tables are taken right now — try again later': 'Gerade sind alle privaten Tische belegt – versuch es später nochmal', 'Sign in to open a private table': 'Melde dich an, um einen privaten Tisch zu eröffnen',
+    'Message to everyone': 'Nachricht an alle',
   });
 
   // ---------- patterns for texts with numbers or names ----------
@@ -187,6 +193,10 @@
     [/^Two to six players · 108 pink cards$/, 'Zwei bis sechs Spieler · 108 rosa Karten'], [/^Two to six players · 36 cards$/, 'Zwei bis sechs Spieler · 36 Karten'],
     [/^(Texas Hold'em|Blackjack|Durak|Roulette|Flamingo) · (.*)$/, (m, a, b) => `${a} · ${tr(b)}`],
     [/^Your coins: ?$/, 'Deine Münzen:'],
+    [/^🔒 (P-[A-Z0-9]+) · Share$/, '🔒 $1 · Teilen'], [/^(.*)'s table$/, 'Tisch von $1'],
+    [/^Your private table is open — code (P-[A-Z0-9]+)\. Share it with your friends!$/, 'Dein privater Tisch ist offen – Code $1. Teile ihn mit deinen Freunden!'],
+    [/^You already have a private (.*) table \((P-[A-Z0-9]+)\) — close it first by leaving it$/, 'Du hast schon einen privaten $1-Tisch ($2) – verlass ihn zuerst'],
+    [/^📣 (.*)$/, (m, a) => `📣 ${tr(a)}`], [/^🎁 A gift from the house: (.*) for every member!$/, (m, a) => `🎁 Ein Geschenk vom Haus: ${a.replace(' chips', ' Chips').replace(' coins', ' Münzen').replace(' and ', ' und ')} für jedes Mitglied!`],
     [/^Bets from ([\d,.]+)$/, 'Einsätze ab $1'], [/^Blinds ([\d,.]+) \/ ([\d,.]+)$/, 'Blinds $1 / $2'], [/^buy-in ([\d,.]+)$/, 'Einsatz $1'],
     [/^(.*) · buy-in ([\d,.]+)(.*)$/, (m, a, b, c) => `${tr(a)} · Buy-in ${b}${c.replace(' · members only', ' · nur Mitglieder').replace(/ · members with ([\d,.]+)\+ chips/, ' · Mitglieder mit $1+ Chips')}`],
     [/^2–6 players · members with ([\d,.]+)\+ chips$/, '2–6 Spieler · Mitglieder mit $1+ Chips'],

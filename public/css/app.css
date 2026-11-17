@@ -913,3 +913,4 @@ body.spectating [data-act=gesture] { display: none !important; }
 html[lang="de"] .blackjack .plaque b { letter-spacing: .06em; }
 html[lang="de"] .bottom-bar .info small { letter-spacing: .12em; }
 @media (max-width: 760px) { html[lang="de"] .blackjack .plaque b { font-size: 12px; letter-spacing: .02em; } }
+.priv-code { display: inline-block; margin-top: 2px; padding: 2px 10px; border-radius: 999px; background: #F2C14E; color: #231A02; font: 700 12px/1.6 'Montserrat', system-ui, sans-serif; letter-spacing: .04em; white-space: nowrap; }

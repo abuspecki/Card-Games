@@ -42,12 +42,57 @@ function createLobby(ctx) {
   // ctx: { store(), coins(), log }
   const rooms = new Map();
 
-  for (const def of TABLES) {
+  function makeRoom(def) {
     const settings = { ...(def.settings || {}), startingStack: def.buyIn || 1000 };
     const room = { ...def, code: def.id, table: GAMES[def.game].make(settings), clients: new Map(), watchers: new Map(), nextTimer: null, turnTimer: null, startTimer: null, phaseTimer: null };
     wireTable(room);
     rooms.set(def.id, room);
+    return room;
   }
+  for (const def of TABLES) makeRoom(def);
+
+  // ----- private tables: a member opens one, friends join with its code -----
+  const PRIVATE = {
+    holdem: { capacity: 8, buyIn: 1000, minBuyIn: 200, settings: { smallBlind: 5, bigBlind: 10 }, label: "Hold'em" },
+    blackjack: { capacity: 7, buyIn: 1000, minBuyIn: 100, settings: { bigBlind: 10 }, label: 'Blackjack' },
+    roulette: { capacity: 8, buyIn: 1000, minBuyIn: 100, settings: { bigBlind: 5 }, label: 'Roulette' },
+    durak: { capacity: 6, label: 'Durak' },
+    flamingo: { capacity: 6, label: 'Flamingo' },
+  };
+  const PRIVATE_MAX = 30;
+  const PRIVATE_IDLE = 10 * 60 * 1000;   // an empty private table closes after this
+  const codeChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  function createPrivate(userId, username, game) {
+    const P = PRIVATE[game];
+    if (!P) return { error: 'Pick a game' };
+    // one private table per member: reuse it
+    for (const r of rooms.values()) if (r.private && r.ownerId === userId) {
+      if (r.game === game) return { ok: true, id: r.id, reused: true };
+      if (r.table.seats.some((s) => s && !s.isBot)) return { error: `You already have a private ${PRIVATE[r.game].label} table (${r.id}) — close it first by leaving it` };
+      closeRoom(r);
+    }
+    if ([...rooms.values()].filter((r) => r.private).length >= PRIVATE_MAX) return { error: 'All private tables are taken right now — try again later' };
+    let id;
+    do { id = 'P-' + Array.from({ length: 5 }, () => codeChars[crypto.randomInt(codeChars.length)]).join(''); } while (rooms.has(id));
+    const room = makeRoom({ id, name: `${P.label} · ${username}'s table`, game, capacity: P.capacity, buyIn: P.buyIn, minBuyIn: P.minBuyIn, settings: P.settings, private: true, ownerId: userId, host: username });
+    room.emptySince = Date.now();
+    return { ok: true, id: room.id };
+  }
+  function closeRoom(room) {
+    for (const t of ['nextTimer', 'turnTimer', 'startTimer', 'phaseTimer']) clearTimeout(room[t]);
+    for (const ws of room.watchers.values()) send(ws, { t: 'left' });
+    rooms.delete(room.id);
+  }
+  // Close private tables that have been empty for a while.
+  setInterval(() => {
+    for (const room of [...rooms.values()]) {
+      if (!room.private) continue;
+      const humans = room.table.seats.some((s) => s && !s.isBot);
+      if (humans) room.emptySince = null;
+      else if (!room.emptySince) room.emptySince = Date.now();
+      else if (Date.now() - room.emptySince > PRIVATE_IDLE && !room.table.seats.some((s) => s && s.buyIn > 0)) closeRoom(room);
+    }
+  }, 30000).unref();
 
   function wireTable(room) {
     room.table.onEvent = (kind) => {
@@ -73,6 +118,7 @@ function createLobby(ctx) {
       players: seats.map((x) => ({ name: x.name, bot: x.isBot, avatar: x.avatar || null })),
       playing: room.table.isPlaying(),
       highRoller: !!room.highRoller,
+      private: !!room.private, host: room.host || null,
       accountsOnly: !!room.highRoller,
       buyIn: room.buyIn || 0,
       minBuyIn: room.minBuyIn || 0,
@@ -611,7 +657,7 @@ function createLobby(ctx) {
     return { humans, bots: botsN, tablesPlaying: playing, tables: [...rooms.values()].map(tableSummary) };
   }
 
-  return { rooms, tableSummary, handleConnection, locate, leaveBy, seatedAccounts, refreshLook, kick, cashOutAll, liveStats, GAMES, announce, currentAnnouncement, setMaintenance, maintenanceInfo, drain, isIdle, playerCount };
+  return { rooms, tableSummary, handleConnection, locate, leaveBy, seatedAccounts, refreshLook, kick, cashOutAll, liveStats, GAMES, createPrivate, PRIVATE_GAMES: Object.keys(PRIVATE), announce, currentAnnouncement, setMaintenance, maintenanceInfo, drain, isIdle, playerCount };
 }
 
 module.exports = { createLobby, TABLES, GAMES };

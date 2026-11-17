@@ -135,6 +135,7 @@
     else if (what === 'bank') openBank();
     else if (what === 'goldrush') openGoldRush();
     else if (what === 'install') installApp();
+    else if (what === 'private') openPrivate();
     else if (what === 'shop') openLounge('shop');
     else if (what === 'friends') openLounge('friends');
     else if (what === 'leaderboard') openLeaderboard();
@@ -436,6 +437,53 @@
   }
   setInterval(() => { if (!$('hub').classList.contains('hidden') && document.visibilityState === 'visible') loadTables(); }, 4000);
 
+  // ================= PRIVATE TABLES =================
+  const PRIV_GAMES = [['holdem', "Hold'em", '♠'], ['blackjack', 'Blackjack', '🂡'], ['roulette', 'Roulette', '◉'], ['durak', 'Durak', '♦'], ['flamingo', 'Flamingo', '🦩']];
+  function openPrivate() {
+    openModal((card) => {
+      modalHead(card, 'Friends only', 'Private table');
+      const body = h('div', 'priv');
+      body.innerHTML = `
+        <section><h4>Join with a code</h4>
+          <form class="priv-join"><input name="code" placeholder="P-ABC12" maxlength="8" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="Table code"><button class="btn btn-navy">Join</button></form>
+          <p class="merror" role="alert"></p></section>
+        <section><h4>Open your own</h4>
+          ${App.account ? `<p class="fine">Pick a game — you get a code to send to your friends. Only people with the code can sit down.</p>
+            <div class="priv-games">${PRIV_GAMES.map(([g, label, ico]) => `<button data-g="${g}"><i>${ico}</i>${label}</button>`).join('')}</div>`
+    : '<p class="fine">Members can open a private table. <button class="link" data-open="register">Join free</button></p>'}</section>`;
+      card.appendChild(body);
+      const err = body.querySelector('.merror');
+      body.querySelector('.priv-join').onsubmit = async (e) => {
+        e.preventDefault();
+        let code = e.target.code.value.trim().toUpperCase().replace(/\s+/g, '');
+        if (!code) return;
+        const r = await api('/api/private/' + encodeURIComponent(code));
+        if (!r.ok) { err.textContent = r.data.error; return; }
+        closeModal();
+        joinTable(r.data.id);
+      };
+      body.querySelectorAll('[data-g]').forEach((b) => { b.onclick = async () => {
+        b.disabled = true;
+        const r = await api('/api/private', { game: b.dataset.g });
+        b.disabled = false;
+        if (!r.ok) { err.textContent = r.data.error; return; }
+        closeModal();
+        joinTable(r.data.id);
+        setTimeout(() => toast(`Your private table is open — code ${r.data.id}. Share it with your friends!`, { kind: 'good', timeout: 9000 }), 800);
+      }; });
+    });
+  }
+  App.openPrivate = openPrivate;
+  async function shareCode(code) {
+    const url = `${location.origin}${location.pathname}?table=${code}`;
+    const text = `Join my table on CardGames — code ${code}`;
+    try {
+      if (navigator.share) { await navigator.share({ title: 'CardGames', text, url }); return; }
+      await navigator.clipboard.writeText(`${text}: ${url}`);
+      toast('Code and link copied — send them to your friends.', { kind: 'good' });
+    } catch { /* cancelled */ }
+  }
+
   // ================= INSTALL AS AN APP (PWA) =================
   let installEvent = null;
   const standalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
@@ -731,6 +779,7 @@
     renderBubbles(st);
     renderLog(st);
     renderTableInfo(S, st);
+    renderPrivateCode(S);
     renderOdds(st);
     const title = document.querySelector('[data-tb-title]');
     if (title) title.textContent = S.tableName.replace(/^[^·]*·\s*/, '') + (st.game === 'holdem' ? ` · Blinds ${st.settings.smallBlind} / ${st.settings.bigBlind}` : st.game === 'blackjack' || st.game === 'roulette' ? ` · Bets from ${st.minBet}` : st.stage !== 'waiting' ? ` · Game ${st.handNo}` : '');
@@ -930,6 +979,20 @@
     list.replaceChildren();
     for (const line of st.log) if (typeof line === 'string') list.appendChild(h('p', line.startsWith('—') ? 'hand' : '', esc(line)));
     if (atBottom) list.scrollTop = list.scrollHeight;
+  }
+
+  function renderPrivateCode(S) {
+    const box = document.querySelector('.tb-center');
+    if (!box) return;
+    let chip = box.querySelector('.priv-code');
+    if (!String(S.room || '').startsWith('P-')) { if (chip) chip.remove(); return; }
+    if (!chip) {
+      chip = h('button', 'priv-code');
+      chip.title = 'Share the code with your friends';
+      chip.onclick = () => shareCode(S.room);
+      box.appendChild(chip);
+    }
+    chip.textContent = `🔒 ${S.room} · Share`;
   }
 
   function renderTableInfo(S, st) {

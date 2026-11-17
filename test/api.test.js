@@ -240,6 +240,21 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   assert.strictEqual(gres.data.wallet.chips, gw0);
   assert.strictEqual((await call('POST', '/api/goldrush/dig', ta)).status, 400, 'no dig without a round');
 
+  // ----- private tables: open with a game, join with the code, hidden from the lobby -----
+  assert.strictEqual((await call('POST', '/api/private', null, { game: 'holdem' })).status, 401, 'members open private tables');
+  assert.strictEqual((await call('POST', '/api/private', ta, { game: 'chess' })).status, 400);
+  const pv = (await call('POST', '/api/private', ta, { game: 'durak' })).data;
+  assert(/^P-[A-Z2-9]{5}$/.test(pv.id), 'code like P-ABC12');
+  assert.strictEqual((await call('POST', '/api/private', ta, { game: 'durak' })).data.id, pv.id, 'one per member, reused');
+  assert(!(await call('GET', '/api/tables', null)).data.tables.some((x) => x.id === pv.id), 'not listed in the lobby');
+  assert.strictEqual((await call('GET', '/api/private/' + pv.id.slice(2).toLowerCase(), null)).data.id, pv.id, 'found by code, any case');
+  assert.strictEqual((await call('GET', '/api/private/P-ZZZZZ', null)).status, 404);
+  const pg1 = await sit(pv.id, ta);
+  const pg2 = await sit(pv.id, null, 'Friend');
+  assert.strictEqual(pg1.first.t, 'joined'); assert.strictEqual(pg2.first.t, 'joined', 'guests with the code can join');
+  pg1.ws.send(JSON.stringify({ t: 'leave' })); pg2.ws.send(JSON.stringify({ t: 'leave' }));
+  await wait(300); pg1.ws.close(); pg2.ws.close();
+
   // ----- owner tools: history, gift for all, announcement -----
   const annId = (await call('GET', '/api/admin/players?search=' + A, to)).data.players[0].id;
   const file = (await call('GET', `/api/admin/players/${annId}`, to)).data;
