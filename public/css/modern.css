@@ -323,3 +323,26 @@ body.is-app .tbar { padding-top: max(6px, env(safe-area-inset-top, 0px)); }
 .priv-games button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 8px; border-radius: 14px; background: var(--a-surface2); border: 1px solid var(--a-line); color: var(--a-text); font: 700 14px var(--a-font) !important; }
 .priv-games button i { font-style: normal !important; font-size: 24px; }
 .priv-games button:hover { border-color: var(--a-accent); }
+
+/* ---------- quests & achievements ---------- */
+.q-sec { display: flex; flex-direction: column; gap: 10px; margin: 6px 0 14px; }
+.q-sec header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.q-sec header small { color: var(--a-muted); font-size: 12px; }
+.q-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.q-list li { display: grid; grid-template-columns: 30px 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px; background: var(--a-surface2); border: 1px solid var(--a-line); }
+.q-list li.done { border-color: rgba(52, 199, 123, .5); }
+.q-ico { font-size: 20px; }
+.q-main b { font: 700 14px var(--a-font) !important; }
+.q-bar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .08); margin-top: 6px; overflow: hidden; }
+.q-bar i { display: block; height: 100%; background: linear-gradient(90deg, #F2C14E, #34C77B); }
+.q-val { text-align: right; font: 600 12px var(--a-font) !important; color: var(--a-muted); display: flex; flex-direction: column; gap: 2px; }
+.q-val em { color: var(--a-accent); font: 700 13px var(--a-font) !important; }
+.a-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.ach { display: flex; flex-direction: column; gap: 3px; padding: 12px; border-radius: 14px; background: var(--a-surface2); border: 1px solid var(--a-line); opacity: .62; }
+.ach.done { opacity: 1; border-color: rgba(242, 193, 78, .55); }
+.ach .a-ico { font-size: 20px; }
+.ach b { font: 700 13px var(--a-font) !important; }
+.ach small { font-size: 11.5px; color: var(--a-muted); line-height: 1.35; }
+.ach em { margin-top: auto; color: var(--a-accent); font: 700 12px var(--a-font) !important; }
+.mb-quests { padding: 10px 14px; border-radius: 12px; background: var(--a-surface2); border: 1px solid var(--a-line); color: var(--a-text); font: 700 14px var(--a-font) !important; white-space: nowrap; }
+@media (max-width: 760px) { #hub .member-bar .mb-quests { grid-column: span 1; } }

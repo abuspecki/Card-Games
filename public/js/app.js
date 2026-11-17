@@ -238,7 +238,7 @@
     }
     else if (r.status === 401) { App.session = null; localStorage.removeItem('cg.session'); App.account = null; }
     renderAccount();
-    if (App.account) { await loadWallet(); pollPresence(); }
+    if (App.account) { await loadWallet(); pollPresence(); loadQuestSummary(); }
   }
 
   function signedOut() {
@@ -436,6 +436,34 @@
     $('onlineLine').innerHTML = people ? `<i class="live-dot"></i>${people} playing now` : '<i class="live-dot"></i>Tables open — be the first';
   }
   setInterval(() => { if (!$('hub').classList.contains('hidden') && document.visibilityState === 'visible') loadTables(); }, 4000);
+
+  // ================= DAILY QUESTS & ACHIEVEMENTS =================
+  App.questSummary = null;
+  async function loadQuestSummary() {
+    if (!App.account) return;
+    const r = await api('/api/quests');
+    if (r.ok) { App.questSummary = r.data; renderMemberBar(); }
+  }
+  async function paintQuests(body) {
+    body.innerHTML = '<p class="muted">Loading…</p>';
+    const r = await api('/api/quests');
+    if (!r.ok) { body.textContent = r.data.error || 'Could not load'; return; }
+    App.questSummary = r.data;
+    const { daily, achievements, resetsIn } = r.data;
+    const hrs = Math.floor(resetsIn / 3600000), mins = Math.floor((resetsIn % 3600000) / 60000);
+    const done = achievements.filter((a) => a.done).length;
+    body.innerHTML = `
+      <section class="q-sec"><header><h4>Today's quests</h4><small>New quests in ${hrs} h ${mins} min</small></header>
+        <ul class="q-list">${daily.map((q) => `<li class="${q.done ? 'done' : ''}">
+          <span class="q-ico">${q.done ? '✅' : '🎯'}</span>
+          <div class="q-main"><b></b><div class="q-bar"><i style="width:${Math.round((q.progress / q.goal) * 100)}%"></i></div></div>
+          <span class="q-val">${fmt(q.progress)} / ${fmt(q.goal)}<em><i class="ico-coin"></i>${q.reward}</em></span></li>`).join('')}</ul></section>
+      <section class="q-sec"><header><h4>Achievements</h4><small>${done} of ${achievements.length} unlocked</small></header>
+        <div class="a-grid">${achievements.map((a) => `<div class="ach ${a.done ? 'done' : ''}"><span class="a-ico">${a.done ? '🏆' : '🔒'}</span><b></b><small></small><em><i class="ico-coin"></i>${a.reward}</em></div>`).join('')}</div></section>`;
+    body.querySelectorAll('.q-list li').forEach((li, i) => { li.querySelector('b').textContent = daily[i].text; });
+    body.querySelectorAll('.ach').forEach((el, i) => { el.querySelector('b').textContent = achievements[i].text; el.querySelector('small').textContent = achievements[i].desc; });
+  }
+  App.openQuests = () => { loungeTab = 'quests'; openLounge('quests'); };
 
   // ================= PRIVATE TABLES =================
   const PRIV_GAMES = [['holdem', "Hold'em", '♠'], ['blackjack', 'Blackjack', '🂡'], ['roulette', 'Roulette', '◉'], ['durak', 'Durak', '♦'], ['flamingo', 'Flamingo', '🦩']];
@@ -1082,7 +1110,7 @@
     openModal((card) => {
       modalHead(card, `The Members' Lounge`, `Good evening, <em>${esc(App.account.username)}</em>`);
       const body = h('div', 'lounge-body');
-      tabs(card, [['wallet', 'Wallet'], ['shop', 'The Shop'], ['friends', 'Friends'], ['profile', 'My Profile']], (k) => { loungeTab = k; paintLounge(body); }, loungeTab);
+      tabs(card, [['wallet', 'Wallet'], ['quests', 'Quests'], ['shop', 'The Shop'], ['friends', 'Friends'], ['profile', 'My Profile']], (k) => { loungeTab = k; paintLounge(body); }, loungeTab);
       card.appendChild(body);
       const foot = h('div', 'lounge-foot');
       if (App.account.isOwner) foot.appendChild(h('a', 'btn btn-outline', 'Owner dashboard')).setAttribute('href', '/admin');
@@ -1098,6 +1126,7 @@
   function paintLounge(body) {
     body.replaceChildren();
     if (loungeTab === 'wallet') paintWallet(body);
+    else if (loungeTab === 'quests') paintQuests(body);
     else if (loungeTab === 'shop') paintShop(body);
     else if (loungeTab === 'friends') paintFriends(body);
     else paintMyProfile(body);
@@ -1366,6 +1395,7 @@
       <button class="mb-stat" data-open="shop" title="The Shop"><small>Coins</small><b><i class="ico-coin"></i>${w ? fmt(w.coins) : '…'}</b></button>
       <button class="mb-stat" data-open="friends" title="Friends"><small>Friends online</small><b>${p.onlineFriends ?? '–'}${p.requests ? ` <em>· ${p.requests} new request${p.requests === 1 ? '' : 's'}</em>` : ''}</b></button>
       ${w && w.daily.ready ? `<button class="mb-bonus" data-mb-bonus>🎁 Collect ${w.daily.amount} coins</button>` : ''}
+      ${App.questSummary ? `<button class="mb-quests" data-mb-quests>🎯 Quests ${App.questSummary.daily.filter((q) => q.done).length}/3</button>` : ''}
       ${a.isOwner ? '<a class="mb-owner" href="/admin" title="Owner dashboard">♛ Owner</a>' : ''}
       <button class="btn btn-navy mb-play" data-mb-play>Quick seat</button>`;
     const bonus = bar.querySelector('[data-mb-bonus]');
@@ -1374,6 +1404,8 @@
       if (r) { coinPop(r.amount, r.streak > 1 ? `Day ${r.streak} in a row` : 'Daily bonus'); Sound.play('win'); }
     };
     bar.querySelector('[data-mb-play]').onclick = () => { const t = quickSeat(); if (t) joinTable(t.id); };
+    const qb = bar.querySelector('[data-mb-quests]');
+    if (qb) qb.onclick = () => App.openQuests();
     // Still holding a seat (another device, or the connection dropped)? Offer to return or free it.
     if (App.seat && !App.tableId) {
       const note = h('div', 'mb-seat', `<span>You still have a seat at <b>${esc(App.seat.tableName)}</b>.</span>`);
@@ -1580,6 +1612,12 @@
     if (!r.ok) return;
     $('navDot').classList.toggle('hidden', !r.data.requests);
     App.presence = r.data;
+    for (const n of r.data.questNews || []) {
+      coinPop(n.coins, n.kind === 'achievement' ? `🏆 ${n.text}` : `✅ ${n.text}`);
+      Sound.play('win');
+      loadWallet();
+    }
+    if ((r.data.questNews || []).length) loadQuestSummary();
     renderMemberBar();
     for (const inv of r.data.invites) {
       if (seenInvites.has(inv.id)) continue;

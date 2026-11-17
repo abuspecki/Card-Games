@@ -221,7 +221,7 @@ function createApi(ctx) {
       if (limited(`wallet:${user.id}`, 60, 60 * 1000)) return json(res, 429, { error: 'Slow down a little' });
       const body = await readBody(req);
       let r;
-      if (url === '/api/wallet/daily') r = await coins.claimDaily(user.id);
+      if (url === '/api/wallet/daily') { r = await coins.claimDaily(user.id); if (r && r.streak) ctx.quests.onStreak(user.id, r.streak); }
       else if (url === '/api/wallet/bankrupt') r = await coins.claimBankrupt(user.id);
       else if (url === '/api/wallet/convert') r = await coins.convert(user.id, body.coins);
       else if (url === '/api/wallet/buychips') r = await coins.buyChips(user.id, body.coins);
@@ -232,6 +232,12 @@ function createApi(ctx) {
       } else return json(res, 404, { error: 'Not found' });
       if (r.error) return json(res, 400, r);
       return json(res, 200, { ...r, wallet: await coins.getStatus(user.id) });
+    }
+
+    // ----- daily quests & achievements -----
+    if (method === 'GET' && url === '/api/quests') {
+      if (!user) return json(res, 401, { error: 'Sign in for daily quests' });
+      return json(res, 200, await ctx.quests.view(user.id));
     }
 
     // ----- private tables -----
@@ -276,6 +282,7 @@ function createApi(ctx) {
         invites: invitesFor(user.id),
         requests: friends.filter((f) => f.status === 'pending' && f.requested_by !== user.id).length,
         onlineFriends: friends.filter((f) => f.status === 'accepted' && presence(f.id, f.last_seen).online).length,
+        questNews: await ctx.quests.takeNews(user.id),
       });
     }
 

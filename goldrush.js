@@ -50,8 +50,8 @@ function createGoldRush(ctx, opts = {}) {
     };
   }
 
-  async function record(userId, net, won, pot) {
-    try { await ctx.store().recordHand(userId, 'goldrush', net, won, pot); } catch (e) { console.error('goldrush record', e); }
+  async function record(userId, net, won, pot, depth = 0) {
+    try { await ctx.store().recordHand(userId, 'goldrush', net, won, pot, { depth }); } catch (e) { console.error('goldrush record', e); }
     if (won && net > 0 && ctx.reward) { try { await ctx.reward(userId, { mode: 'goldrush', net, won, pot }); } catch (e) { console.error('goldrush reward', e); } }
   }
 
@@ -59,7 +59,7 @@ function createGoldRush(ctx, opts = {}) {
     rounds.delete(userId);
     await ctx.coins().cashOut(userId, payout, r.stake);
     const net = payout - r.stake;
-    await record(userId, net, net > 0, Math.max(0, net));
+    await record(userId, net, net > 0, Math.max(0, net), r.step);
     return net;
   }
 
@@ -90,7 +90,7 @@ function createGoldRush(ctx, opts = {}) {
           // cave-in: the stake stays with the house
           rounds.delete(userId);
           await ctx.coins().cashOut(userId, 0, r.stake);
-          await record(userId, -r.stake, false, 0);
+          await record(userId, -r.stake, false, 0, r.step);
           return { ok: true, collapsed: true, step: r.step + 1, lost: r.stake };
         }
         r.step++;

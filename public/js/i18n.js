@@ -178,6 +178,16 @@
     'Code and link copied — send them to your friends.': 'Code und Link kopiert – schick sie deinen Freunden.', 'Share the code with your friends': 'Teile den Code mit deinen Freunden',
     'All private tables are taken right now — try again later': 'Gerade sind alle privaten Tische belegt – versuch es später nochmal', 'Sign in to open a private table': 'Melde dich an, um einen privaten Tisch zu eröffnen',
     'Message to everyone': 'Nachricht an alle',
+    'Quests': 'Aufgaben', "Today's quests": 'Heutige Aufgaben', 'Achievements': 'Erfolge',
+    'Play 10 rounds of any game': 'Spiel 10 Runden in beliebigen Spielen', 'Win 3 rounds of any game': 'Gewinn 3 Runden in beliebigen Spielen', 'Play 3 different games': 'Spiel 3 verschiedene Spiele',
+    'Win 2 hands of Blackjack': 'Gewinn 2 Hände Blackjack', "Play 5 hands of Hold'em": "Spiel 5 Hände Hold'em", 'Play 5 spins of Roulette': 'Spiel 5 Runden Roulette',
+    'Win a game of Flamingo': 'Gewinn eine Partie Flamingo', 'Escape a game of Durak': 'Komm bei Durak raus', 'Reach 50 m in Gold Rush and cash out': 'Erreich 50 m in Gold Rush und zahl aus',
+    'Win 500 chips today': 'Gewinn heute 500 Chips', "Play 3 hands of Hold'em with real people": "Spiel 3 Hände Hold'em mit echten Mitspielern",
+    'First win': 'Erster Sieg', 'Win your first round': 'Gewinn deine erste Runde', 'Regular': 'Stammgast', 'Play 100 rounds': 'Spiel 100 Runden', 'Part of the furniture': 'Gehört zum Inventar',
+    'Play 1,000 rounds': 'Spiel 1.000 Runden', 'Big pot': 'Großer Pot', 'Win 1,000 chips or more in one round': 'Gewinn 1.000 Chips oder mehr in einer Runde', 'High earner': 'Großverdiener',
+    'Win 10,000 chips in total': 'Gewinn insgesamt 10.000 Chips', 'All-rounder': 'Allrounder', 'Play every game at least once': 'Spiel jedes Spiel mindestens einmal',
+    'Flamingo master': 'Flamingo-Meister', 'Win 10 games of Flamingo': 'Gewinn 10 Partien Flamingo', 'Never the fool': 'Nie der Durak', 'Escape 10 games of Durak': 'Komm 10-mal bei Durak raus',
+    'Deep digger': 'Tiefgräber', 'Cash out at 100 m in Gold Rush': 'Zahl in Gold Rush bei 100 m aus', 'Every day': 'Jeden Tag', 'Collect the daily bonus 7 days in a row': 'Hol dir den Tagesbonus 7 Tage am Stück',
   });
 
   // ---------- patterns for texts with numbers or names ----------
@@ -193,6 +203,8 @@
     [/^Two to six players · 108 pink cards$/, 'Zwei bis sechs Spieler · 108 rosa Karten'], [/^Two to six players · 36 cards$/, 'Zwei bis sechs Spieler · 36 Karten'],
     [/^(Texas Hold'em|Blackjack|Durak|Roulette|Flamingo) · (.*)$/, (m, a, b) => `${a} · ${tr(b)}`],
     [/^Your coins: ?$/, 'Deine Münzen:'],
+    [/^New quests in (\d+) h (\d+) min$/, 'Neue Aufgaben in $1 Std. $2 Min.'], [/^(\d+) of (\d+) unlocked$/, '$1 von $2 freigeschaltet'], [/^🎯 Quests (\d)\/3$/, '🎯 Aufgaben $1/3'],
+    [/^(✅|🏆) (.*)$/, (m, a, b) => `${a} ${tr(b)}`],
     [/^🔒 (P-[A-Z0-9]+) · Share$/, '🔒 $1 · Teilen'], [/^(.*)'s table$/, 'Tisch von $1'],
     [/^Your private table is open — code (P-[A-Z0-9]+)\. Share it with your friends!$/, 'Dein privater Tisch ist offen – Code $1. Teile ihn mit deinen Freunden!'],
     [/^You already have a private (.*) table \((P-[A-Z0-9]+)\) — close it first by leaving it$/, 'Du hast schon einen privaten $1-Tisch ($2) – verlass ihn zuerst'],

@@ -147,6 +147,7 @@ function postgresStore(url) {
         id BIGSERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         mode TEXT NOT NULL, net INTEGER NOT NULL, won BOOLEAN NOT NULL, at TIMESTAMPTZ NOT NULL DEFAULT now())`);
       await q('CREATE INDEX IF NOT EXISTS hand_log_user ON hand_log (user_id, id DESC)');
+      await q('CREATE TABLE IF NOT EXISTS quests (user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, data JSONB NOT NULL)');
       await q(`CREATE TABLE IF NOT EXISTS admin_log (
         id BIGSERIAL PRIMARY KEY, by_user TEXT NOT NULL, action TEXT NOT NULL, at TIMESTAMPTZ NOT NULL DEFAULT now())`);
       await q(`CREATE TABLE IF NOT EXISTS error_log (
@@ -221,6 +222,8 @@ function postgresStore(url) {
       return r.rows;
     },
     async allUserIds() { return (await q('SELECT id FROM users WHERE NOT banned')).rows.map((r) => r.id); },
+    async getQuests(userId) { const r = await q('SELECT data FROM quests WHERE user_id = $1', [userId]); return r.rows[0] ? r.rows[0].data : null; },
+    async saveQuests(userId, data) { await q('INSERT INTO quests (user_id, data) VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE SET data = $2', [userId, JSON.stringify(data)]); },
     async logAdmin(by, action) { await q('INSERT INTO admin_log (by_user, action) VALUES ($1, $2)', [by, String(action).slice(0, 300)]); },
     async adminLog(limit = 40) { return (await q('SELECT by_user, action, at FROM admin_log ORDER BY id DESC LIMIT $1', [limit])).rows; },
     // mode: one mode, or a list of modes added together (e.g. the lobby's overall ranking)
@@ -457,6 +460,8 @@ function fileStore(file) {
       return (db.handLog || []).slice(-limit).reverse().map(({ user_id, ...h }) => ({ username: (userById(user_id) || {}).username || '?', ...h }));
     },
     async allUserIds() { return db.users.filter((u) => !u.banned).map((u) => u.id); },
+    async getQuests(userId) { return (db.quests || {})[userId] ? JSON.parse(JSON.stringify(db.quests[userId])) : null; },
+    async saveQuests(userId, data) { db.quests = db.quests || {}; db.quests[userId] = JSON.parse(JSON.stringify(data)); save(); },
     async logAdmin(by, action) { db.adminLog = db.adminLog || []; db.adminLog.push({ by_user: by, action: String(action).slice(0, 300), at: new Date().toISOString() }); if (db.adminLog.length > 500) db.adminLog.shift(); save(); },
     async adminLog(limit = 40) { return (db.adminLog || []).slice(-limit).reverse(); },
     async leaderboard(mode, limit = 50) {

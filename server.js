@@ -11,6 +11,7 @@ const { openStore } = require('./store');
 const { makeCoins, rewardFor } = require('./coins');
 const { createGoldRush } = require('./goldrush');
 const { createErrorLog } = require('./errorlog');
+const { createQuests } = require('./quests');
 // Error monitoring first, so every console.error from here on is recorded.
 const errors = createErrorLog();
 errors.hookConsole();
@@ -41,6 +42,7 @@ ctx.lobby = createLobby(ctx);
 // Coins for a win outside the tables (Gold Rush), with the same daily cap.
 ctx.reward = (userId, result) => { const n = rewardFor(result); return n ? coins.earn(userId, n) : null; };
 ctx.goldrush = createGoldRush(ctx);
+ctx.quests = createQuests(ctx);
 const api = createApi(ctx);
 
 const SECURITY_HEADERS = {
@@ -172,6 +174,12 @@ openStore()
     databaseError = r.error;
     coins = makeCoins(store);
     await errors.attach(store);
+    // every recorded result also counts for quests and achievements
+    const recordHand = store.recordHand.bind(store);
+    store.recordHand = async (userId, mode, net, won, pot, extra = {}) => {
+      await recordHand(userId, mode, net, won, pot);
+      ctx.quests.onResult(userId, { mode, net, won, pot, depth: extra.depth });
+    };
     // Chips left at tables by a crash go back to their owners.
     const refunded = await store.refundInPlay();
     if (refunded) console.log(`Refunded table chips for ${refunded} player(s) after a restart`);
