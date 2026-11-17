@@ -864,3 +864,7 @@ body.portrait .chip-stack .stack-amt { font-size: 12px; padding: 0 6px; }
 .principle b { color: var(--navy); }
 html[data-theme="dark"] .principle li::before { background: #DCC07A; color: #14161C; }
 @media (max-width: 760px) { .principle { grid-template-columns: 1fr; } }
+
+/* ================= TURN CLOCK ================= */
+.turn-clock { padding: 6px 12px; border-radius: 999px; background: rgba(232, 196, 104, .16); border: 1px solid rgba(232, 196, 104, .6); color: #F3DDA2; font: 700 14px/1 'Montserrat', sans-serif; white-space: nowrap; }
+.turn-clock.soon { background: #A3202C; border-color: #FF8A8A; color: #fff; animation: v-pulse 1s ease-in-out infinite; }

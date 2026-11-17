@@ -155,29 +155,35 @@
       ctx.plates[meIdx] = [G.me[0], G.me[1] - (port ? 22 : 34)];
       const hand = (me.hole || []).slice();
       const H = G.hand;
-      const nH = hand.length;
-      const step = nH > 1 ? Math.min(port ? 7 : 5, H.spread / (nH - 1)) : 0;
-      const spreadX = Math.min(port ? 330 : 760, nH * H.size * 0.55);
-      hand.forEach((c, k) => {
-        const e = fcard(c, H.size);
-        const off = k - (nH - 1) / 2;
-        const ok = mv && mv.cards.includes(c);
-        const x0 = G.cx - H.size / 2 + (nH > 1 ? (off / ((nH - 1) / 2 || 1)) * spreadX / 2 : 0);
-        place(e, x0, H.y + Math.abs(off) * (port ? 2 : 3));
-        e.style.transform = `rotate(${off * step}deg) translateY(${selected === c ? -H.size * 0.3 : 0}px)`;
-        e.classList.add('hand-card');
-        if (ok) e.classList.add('playable');
-        else if (mv) e.classList.add('unplayable');
-        if (mv && mv.drew === c) e.classList.add('just-drawn');
-        if (selected === c) e.classList.add('selected');
-        e.tabIndex = ok ? 0 : -1;
-        const pick = () => {
-          if (!ok) return;
-          if (selected === c && !isWild(c)) play(ctx); else { selected = c; render(st, S, ctx); }
-        };
-        e.addEventListener('click', pick);
-        e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick(); } });
-        layer.appendChild(e);
+      // Phones: big hands go into two rows so every card stays easy to tap.
+      const rows = port && hand.length > 8 ? [hand.slice(0, Math.ceil(hand.length / 2)), hand.slice(Math.ceil(hand.length / 2))] : [hand];
+      rows.forEach((row, ri) => {
+        const nH = row.length;
+        const size = rows.length > 1 ? H.size * 0.86 : H.size;
+        const y = H.y + (rows.length > 1 ? (ri ? size * 0.62 : -size * 0.32) : 0);
+        const step = nH > 1 ? Math.min(port ? 7 : 5, H.spread / (nH - 1)) : 0;
+        const spreadX = Math.min(port ? 330 : 760, nH * size * 0.55);
+        row.forEach((c, k) => {
+          const e = fcard(c, size);
+          const off = k - (nH - 1) / 2;
+          const ok = mv && mv.cards.includes(c);
+          const x0 = G.cx - size / 2 + (nH > 1 ? (off / ((nH - 1) / 2 || 1)) * spreadX / 2 : 0);
+          place(e, x0, y + Math.abs(off) * (port ? 2 : 3));
+          e.style.transform = `rotate(${off * step}deg) translateY(${selected === c ? -size * 0.3 : 0}px)`;
+          e.classList.add('hand-card');
+          if (ok) e.classList.add('playable');
+          else if (mv) e.classList.add('unplayable');
+          if (mv && mv.drew === c) e.classList.add('just-drawn');
+          if (selected === c) e.classList.add('selected');
+          e.tabIndex = ok ? 0 : -1;
+          const pick = () => {
+            if (!ok) return;
+            if (selected === c && !isWild(c)) play(ctx); else { selected = c; render(st, S, ctx); }
+          };
+          e.addEventListener('click', pick);
+          e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick(); } });
+          layer.appendChild(e);
+        });
       });
       const sel = layer.querySelector('.hand-card.selected');
       if (sel) layer.appendChild(sel);

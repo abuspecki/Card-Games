@@ -39,6 +39,48 @@ const SECURITY_HEADERS = {
   'X-Frame-Options': 'SAMEORIGIN',
 };
 
+// ---------- static files: one CSS and one JS bundle, cached by the browser ----------
+// At start-up the stylesheets and scripts that index.html lists are joined into
+// /bundle.css and /bundle.js (named by a content hash), so a visit needs 2
+// requests instead of ~19, and repeat visits load them from the browser cache.
+const crypto = require('crypto');
+const hashOf = (buf) => crypto.createHash('sha1').update(buf).digest('hex').slice(0, 12);
+const bundles = {};
+let indexHtml = null;
+function buildBundles() {
+  try {
+    let html = fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8');
+    const bodyAt = html.indexOf('<body');
+    const css = [];
+    html = html.replace(/<link rel="stylesheet" href="(css\/[^"]+)">\n?/g, (m, href) => { css.push(href); return css.length === 1 ? '@@CSS@@' : ''; });
+    const js = [];
+    const head = html.slice(0, html.indexOf('<body'));
+    let body = html.slice(html.indexOf('<body'));
+    body = body.replace(/ *<script src="([^"]+)"><\/script>\n?/g, (m, src) => { js.push(src); return js.length === 1 ? '@@JS@@' : ''; });
+    if (!css.length || !js.length || bodyAt === -1) return;
+    const cssBuf = Buffer.from(css.map((f) => `/* ${f} */\n` + fs.readFileSync(path.join(PUBLIC, f), 'utf8')).join('\n'));
+    const jsBuf = Buffer.from(js.map((f) => `/* ${f} */\n` + fs.readFileSync(path.join(PUBLIC, f), 'utf8') + '\n;').join('\n'));
+    const ch = hashOf(cssBuf), jh = hashOf(jsBuf);
+    bundles['/bundle.css'] = { data: cssBuf, type: 'text/css; charset=utf-8', hash: ch };
+    bundles['/bundle.js'] = { data: jsBuf, type: 'text/javascript; charset=utf-8', hash: jh };
+    indexHtml = Buffer.from((head + body)
+      .replace('@@CSS@@', `<link rel="stylesheet" href="/bundle.css?v=${ch}">\n`)
+      .replace('@@JS@@', `  <script src="/bundle.js?v=${jh}"></script>\n`));
+  } catch (e) {
+    console.error('bundle error (serving files one by one)', e.message);
+  }
+}
+buildBundles();
+
+function sendFile(req, res, data, type, cache) {
+  const etag = '"' + hashOf(data) + '"';
+  res.setHeader('ETag', etag);
+  res.setHeader('Cache-Control', cache);
+  if (req.headers['if-none-match'] === etag) { res.writeHead(304); return res.end(); }
+  res.writeHead(200, { 'Content-Type': type });
+  res.end(data);
+}
+
 const server = http.createServer((req, res) => {
   let url;
   try { url = decodeURIComponent(req.url.split('?')[0]); } catch { res.writeHead(400); return res.end(); }
@@ -58,13 +100,15 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify(list));
   }
+  if (bundles[url]) return sendFile(req, res, bundles[url].data, bundles[url].type, 'public, max-age=31536000, immutable');
+  if ((url === '/' || url === '/index.html') && indexHtml) return sendFile(req, res, indexHtml, 'text/html; charset=utf-8', 'no-cache');
   const route = { '/': 'index.html', '/admin': 'admin.html' }[url] || url;
   const file = path.normalize(path.join(PUBLIC, route));
   if (!file.startsWith(PUBLIC)) { res.writeHead(403); return res.end(); }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); return res.end('Not found'); }
-    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' });
-    res.end(data);
+    // Other files: the browser keeps them but checks for changes (cheap 304s).
+    sendFile(req, res, data, TYPES[path.extname(file)] || 'application/octet-stream', /\.(png|jpe?g|svg|webp|mp3|wav|ogg|ico)$/.test(file) ? 'public, max-age=86400' : 'no-cache');
   });
 });
 

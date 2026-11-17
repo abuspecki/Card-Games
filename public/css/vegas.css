@@ -64,21 +64,21 @@ body.hub.scrolled #hub > .nav { box-shadow: 0 8px 30px rgba(0, 0, 0, .45); paddi
   box-shadow: 0 6px 22px rgba(242, 207, 107, .35), inset 0 1px 0 rgba(255, 255, 255, .6);
 }
 .btn-gold::after, #hub .btn-navy::after {
-  content: ''; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%; transform: skewX(-20deg);
+  content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; transform: translateX(-150%) skewX(-20deg); will-change: transform;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .65), transparent); animation: v-shine 3.2s ease-in-out infinite;
 }
 .btn-gold:hover, #hub .btn-navy:hover { filter: brightness(1.08); transform: translateY(-1px); background: var(--v-gold); }
 .btn-ghost, #hub .btn-outline { border: 1px solid var(--v-line); color: var(--v-text); background: rgba(255, 255, 255, .03); }
 .btn-ghost:hover, #hub .btn-outline:hover { background: rgba(232, 196, 104, .12); color: var(--v-text); }
 #hub .hero .btn { padding: 18px 38px; font-size: 15px; }
-@keyframes v-shine { 0%, 55% { left: -60%; } 100% { left: 130%; } }
+@keyframes v-shine { 0%, 55% { transform: translateX(-150%) skewX(-20deg); } 100% { transform: translateX(330%) skewX(-20deg); } }
 
 /* ---------- hero: marquee sign ---------- */
 #hub .hero { position: relative; overflow: hidden; gap: 22px; padding: 56px var(--pad) 20px; background: none !important; }
 .hero-fx { position: absolute; inset: 0; pointer-events: none; }
 .hero-fx i { position: absolute; top: -60px; width: 34px; height: 34px; border-radius: 50%; opacity: .55;
   background: repeating-conic-gradient(#F4EAD0 0 12deg, #A3202C 12deg 30deg); box-shadow: inset 0 0 0 6px #A3202C, inset 0 0 0 8px #F4EAD0;
-  animation: v-fall 11s linear infinite; }
+  animation: v-fall 11s linear infinite; will-change: transform; }
 .hero-fx i:nth-child(2n) { background: repeating-conic-gradient(#F4EAD0 0 12deg, #145238 12deg 30deg); box-shadow: inset 0 0 0 6px #145238, inset 0 0 0 8px #F4EAD0; }
 .hero-fx i:nth-child(3n) { background: repeating-conic-gradient(#F2CF6B 0 12deg, #121614 12deg 30deg); box-shadow: inset 0 0 0 6px #121614, inset 0 0 0 8px #F2CF6B; }
 .hero-fx i:nth-child(1) { left: 6%; animation-delay: -1s; } .hero-fx i:nth-child(2) { left: 17%; animation-delay: -6s; width: 26px; height: 26px; }
@@ -207,3 +207,18 @@ html[data-theme="light"] .marquee .eyebrow { color: #A9801F; }
 .modal-card h4 { font-size: 19px !important; letter-spacing: .04em; }
 html[data-theme="dark"] .modal-card :is(.bal, .wcard, .desk, .bank-balances > div:not(.bank-rate), .shop-item, .principle li) { background: rgba(5, 18, 11, .65) !important; border-color: rgba(232, 196, 104, .28) !important; border-radius: 12px; }
 html[data-theme="dark"] .modal-card .lounge-foot { background: linear-gradient(180deg, rgba(8, 26, 17, 0), #081A11 35%); }
+
+/* ---------- phones & tablets: same look, far less work for the graphics chip ---------- */
+@media (hover: none), (max-width: 1100px) {
+  #hub > .nav, #hub .member-bar { backdrop-filter: none; -webkit-backdrop-filter: none; }
+  html[data-theme="dark"] #hub > .nav { background: #06130C; }
+  html[data-theme="light"] #hub > .nav { background: #FFF8E8; }
+  html[data-theme="dark"] body.hub:not([data-bg=""]):not([data-bg]), html[data-theme="dark"] body.hub[data-bg=""],
+  html[data-theme="light"] body.hub[data-bg=""], html[data-theme="light"] body.hub:not([data-bg]) { background-attachment: scroll; }
+  .shine { animation: none; filter: none; background-position: 30% 0; }
+  .marquee .bulbs { filter: none; }
+  .hero-fx i:nth-child(n+5) { display: none; }
+  #hub .room:hover { transform: none; }
+  #hub .room { box-shadow: 0 12px 28px rgba(0, 0, 0, .4); }
+}
+@media (max-width: 760px) { .hero-fx { display: none; } }

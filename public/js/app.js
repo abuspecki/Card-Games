@@ -592,10 +592,28 @@
   });
 
   let wasMyTurn = false;
+  // "Your turn": sound (also when you move twice in a row) and a clock in the top bar.
+  let lastTurnKey = '';
+  let turnClock = null;
   function myTurnSound(st) {
-    const mine = st.toAct !== -1 && st.toAct === st.mySeat;
-    if (mine && !wasMyTurn) Sound.play('turn');
+    const turn = App.S && App.S.turn;
+    const mine = !!turn && turn.seat === st.mySeat && st.toAct === st.mySeat;
+    if (mine && turn.key !== lastTurnKey) { Sound.play('turn'); if (navigator.vibrate) navigator.vibrate(60); }
+    lastTurnKey = mine ? turn.key : '';
     wasMyTurn = mine;
+    const box = document.querySelector('[data-turn-clock]');
+    clearInterval(turnClock);
+    if (!box) return;
+    if (!mine) { box.classList.add('hidden'); return; }
+    const ends = Date.now() + turn.msLeft;
+    const paint = () => {
+      const s = Math.max(0, Math.ceil((ends - Date.now()) / 1000));
+      box.textContent = `⏱ ${s}s`;
+      box.classList.toggle('soon', s <= 10);
+      box.classList.remove('hidden');
+    };
+    paint();
+    turnClock = setInterval(paint, 500);
   }
 
   // Top bar shared by every room (styled per room by its CSS).
@@ -606,7 +624,7 @@
     tb.innerHTML = `
       <button class="lobby-link" data-act="lobby"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg><span>Lobby</span></button>
       <div class="tb-center"><small>${esc(game === 'durak' ? 'Durak' : title)} · ${esc(room)}</small><strong data-tb-title></strong></div>
-      <div class="tb-right"><span data-topbar-wallet></span>
+      <div class="tb-right"><span class="turn-clock hidden" data-turn-clock aria-live="polite"></span><span data-topbar-wallet></span>
         <button class="tb-btn" data-act="gesture" title="Gestures" aria-label="Gestures"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v11H7z M3 15h18v2.5H3z"/></svg></button>
         <button class="tb-btn" data-act="rules" title="How to play" aria-label="How to play">?</button>
         <button class="tb-btn" data-act="panel" title="Chat & table" aria-label="Open chat and table panel">☰<span class="dot hidden" data-chat-dot></span></button></div>`;

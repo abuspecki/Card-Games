@@ -33,6 +33,7 @@ const TABLES = [
 
 const NEXT_HAND_DELAY = 6000;
 const DISCONNECTED_TURN_TIMEOUT = 8000;
+const TURN_TIMEOUT = Number(process.env.TURN_TIMEOUT_MS) || 40000;            // a seated player who does nothing this long gets a safe default move
 const BOT_THINK_MS = [700, 1800];
 const AUTO_START_DELAY = 3000;          // deal this long after enough players sit down
 const AWAY_LIMIT = 3 * 60 * 1000;       // disconnected players lose their seat after this
@@ -81,13 +82,24 @@ function createLobby(ctx) {
     };
   }
 
+  // Every move counts up, so "whose turn" is a new turn even when the same
+  // player moves twice in a row (e.g. after a skip with two players).
+  function turnInfo(room) {
+    const t = room.table;
+    if (!t.isPlaying() || t.toAct === -1 || !t.seats[t.toAct]) return null;
+    const key = `${t.handNo}:${t.toAct}:${room.moveSeq || 0}`;
+    if (!room.turn || room.turn.key !== key) room.turn = { key, seat: t.toAct, endsAt: Date.now() + TURN_TIMEOUT };
+    return room.turn;
+  }
+
   function pushState(room) {
     try {
+      room.turn = turnInfo(room);
+      scheduleTimers(room);
       const t = room.table;
       for (const [pid, ws] of room.clients) {
-        send(ws, { t: 'state', room: room.code, tableName: room.name, highRoller: !!room.highRoller, usesChips: usesChips(room), state: t.view(pid) });
+        send(ws, { t: 'state', room: room.code, tableName: room.name, highRoller: !!room.highRoller, usesChips: usesChips(room), state: t.view(pid), turn: room.turn ? { key: room.turn.key, seat: room.turn.seat, msLeft: Math.max(0, room.turn.endsAt - Date.now()) } : null });
       }
-      scheduleTimers(room);
     } catch (e) {
       console.error('pushState error', e);
     }
@@ -140,15 +152,24 @@ function createLobby(ctx) {
           try { d = t.botAction ? t.botAction(seat) : bots.decide(t, seat); } catch (e) { console.error('bot error', e); d = t.defaultAction(seat); }
           const r = t.act(p.id, d.action, d.amount);
           if (r.error) { const f = t.defaultAction(seat); t.act(p.id, f.action, f.amount); }
+          room.moveSeq = (room.moveSeq || 0) + 1;
           pushState(room);
         }, wait);
-      } else if (p && !p.connected) {
+      } else if (p) {
+        // Disconnected: play for them soon. Connected but idle: after the turn clock runs out.
+        const key = room.turn && room.turn.key;
+        const wait = !p.connected ? DISCONNECTED_TURN_TIMEOUT : Math.max(0, (room.turn ? room.turn.endsAt : Date.now() + TURN_TIMEOUT) - Date.now());
         room.turnTimer = setTimeout(() => {
-          if (!t.isPlaying() || t.toAct === -1) return;
+          room.turnTimer = null;
+          if (!t.isPlaying() || t.toAct === -1 || (room.turn && room.turn.key !== key)) return;
+          const seat = t.seats[t.toAct];
           const d = t.defaultAction(t.toAct);
-          t.act(t.seats[t.toAct].id, d.action, d.amount);
+          const r = t.act(seat.id, d.action, d.amount);
+          if (r && r.error && d.action !== 'pass') t.act(seat.id, 'pass');
+          if (seat.connected) t.addLog(`${seat.name} ran out of time`);
+          room.moveSeq = (room.moveSeq || 0) + 1;
           pushState(room);
-        }, DISCONNECTED_TURN_TIMEOUT);
+        }, wait);
       }
     }
   }
@@ -359,6 +380,7 @@ function createLobby(ctx) {
         case 'action': {
           const r = t.act(pid, String(m.action || ''), m.amount);
           if (r.error) send(ws, { t: 'error', msg: r.error });
+          else room.moveSeq = (room.moveSeq || 0) + 1;
           break;
         }
         case 'addBot':
