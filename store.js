@@ -110,6 +110,37 @@ function postgresStore(url) {
         game TEXT NOT NULL,
         hands INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (day, game))`);
+      await q('ALTER TABLE users ADD COLUMN IF NOT EXISTS theme TEXT');
+      await q('ALTER TABLE feedback ADD COLUMN IF NOT EXISTS task_id INTEGER');
+      await q(`CREATE TABLE IF NOT EXISTS tasks (
+        id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        priority INTEGER NOT NULL DEFAULT 3,
+        status TEXT NOT NULL DEFAULT 'pending',
+        category TEXT,
+        source TEXT NOT NULL DEFAULT 'owner',
+        created_by TEXT,
+        progress INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        started_at TIMESTAMPTZ,
+        completed_at TIMESTAMPTZ)`);
+      await q(`CREATE TABLE IF NOT EXISTS task_notes (
+        id SERIAL PRIMARY KEY,
+        task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+        author TEXT,
+        kind TEXT NOT NULL DEFAULT 'note',
+        text TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
+      await q(`CREATE TABLE IF NOT EXISTS dev_keys (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        hash TEXT NOT NULL UNIQUE,
+        created_by TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        last_used TIMESTAMPTZ,
+        revoked BOOLEAN NOT NULL DEFAULT false)`);
     },
 
     // ----- users & sessions -----
@@ -240,8 +271,8 @@ function postgresStore(url) {
     },
     async listFeedback(status, limit = 200) {
       const r = status
-        ? await q('SELECT id, username, category, message, context, status, created_at FROM feedback WHERE status = $1 ORDER BY id DESC LIMIT $2', [status, limit])
-        : await q('SELECT id, username, category, message, context, status, created_at FROM feedback ORDER BY id DESC LIMIT $1', [limit]);
+        ? await q('SELECT id, username, category, message, context, status, task_id, created_at FROM feedback WHERE status = $1 ORDER BY id DESC LIMIT $2', [status, limit])
+        : await q('SELECT id, username, category, message, context, status, task_id, created_at FROM feedback ORDER BY id DESC LIMIT $1', [limit]);
       return r.rows;
     },
     async setFeedbackStatus(id, status) {
@@ -261,6 +292,65 @@ function postgresStore(url) {
       const r = await q('SELECT day, game, hands FROM activity WHERE day >= $1 ORDER BY day', [sinceDay]);
       return r.rows;
     },
+    // ----- preferences -----
+    async setTheme(userId, theme) { await q('UPDATE users SET theme = $2 WHERE id = $1', [userId, theme]); },
+    async getTheme(userId) { const r = await q('SELECT theme FROM users WHERE id = $1', [userId]); return r.rows[0] ? r.rows[0].theme : null; },
+
+    // ----- tasks -----
+    async createTask(t) {
+      const r = await q(`INSERT INTO tasks (title, description, priority, category, source, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+        [t.title, t.description || null, t.priority, t.category || null, t.source || 'owner', t.createdBy || null]);
+      return r.rows[0].id;
+    },
+    async getTask(id) {
+      const r = await q('SELECT * FROM tasks WHERE id = $1', [id]);
+      if (!r.rows[0]) return null;
+      const notes = await q('SELECT id, author, kind, text, created_at FROM task_notes WHERE task_id = $1 ORDER BY id', [id]);
+      const fb = await q('SELECT id FROM feedback WHERE task_id = $1', [id]);
+      return { ...r.rows[0], notes: notes.rows, feedbackIds: fb.rows.map((x) => x.id) };
+    },
+    async listTasks() {
+      const r = await q(`SELECT t.*, (SELECT count(*) FROM task_notes n WHERE n.task_id = t.id)::int AS note_count,
+          (SELECT count(*) FROM feedback f WHERE f.task_id = t.id)::int AS feedback_count
+        FROM tasks t ORDER BY t.id DESC LIMIT 1000`);
+      return r.rows;
+    },
+    async updateTask(id, fields) {
+      const allowed = ['title', 'description', 'priority', 'status', 'category', 'progress', 'started_at', 'completed_at'];
+      const keys = Object.keys(fields).filter((k) => allowed.includes(k));
+      if (!keys.length) return;
+      await q(`UPDATE tasks SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')}, updated_at = now() WHERE id = $1`, [id, ...keys.map((k) => fields[k])]);
+    },
+    async removeTask(id) {
+      await q('UPDATE feedback SET task_id = NULL WHERE task_id = $1', [id]);
+      const r = await q('DELETE FROM tasks WHERE id = $1', [id]);
+      return r.rowCount > 0;
+    },
+    async addTaskNote(taskId, author, kind, text) {
+      await q('INSERT INTO task_notes (task_id, author, kind, text) VALUES ($1, $2, $3, $4)', [taskId, author, kind, text]);
+      await q('UPDATE tasks SET updated_at = now() WHERE id = $1', [taskId]);
+    },
+    async linkFeedback(ids, taskId) {
+      if (!ids.length) return;
+      await q('UPDATE feedback SET task_id = $1, status = CASE WHEN status = \'new\' THEN \'read\' ELSE status END WHERE id = ANY($2::int[])', [taskId, ids]);
+    },
+    async resolveTaskFeedback(taskId) { await q('UPDATE feedback SET status = \'resolved\' WHERE task_id = $1', [taskId]); },
+
+    // ----- developer keys -----
+    async addDevKey(name, hash, createdBy) {
+      const r = await q('INSERT INTO dev_keys (name, hash, created_by) VALUES ($1, $2, $3) RETURNING id', [name, hash, createdBy]);
+      return r.rows[0].id;
+    },
+    async listDevKeys() {
+      const r = await q('SELECT id, name, created_by, created_at, last_used, revoked FROM dev_keys ORDER BY id DESC');
+      return r.rows;
+    },
+    async findDevKey(hash) {
+      const r = await q('UPDATE dev_keys SET last_used = now() WHERE hash = $1 AND NOT revoked RETURNING id, name', [hash]);
+      return r.rows[0] || null;
+    },
+    async revokeDevKey(id) { await q('UPDATE dev_keys SET revoked = true WHERE id = $1', [id]); },
+
     async listPlayers({ search = '', limit = 50, offset = 0 } = {}) {
       const like = `%${String(search).toLowerCase().replace(/[%_\\]/g, '\\$&')}%`;
       const rows = await q(`SELECT u.id, u.username, u.created_at, u.last_seen::float8 AS last_seen, u.banned, u.ban_reason,
@@ -312,7 +402,8 @@ function fileStore(file) {
     async init() {
       try { db = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { db = null; }
       db = { nextId: 1, users: [], sessions: {}, stats: {}, wallets: {}, items: {}, equipped: {},
-        friends: {}, feedback: [], nextFeedback: 1, activity: {}, ...(db || {}) };
+        friends: {}, feedback: [], nextFeedback: 1, activity: {}, tasks: [], nextTask: 1, notes: [], nextNote: 1,
+        devKeys: [], nextKey: 1, themes: {}, ...(db || {}) };
       for (const w of Object.values(db.wallets)) {
         if (w.chips === undefined) w.chips = 5000;
         Object.assign(w, { ...freshWallet({ coins: w.coins, chips: w.chips }), ...w });
@@ -423,7 +514,7 @@ function fileStore(file) {
     async addFeedback(f) {
       const id = db.nextFeedback++;
       db.feedback.push({ id, user_id: f.userId || null, username: f.username || null, category: f.category, message: f.message,
-        context: f.context || null, status: 'new', created_at: new Date().toISOString() });
+        context: f.context || null, status: 'new', task_id: null, created_at: new Date().toISOString() });
       save();
       return id;
     },
@@ -453,6 +544,74 @@ function fileStore(file) {
       return Object.entries(db.activity).map(([k, hands]) => { const [day, game] = k.split('|'); return { day, game, hands }; })
         .filter((r) => r.day >= sinceDay).sort((a, b) => a.day.localeCompare(b.day));
     },
+    // ----- preferences -----
+    async setTheme(userId, theme) { db.themes[userId] = theme; save(); },
+    async getTheme(userId) { return db.themes[userId] || null; },
+
+    // ----- tasks -----
+    async createTask(t) {
+      const now = new Date().toISOString();
+      const id = db.nextTask++;
+      db.tasks.push({ id, title: t.title, description: t.description || null, priority: t.priority, status: 'pending', category: t.category || null,
+        source: t.source || 'owner', created_by: t.createdBy || null, progress: 0, created_at: now, updated_at: now, started_at: null, completed_at: null });
+      save();
+      return id;
+    },
+    async getTask(id) {
+      const t = db.tasks.find((x) => x.id === id);
+      if (!t) return null;
+      return { ...t, notes: db.notes.filter((n) => n.task_id === id).map(({ task_id, ...n }) => n),
+        feedbackIds: db.feedback.filter((f) => f.task_id === id).map((f) => f.id) };
+    },
+    async listTasks() {
+      return db.tasks.slice().reverse().map((t) => ({ ...t,
+        note_count: db.notes.filter((n) => n.task_id === t.id).length,
+        feedback_count: db.feedback.filter((f) => f.task_id === t.id).length }));
+    },
+    async updateTask(id, fields) {
+      const t = db.tasks.find((x) => x.id === id);
+      if (!t) return;
+      for (const k of ['title', 'description', 'priority', 'status', 'category', 'progress', 'started_at', 'completed_at']) if (k in fields) t[k] = fields[k];
+      t.updated_at = new Date().toISOString();
+      save();
+    },
+    async removeTask(id) {
+      const before = db.tasks.length;
+      db.tasks = db.tasks.filter((x) => x.id !== id);
+      db.notes = db.notes.filter((n) => n.task_id !== id);
+      for (const f of db.feedback) if (f.task_id === id) f.task_id = null;
+      save();
+      return db.tasks.length < before;
+    },
+    async addTaskNote(taskId, author, kind, text) {
+      db.notes.push({ id: db.nextNote++, task_id: taskId, author, kind, text, created_at: new Date().toISOString() });
+      const t = db.tasks.find((x) => x.id === taskId);
+      if (t) t.updated_at = new Date().toISOString();
+      save();
+    },
+    async linkFeedback(ids, taskId) {
+      for (const f of db.feedback) if (ids.includes(f.id)) { f.task_id = taskId; if (f.status === 'new') f.status = 'read'; }
+      save();
+    },
+    async resolveTaskFeedback(taskId) { for (const f of db.feedback) if (f.task_id === taskId) f.status = 'resolved'; save(); },
+
+    // ----- developer keys -----
+    async addDevKey(name, hash, createdBy) {
+      const id = db.nextKey++;
+      db.devKeys.push({ id, name, hash, created_by: createdBy, created_at: new Date().toISOString(), last_used: null, revoked: false });
+      save();
+      return id;
+    },
+    async listDevKeys() { return db.devKeys.slice().reverse().map(({ hash, ...k }) => k); },
+    async findDevKey(hash) {
+      const k = db.devKeys.find((x) => x.hash === hash && !x.revoked);
+      if (!k) return null;
+      k.last_used = new Date().toISOString();
+      save();
+      return { id: k.id, name: k.name };
+    },
+    async revokeDevKey(id) { const k = db.devKeys.find((x) => x.id === id); if (k) { k.revoked = true; save(); } },
+
     async listPlayers({ search = '', limit = 50, offset = 0 } = {}) {
       const s = String(search).toLowerCase();
       const all = db.users.filter((u) => u.username.toLowerCase().includes(s)).map((u) => {

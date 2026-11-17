@@ -130,6 +130,9 @@
     if (what === 'signin') authModal('login');
     else if (what === 'register') authModal('register');
     else if (what === 'lounge') openLounge();
+    else if (what === 'bank') openBank();
+    else if (what === 'shop') openLounge('shop');
+    else if (what === 'friends') openLounge('friends');
     else if (what === 'leaderboard') openLeaderboard();
     else if (what === 'feedback') openFeedback();
     else if (what === 'howto') openHowTo(App.game || 'holdem');
@@ -142,6 +145,23 @@
     $('navBurger').setAttribute('aria-expanded', String(!open));
   };
   $('mobileMenu').addEventListener('click', (e) => { if (e.target.closest('a')) closeMobileMenu(); });
+
+  // ================= APPEARANCE =================
+  function saveTheme() {
+    if (App.account) api('/api/me/theme', { theme: Theme.mode() });
+  }
+  function paintTheme() {
+    const mode = Theme.mode();
+    document.querySelectorAll('[data-set-theme]').forEach((b) => b.classList.toggle('on', b.dataset.setTheme === mode));
+  }
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-theme-toggle]');
+    if (t) { Theme.toggle(); saveTheme(); return; }
+    const s = e.target.closest('[data-set-theme]');
+    if (s) { Theme.set(s.dataset.setTheme); saveTheme(); }
+  });
+  Theme.onChange(paintTheme);
+  paintTheme();
 
   // ================= ACCOUNTS =================
   function authModal(mode, note) {
@@ -205,7 +225,11 @@
   async function loadAccount() {
     if (!App.session) { renderAccount(); return; }
     const r = await api('/api/me');
-    if (r.ok) App.account = { username: r.data.username, isOwner: r.data.isOwner };
+    if (r.ok) {
+      App.account = { username: r.data.username, isOwner: r.data.isOwner };
+      // The appearance saved on the account follows you to every device.
+      if (r.data.theme && r.data.theme !== Theme.mode()) Theme.set(r.data.theme);
+    }
     else if (r.status === 401) { App.session = null; localStorage.removeItem('cg.session'); App.account = null; }
     renderAccount();
     if (App.account) { await loadWallet(); pollPresence(); }
@@ -230,6 +254,8 @@
     $('navGuest').classList.toggle('hidden', !!a);
     $('navMember').classList.toggle('hidden', !a);
     document.querySelectorAll('.owner-only').forEach((x) => x.classList.toggle('hidden', !(a && a.isOwner)));
+    if (document.body.classList.contains('hub') || !App.tableId) document.body.classList.toggle('member', !!a);
+    renderMemberBar();
     if (a) {
       $('navAvatar').textContent = myAvatar();
       $('navChips').textContent = fmt(App.wallet ? App.wallet.chips : 0);
@@ -780,16 +806,10 @@
           <button class="btn btn-navy wide" data-daily ${d.ready ? '' : 'disabled'}>${d.ready ? `Collect ${d.amount} coins` : `Next gift in ${untilText(d.nextAt)} · ${d.amount} coins`}</button>
         </section>
         <section class="wcard">
-          <h4>The Exchange</h4>
-          <p>Turn chips you have <em>won</em> into coins: ${fmt(c.rate)} chips buy 1 coin. You always keep your first ${fmt(c.floor)} chips, and up to ${c.dailyMax} coins may be exchanged per day.</p>
-          ${c.maxCoins > 0 ? `
-            <div class="exchange">
-              <input type="range" min="1" max="${c.maxCoins}" value="${c.maxCoins}" data-conv-range aria-label="Coins to receive">
-              <div class="row gap"><input type="number" min="1" max="${c.maxCoins}" value="${c.maxCoins}" data-conv-num aria-label="Coins"><span>coins for <b data-conv-chips>${fmt(c.maxCoins * c.rate)}</b> chips</span></div>
-            </div>
-            <button class="btn btn-navy wide" data-convert>Exchange</button>`
-    : `<p class="muted">${c.usedToday >= c.dailyMax ? 'You have exchanged today\'s maximum. Come back tomorrow.' : `Nothing to exchange yet — win chips above ${fmt(c.floor)} at the tables first.`}</p>`}
-          <p class="fine">Exchanged today: ${c.usedToday} / ${c.dailyMax} coins</p>
+          <h4>The Bank</h4>
+          <p>Exchange won chips for coins, or coins back into chips. ${fmt(c.rate)} chips buy 1 coin; 1 coin buys ${fmt(w.buyChips.rate)} chips.</p>
+          <p class="muted">${c.maxCoins > 0 ? `You may exchange up to ${c.maxCoins} coins' worth of chips today.` : `Chips above ${fmt(c.floor)} can be exchanged — win some at the tables first.`}</p>
+          <button class="btn btn-navy wide" data-bank>Visit the Bank</button>
         </section>
         <section class="wcard">
           <h4>Hard Luck?</h4>
@@ -801,21 +821,121 @@
           <p>Win a hand, a Blackjack or escape a game of Durak to earn coins — double at the High Roller tables. Today: ${fmt(w.earnedToday)} / ${fmt(w.tableCap)}.</p>
         </section>
       </div>`;
+    body.querySelector('[data-bank]').onclick = () => openBank();
     const daily = body.querySelector('[data-daily]');
     if (daily) daily.onclick = async () => { const r = await walletAction('/api/wallet/daily'); if (r) { coinPop(r.amount, r.streak > 1 ? `Day ${r.streak} in a row` : 'Daily bonus'); Sound.play('win'); paintLounge(body); } };
     const bk = body.querySelector('[data-bankrupt]');
     if (bk) bk.onclick = async () => { const r = await walletAction('/api/wallet/bankrupt'); if (r) { coinPop(r.amount, 'A fresh stake', 'chip'); Sound.play('chips'); paintLounge(body); } };
-    const range = body.querySelector('[data-conv-range]');
-    if (range) {
-      const num = body.querySelector('[data-conv-num]');
-      const sync = (v) => { v = Math.max(1, Math.min(c.maxCoins, Math.floor(Number(v)) || 1)); range.value = v; num.value = v; body.querySelector('[data-conv-chips]').textContent = fmt(v * c.rate); };
-      range.oninput = () => sync(range.value);
+  }
+
+  // ================= THE BANK =================
+  async function openBank() {
+    if (!App.account) { authModal('login', 'The Bank is for members — sign in to exchange chips and coins.'); return; }
+    await loadWallet();
+    openModal((card) => {
+      modalHead(card, 'CardGames & Co.', 'The <em>Bank</em>');
+      const body = h('div', 'bank');
+      card.appendChild(body);
+      paintBank(body);
+    }, { wide: true, theme: 'bank-modal' });
+  }
+  App.openBank = openBank;
+
+  function paintBank(body) {
+    const w = App.wallet;
+    const c = w.convert;
+    const b = w.buyChips;
+    body.innerHTML = `
+      <div class="bank-balances">
+        <div><small>Your chips</small><strong><i class="ico-chip"></i>${fmt(w.chips)}</strong><em>${w.inPlay ? `+ ${fmt(w.inPlay)} at the tables` : 'in your bankroll'}</em></div>
+        <div class="bank-rate"><span>${fmt(c.rate)} chips → 1 coin</span><span>1 coin → ${fmt(b.rate)} chips</span></div>
+        <div><small>Your coins</small><strong><i class="ico-coin"></i>${fmt(w.coins)}</strong><em>for the shop</em></div>
+      </div>
+      <div class="bank-desks">
+        <section class="desk">
+          <h4>Chips → Coins</h4>
+          <p>Turn chips you have won into coins for the shop. You always keep your first ${fmt(c.floor)} chips; up to ${c.dailyMax} coins a day.</p>
+          ${c.maxCoins > 0 ? `
+            <label class="amount"><span>Coins to receive</span><input type="number" min="1" max="${c.maxCoins}" value="${Math.min(c.maxCoins, 10)}" data-sell></label>
+            <input type="range" min="1" max="${c.maxCoins}" value="${Math.min(c.maxCoins, 10)}" data-sell-range aria-label="Coins to receive">
+            <p class="quote">You pay <b data-sell-cost></b> chips</p>
+            <button class="btn btn-navy wide" data-sell-go>Exchange chips for coins</button>`
+    : `<p class="muted">${c.usedToday >= c.dailyMax ? 'You have exchanged today\'s maximum — the desk reopens tomorrow.' : `Nothing to exchange yet: only chips above ${fmt(c.floor)} can be turned into coins.`}</p>`}
+          <p class="fine">Exchanged today: ${c.usedToday} / ${c.dailyMax} coins</p>
+        </section>
+        <section class="desk">
+          <h4>Coins → Chips</h4>
+          <p>Short of chips? Trade coins back into chips for your bankroll, at ${fmt(b.rate)} chips per coin.</p>
+          ${w.coins > 0 ? `
+            <label class="amount"><span>Coins to trade</span><input type="number" min="1" max="${Math.min(w.coins, b.max)}" value="${Math.min(w.coins, 10)}" data-buy></label>
+            <input type="range" min="1" max="${Math.min(w.coins, b.max)}" value="${Math.min(w.coins, 10)}" data-buy-range aria-label="Coins to trade">
+            <p class="quote">You receive <b data-buy-get></b> chips</p>
+            <button class="btn btn-navy wide" data-buy-go>Exchange coins for chips</button>`
+    : '<p class="muted">You have no coins to trade yet — collect the daily bonus or win at the tables.</p>'}
+          <p class="fine">Up to ${fmt(b.max)} coins per exchange.</p>
+        </section>
+      </div>
+      <p class="fine center">Rates differ in each direction, so trading back and forth never creates chips or coins. Play money only — nothing here can be bought with or exchanged for real money.</p>`;
+    const wire = (numSel, rangeSel, outSel, rate, max) => {
+      const num = body.querySelector(numSel), range = body.querySelector(rangeSel), out = body.querySelector(outSel);
+      if (!num) return null;
+      const sync = (v) => { v = Math.max(1, Math.min(max, Math.floor(Number(v)) || 1)); num.value = v; range.value = v; out.textContent = fmt(v * rate); };
       num.oninput = () => sync(num.value);
-      body.querySelector('[data-convert]').onclick = async () => {
-        const r = await walletAction('/api/wallet/convert', { coins: Number(num.value) });
-        if (r) { coinPop(r.converted, `For ${fmt(r.spentChips)} chips`); Sound.play('chips'); paintLounge(body); }
-      };
-    }
+      range.oninput = () => sync(range.value);
+      sync(num.value);
+      return num;
+    };
+    const sell = wire('[data-sell]', '[data-sell-range]', '[data-sell-cost]', c.rate, c.maxCoins);
+    const buy = wire('[data-buy]', '[data-buy-range]', '[data-buy-get]', b.rate, Math.min(w.coins, b.max));
+    if (sell) body.querySelector('[data-sell-go]').onclick = async () => {
+      const r = await walletAction('/api/wallet/convert', { coins: Number(sell.value) });
+      if (r) { coinPop(r.converted, `For ${fmt(r.spentChips)} chips`); Sound.play('chips'); paintBank(body); }
+    };
+    if (buy) body.querySelector('[data-buy-go]').onclick = async () => {
+      const r = await walletAction('/api/wallet/buychips', { coins: Number(buy.value) });
+      if (r) { coinPop(r.gotChips, `For ${fmt(r.traded)} coins`, 'chip'); Sound.play('chips'); paintBank(body); }
+    };
+  }
+
+  // ================= MEMBER BAR ("Your evening") =================
+  function greeting() {
+    const hr = new Date().getHours();
+    return hr < 5 ? 'Good night' : hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
+  }
+  function quickSeat() {
+    const w = App.wallet;
+    const ok = (t) => {
+      const full = t.humans + t.bots >= t.capacity && t.bots === 0;
+      if (full) return false;
+      if (t.minBankroll) return w && w.chips >= t.minBankroll;
+      if (t.highRoller) return w && w.chips >= t.minBuyIn;
+      return true;
+    };
+    const open = App.tables.filter(ok);
+    // the liveliest table with people at it, otherwise Hold'em Table 1
+    return open.sort((a, b) => b.humans - a.humans || (b.playing - a.playing))[0] || App.tables[0];
+  }
+  function renderMemberBar() {
+    const bar = $('memberBar');
+    if (!bar) return;
+    const a = App.account;
+    bar.classList.toggle('hidden', !a);
+    if (!a) return;
+    const w = App.wallet;
+    const p = App.presence || {};
+    bar.innerHTML = `
+      <div class="mb-hello"><span class="mb-av">${esc(myAvatar())}</span><div><small>${greeting()}</small><b>${esc(a.username)}</b></div></div>
+      <button class="mb-stat" data-open="bank" title="The Bank"><small>Chips</small><b><i class="ico-chip"></i>${w ? fmt(w.chips) : '…'}</b></button>
+      <button class="mb-stat" data-open="shop" title="The Shop"><small>Coins</small><b><i class="ico-coin"></i>${w ? fmt(w.coins) : '…'}</b></button>
+      <button class="mb-stat" data-open="friends" title="Friends"><small>Friends online</small><b>${p.onlineFriends ?? '–'}${p.requests ? ` <em>· ${p.requests} new request${p.requests === 1 ? '' : 's'}</em>` : ''}</b></button>
+      ${w && w.daily.ready ? `<button class="mb-bonus" data-mb-bonus>🎁 Collect ${w.daily.amount} coins</button>` : ''}
+      <button class="btn btn-navy mb-play" data-mb-play>Quick seat</button>`;
+    const bonus = bar.querySelector('[data-mb-bonus]');
+    if (bonus) bonus.onclick = async () => {
+      const r = await walletAction('/api/wallet/daily');
+      if (r) { coinPop(r.amount, r.streak > 1 ? `Day ${r.streak} in a row` : 'Daily bonus'); Sound.play('win'); }
+    };
+    bar.querySelector('[data-mb-play]').onclick = () => { const t = quickSeat(); if (t) joinTable(t.id); };
   }
 
   // ----- shop -----
@@ -993,6 +1113,8 @@
     const r = await api('/api/presence');
     if (!r.ok) return;
     $('navDot').classList.toggle('hidden', !r.data.requests);
+    App.presence = r.data;
+    renderMemberBar();
     for (const inv of r.data.invites) {
       if (seenInvites.has(inv.id)) continue;
       seenInvites.add(inv.id);
@@ -1159,6 +1281,9 @@
     }, { wide: true });
   }
   App.openHowTo = openHowTo;
+
+  // Shadow under the sticky navigation once you scroll.
+  window.addEventListener('scroll', () => document.body.classList.toggle('scrolled', window.scrollY > 10), { passive: true });
 
   // ================= START =================
   buildTrio();

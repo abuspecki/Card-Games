@@ -19,6 +19,8 @@ const TABLE_DAILY_CAP = 500;     // most coins you can win at tables per day
 const CONVERT_RATE = 100;        // chips per coin
 const CONVERT_FLOOR = 5000;      // chips you always keep; only chips above it convert
 const CONVERT_DAILY_MAX = 300;   // most coins from conversion per day
+const COIN_TO_CHIPS = 80;        // chips you get for 1 coin (less than 100, so trading in circles always loses)
+const BUYCHIPS_MAX = 1000;       // most coins per exchange
 const BANKRUPT_BELOW = 100;      // total chips (bankroll + at tables) to count as bankrupt
 const BANKRUPT_GRANT = 1000;
 const BANKRUPT_COOLDOWN = 15 * 60 * 1000;
@@ -102,6 +104,7 @@ function status(w, now = Date.now()) {
       below: BANKRUPT_BELOW,
       nextAt: now >= bankruptAt ? null : bankruptAt,
     },
+    buyChips: { rate: COIN_TO_CHIPS, max: BUYCHIPS_MAX },
     convert: {
       rate: CONVERT_RATE, floor: CONVERT_FLOOR, dailyMax: CONVERT_DAILY_MAX,
       maxCoins: conv.coins, usedToday: conv.usedToday,
@@ -161,6 +164,19 @@ function makeCoins(store) {
           update: { chips, coins, converted_day: dayString(now), converted_today: c.usedToday + want },
           result: { coins, chips, converted: want, spentChips: want * CONVERT_RATE },
         };
+      });
+    },
+
+    // Trade coins back into chips.
+    async buyChips(userId, coinsGiven) {
+      const n = int(coinsGiven);
+      if (!(n >= 1)) return { error: 'Choose how many coins to trade' };
+      if (n > BUYCHIPS_MAX) return { error: `You can trade up to ${BUYCHIPS_MAX.toLocaleString()} coins at once` };
+      return wallet(userId, (w) => {
+        if (w.coins < n) return { result: { error: `You only have ${w.coins.toLocaleString()} coins` } };
+        const coins = w.coins - n;
+        const chips = w.chips + n * COIN_TO_CHIPS;
+        return { update: { coins, chips }, result: { coins, chips, traded: n, gotChips: n * COIN_TO_CHIPS } };
       });
     },
 
@@ -252,6 +268,6 @@ function rewardFor(r, highRoller) {
 
 module.exports = {
   makeCoins, rewardFor, status, dailyAmount, dayString, CATALOG, ITEMS, SLOTS,
-  WELCOME_COINS, WELCOME_CHIPS, TABLE_DAILY_CAP, CONVERT_RATE, CONVERT_FLOOR, CONVERT_DAILY_MAX,
+  WELCOME_COINS, WELCOME_CHIPS, TABLE_DAILY_CAP, CONVERT_RATE, CONVERT_FLOOR, CONVERT_DAILY_MAX, COIN_TO_CHIPS, BUYCHIPS_MAX,
   BANKRUPT_BELOW, BANKRUPT_GRANT, BANKRUPT_COOLDOWN,
 };

@@ -22,7 +22,9 @@ const TYPES = {
 
 // Owners (who may open the dashboard) are set with an environment variable:
 //   OWNER_USERNAMES=alice,bob
-const owners = new Set(String(process.env.OWNER_USERNAMES || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean));
+// BigV is always an owner (the account already exists, so the name can't be claimed by anyone else).
+const DEFAULT_OWNERS = ['bigv'];
+const owners = new Set([...DEFAULT_OWNERS, ...String(process.env.OWNER_USERNAMES || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)]);
 
 let store = null;
 let coins = null;

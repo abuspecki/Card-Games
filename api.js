@@ -2,7 +2,12 @@
 // owner dashboard. Every request is validated here, on the server.
 const crypto = require('crypto');
 const { hashPassword, checkPassword, MODES, FEEDBACK_CATEGORIES, FEEDBACK_STATUSES } = require('./store');
-const { CATALOG, SLOTS, CONVERT_RATE, CONVERT_FLOOR, CONVERT_DAILY_MAX, BANKRUPT_GRANT, dayString } = require('./coins');
+const { CATALOG, SLOTS, CONVERT_RATE, CONVERT_FLOOR, CONVERT_DAILY_MAX, BANKRUPT_GRANT, COIN_TO_CHIPS, dayString } = require('./coins');
+const fb = require('./feedback');
+
+const TASK_STATUSES = ['pending', 'in_progress', 'done', 'cancelled'];
+const THEMES = ['light', 'dark', 'system'];
+const hashKey = (k) => crypto.createHash('sha256').update(String(k)).digest('hex');
 
 const ONLINE_WINDOW = 70 * 1000;   // seen this recently = online
 const INVITE_TTL = 10 * 60 * 1000;
@@ -109,7 +114,15 @@ function createApi(ctx) {
     if (method === 'GET' && url === '/api/me') {
       const user = await currentUser(req);
       if (!user) return json(res, 401, { error: 'Not logged in' });
-      return json(res, 200, { username: user.username, isOwner: isOwner(user), stats: await store.userStats(user.id) });
+      return json(res, 200, { username: user.username, isOwner: isOwner(user), theme: await store.getTheme(user.id), stats: await store.userStats(user.id) });
+    }
+    if (method === 'POST' && url === '/api/me/theme') {
+      const user = await currentUser(req);
+      if (!user) return json(res, 401, { error: 'Please sign in first' });
+      const body = await readBody(req);
+      if (!THEMES.includes(body.theme)) return json(res, 400, { error: 'Unknown theme' });
+      await store.setTheme(user.id, body.theme);
+      return json(res, 200, { ok: true });
     }
 
     // ===== public data =====
@@ -126,7 +139,7 @@ function createApi(ctx) {
       });
     }
     if (method === 'GET' && url === '/api/shop') {
-      return json(res, 200, { items: CATALOG, slots: SLOTS, rules: { convertRate: CONVERT_RATE, convertFloor: CONVERT_FLOOR, convertDailyMax: CONVERT_DAILY_MAX, bankruptGrant: BANKRUPT_GRANT } });
+      return json(res, 200, { items: CATALOG, slots: SLOTS, rules: { convertRate: CONVERT_RATE, convertFloor: CONVERT_FLOOR, convertDailyMax: CONVERT_DAILY_MAX, bankruptGrant: BANKRUPT_GRANT, coinToChips: COIN_TO_CHIPS } });
     }
     const profileMatch = url.match(/^\/api\/players\/([A-Za-z0-9_-]{1,16})$/);
     if (method === 'GET' && profileMatch) {
@@ -164,6 +177,13 @@ function createApi(ctx) {
       return json(res, 200, { ok: true });
     }
 
+    // ===== task board (owners, or a developer key) =====
+    if (url.startsWith('/api/tasks')) {
+      const who = await taskActor(req);
+      if (!who) return json(res, 401, { error: 'Owners or a developer key only' });
+      return handleTasks(req, res, url, who);
+    }
+
     // ===== everything below needs an account =====
     const user = await currentUser(req);
     const needsAuth = url.startsWith('/api/wallet') || url.startsWith('/api/shop/') || url.startsWith('/api/friends') || url.startsWith('/api/presence') || url.startsWith('/api/admin');
@@ -179,6 +199,7 @@ function createApi(ctx) {
       if (url === '/api/wallet/daily') r = await coins.claimDaily(user.id);
       else if (url === '/api/wallet/bankrupt') r = await coins.claimBankrupt(user.id);
       else if (url === '/api/wallet/convert') r = await coins.convert(user.id, body.coins);
+      else if (url === '/api/wallet/buychips') r = await coins.buyChips(user.id, body.coins);
       else if (url === '/api/shop/buy') r = await coins.buy(user.id, String(body.item || ''));
       else if (url === '/api/shop/equip') {
         r = await coins.equip(user.id, String(body.slot || ''), body.item ? String(body.item) : null);
@@ -262,6 +283,38 @@ function createApi(ctx) {
       if (!isOwner(user)) return json(res, 403, { error: 'Owners only' });
       const now = Date.now();
 
+      if (method === 'GET' && url === '/api/admin/feedback/overview') {
+        return json(res, 200, fb.analyze(await store.listFeedback(null, 5000)));
+      }
+      if (method === 'POST' && url === '/api/admin/feedback/totask') {
+        const body = await readBody(req);
+        const ids = (Array.isArray(body.ids) ? body.ids : []).map(Number).filter(Number.isInteger).slice(0, 200);
+        if (!ids.length) return json(res, 400, { error: 'Choose some feedback first' });
+        const all = await store.listFeedback(null, 5000);
+        const chosen = all.filter((f) => ids.includes(f.id));
+        if (!chosen.length) return json(res, 404, { error: 'Feedback not found' });
+        const { clusters } = fb.analyze(chosen);
+        const lead = clusters[0];
+        const title = String(body.title || lead.title).trim().slice(0, 140);
+        const description = `From ${chosen.length} feedback message${chosen.length === 1 ? '' : 's'} (${lead.topicLabel}, ${lead.level}):\n\n`
+          + chosen.map((f) => `• ${f.username || 'guest'}: ${f.message}`).join('\n').slice(0, 4000);
+        const priority = clampPriority(body.priority || fb.priorityFor(lead.level));
+        const id = await store.createTask({ title, description, priority, category: lead.topicLabel, source: 'feedback', createdBy: user.username });
+        await store.linkFeedback(chosen.map((f) => f.id), id);
+        await store.addTaskNote(id, user.username, 'event', `Created from ${chosen.length} feedback message${chosen.length === 1 ? '' : 's'}`);
+        return json(res, 200, { ok: true, id });
+      }
+      if (method === 'GET' && url === '/api/admin/devkeys') return json(res, 200, { keys: await store.listDevKeys() });
+      if (method === 'POST' && url === '/api/admin/devkeys') {
+        const body = await readBody(req);
+        const name = String(body.name || 'Developer').trim().slice(0, 60) || 'Developer';
+        const key = 'cgk_' + crypto.randomBytes(24).toString('hex');
+        await store.addDevKey(name, hashKey(key), user.username);
+        return json(res, 200, { key, name });
+      }
+      const km = url.match(/^\/api\/admin\/devkeys\/(\d+)\/revoke$/);
+      if (km && method === 'POST') { await store.revokeDevKey(Number(km[1])); return json(res, 200, { ok: true }); }
+
       if (method === 'GET' && url === '/api/admin/overview') {
         const since = dayString(now - 13 * 86400000);
         return json(res, 200, {
@@ -331,6 +384,104 @@ function createApi(ctx) {
     }
 
     return json(res, 404, { error: 'Not found' });
+  }
+
+  // ---------- task board ----------
+  const clampPriority = (p) => Math.max(1, Math.min(4, Math.round(Number(p)) || 3));
+
+  // Who may use the task board: an owner (session) or a developer key.
+  async function taskActor(req) {
+    const key = String(req.headers['x-dev-key'] || '');
+    if (key) {
+      if (key.length > 200) return null;
+      const k = await ctx.store().findDevKey(hashKey(key));
+      return k ? { name: `Claude · ${k.name}`, dev: true } : null;
+    }
+    const user = await currentUser(req);
+    return isOwner(user) ? { name: user.username, dev: false } : null;
+  }
+
+  function sortTasks(tasks) {
+    const byPrio = (a, b) => a.priority - b.priority || new Date(a.created_at) - new Date(b.created_at);
+    return {
+      inProgress: tasks.filter((t) => t.status === 'in_progress').sort(byPrio),
+      queue: tasks.filter((t) => t.status === 'pending').sort(byPrio),
+      done: tasks.filter((t) => t.status === 'done' || t.status === 'cancelled').sort((a, b) => new Date(b.completed_at || b.updated_at) - new Date(a.completed_at || a.updated_at)),
+    };
+  }
+
+  async function handleTasks(req, res, url, who) {
+    const store = ctx.store();
+    const method = req.method;
+    if (method === 'GET' && url === '/api/tasks') {
+      const tasks = await store.listTasks();
+      return json(res, 200, { ...sortTasks(tasks), counts: {
+        pending: tasks.filter((t) => t.status === 'pending').length,
+        in_progress: tasks.filter((t) => t.status === 'in_progress').length,
+        done: tasks.filter((t) => t.status === 'done').length,
+      } });
+    }
+    if (method === 'GET' && url === '/api/tasks/feedback') {
+      // Developers read the ranked feedback through the task board.
+      return json(res, 200, fb.analyze(await store.listFeedback(null, 5000)));
+    }
+    if (method === 'POST' && url === '/api/tasks') {
+      const body = await readBody(req);
+      const title = String(body.title || '').trim();
+      if (title.length < 3) return json(res, 400, { error: 'Give the task a title (3+ characters)' });
+      const id = await store.createTask({
+        title: title.slice(0, 140), description: String(body.description || '').slice(0, 8000),
+        priority: clampPriority(body.priority), category: String(body.category || '').slice(0, 60) || null,
+        source: who.dev ? 'claude' : 'owner', createdBy: who.name,
+      });
+      await store.addTaskNote(id, who.name, 'event', 'Task created');
+      return json(res, 200, { ok: true, id });
+    }
+    const m = url.match(/^\/api\/tasks\/(\d+)(?:\/(notes|delete))?$/);
+    if (!m) return json(res, 404, { error: 'Not found' });
+    const id = Number(m[1]);
+    const task = await store.getTask(id);
+    if (!task) return json(res, 404, { error: 'Task not found' });
+    if (method === 'GET' && !m[2]) return json(res, 200, task);
+    if (method !== 'POST') return json(res, 404, { error: 'Not found' });
+    const body = await readBody(req);
+    if (m[2] === 'notes') {
+      const text = String(body.text || '').trim();
+      if (!text) return json(res, 400, { error: 'Write a note first' });
+      await store.addTaskNote(id, who.name, 'note', text.slice(0, 4000));
+      return json(res, 200, { ok: true });
+    }
+    if (m[2] === 'delete') {
+      if (who.dev) return json(res, 403, { error: 'Only owners can delete tasks' });
+      await store.removeTask(id);
+      return json(res, 200, { ok: true });
+    }
+    // Update fields; status and priority changes are written to the history.
+    const fields = {};
+    const events = [];
+    if (body.title !== undefined) { const t = String(body.title).trim(); if (t.length >= 3) fields.title = t.slice(0, 140); }
+    if (body.description !== undefined) fields.description = String(body.description).slice(0, 8000);
+    if (body.category !== undefined) fields.category = String(body.category).slice(0, 60) || null;
+    if (body.priority !== undefined) {
+      const p = clampPriority(body.priority);
+      if (p !== task.priority) { fields.priority = p; events.push(`Priority ${task.priority} → ${p}`); }
+    }
+    if (body.progress !== undefined) fields.progress = Math.max(0, Math.min(100, Math.round(Number(body.progress)) || 0));
+    if (body.status !== undefined) {
+      if (!TASK_STATUSES.includes(body.status)) return json(res, 400, { error: 'Unknown status' });
+      if (body.status !== task.status) {
+        fields.status = body.status;
+        const nowIso = new Date().toISOString();
+        if (body.status === 'in_progress' && !task.started_at) fields.started_at = nowIso;
+        if (body.status === 'done') { fields.completed_at = nowIso; fields.progress = 100; }
+        if (body.status === 'pending') fields.completed_at = null;
+        events.push({ pending: 'Moved back to the queue', in_progress: 'Started', done: 'Completed', cancelled: 'Cancelled' }[body.status]);
+      }
+    }
+    await store.updateTask(id, fields);
+    for (const e of events) await store.addTaskNote(id, who.name, 'event', e);
+    if (fields.status === 'done') await store.resolveTaskFeedback(id);
+    return json(res, 200, { ok: true, task: await store.getTask(id) });
   }
 
   return {

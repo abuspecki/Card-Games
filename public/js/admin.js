@@ -47,6 +47,7 @@
     document.querySelectorAll('[data-section]').forEach((s) => s.classList.toggle('hidden', s.dataset.section !== v));
     document.querySelectorAll('#adminTabs button').forEach((b) => b.classList.toggle('on', b.dataset.view === v));
     $('detail').classList.add('hidden');
+    if (v === 'tasks') loadTasks();
     if (v === 'overview') loadOverview();
     if (v === 'players') loadPlayers();
     if (v === 'feedback') loadFeedback();
@@ -195,8 +196,10 @@
   }
 
   // ---------- feedback ----------
-  let fbStatus = 'new';
+  let fbStatus = 'priority';
   async function loadFeedback() {
+    $('fbSummary').innerHTML = '';
+    if (fbStatus === 'priority') return loadPriorities();
     const r = await api(`/api/admin/feedback${fbStatus ? '?status=' + fbStatus : ''}`);
     if (!r.ok) return toast(r.data.error || 'Could not load', true);
     const list = $('feedback');
@@ -261,9 +264,221 @@
       return;
     }
     $('who').textContent = `Signed in as ${me.data.username}`;
-    const initial = (location.hash || '#overview').slice(1);
-    show(['overview', 'players', 'feedback'].includes(initial) ? initial : 'overview');
+    const initial = (location.hash || '#tasks').slice(1);
+    show(['tasks', 'overview', 'players', 'feedback'].includes(initial) ? initial : 'tasks');
     refreshCount();
-    setInterval(() => { if (view === 'overview' && document.visibilityState === 'visible') loadOverview(); }, 30000);
+    setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      if (view === 'overview') loadOverview();
+      if (view === 'tasks' && $('detail').classList.contains('hidden')) loadTasks();
+    }, 15000);
   })();
+})();
+
+/* ---------- task board, feedback priorities, developer access ---------- */
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const session = localStorage.getItem('cg.session') || localStorage.getItem('poker.session');
+  async function api(path, body) {
+    const r = await fetch(path, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session }, body: body ? JSON.stringify(body) : undefined });
+    return { ok: r.ok, status: r.status, data: await r.json().catch(() => ({})) };
+  }
+  function toast(msg, bad) {
+    const t = document.createElement('div');
+    t.className = 'toast' + (bad ? ' bad' : ' good');
+    t.textContent = msg;
+    $('toasts').appendChild(t);
+    setTimeout(() => t.remove(), 4000);
+  }
+  const PRIO = { 1: 'Highest', 2: 'High', 3: 'Medium', 4: 'Low' };
+  const LEVEL = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' };
+  const when = (d) => {
+    if (!d) return '';
+    const s = (Date.now() - new Date(d).getTime()) / 1000;
+    if (s < 90) return 'just now';
+    if (s < 3600) return `${Math.round(s / 60)} min ago`;
+    if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+    return new Date(d).toLocaleDateString([], { day: 'numeric', month: 'short' });
+  };
+  const sourceTag = (t) => ({ owner: 'from you', feedback: 'from feedback', claude: 'from Claude' }[t.source] || t.source);
+
+  // ----- board -----
+  window.loadTasks = async function loadTasks() {
+    const r = await api('/api/tasks');
+    if (!r.ok) return toast(r.data.error || 'Could not load tasks', true);
+    const { inProgress, queue, done, counts } = r.data;
+    $('taskCount').textContent = counts.pending + counts.in_progress;
+    $('taskCount').classList.toggle('hidden', !(counts.pending + counts.in_progress));
+    $('cntDoing').textContent = inProgress.length;
+    $('cntQueue').textContent = queue.length;
+    $('cntDone').textContent = done.length;
+    const card = (t, i) => `
+      <article class="tcard p${t.priority} ${t.status}" data-id="${t.id}" tabindex="0">
+        <header><span class="prio p${t.priority}">${t.status === 'pending' ? `#${i + 1} · ` : ''}${PRIO[t.priority]}</span>${t.category ? `<span class="tag">${esc(t.category)}</span>` : ''}</header>
+        <h3>${esc(t.title)}</h3>
+        ${t.status === 'in_progress' ? `<div class="bar"><i style="width:${t.progress}%"></i></div><p class="meta">${t.progress}% · updated ${when(t.updated_at)}</p>` : ''}
+        ${t.status === 'done' ? `<p class="meta">✓ done ${when(t.completed_at)}</p>` : t.status === 'cancelled' ? '<p class="meta">cancelled</p>' : ''}
+        <footer><span>${sourceTag(t)}</span><span>${t.note_count ? `${t.note_count} update${t.note_count === 1 ? '' : 's'}` : ''}${t.feedback_count ? ` · ${t.feedback_count} feedback` : ''}</span></footer>
+      </article>`;
+    $('colDoing').innerHTML = inProgress.map(card).join('') || '<p class="empty">Nothing in progress.</p>';
+    $('colQueue').innerHTML = queue.map(card).join('') || '<p class="empty">The queue is empty — add a task.</p>';
+    $('colDone').innerHTML = done.slice(0, 40).map(card).join('') || '<p class="empty">Nothing completed yet.</p>';
+    document.querySelectorAll('.tcard').forEach((el) => {
+      el.onclick = () => openTask(Number(el.dataset.id));
+      el.onkeydown = (e) => { if (e.key === 'Enter') openTask(Number(el.dataset.id)); };
+    });
+  };
+
+  $('newTaskBtn').onclick = () => { $('newTask').classList.toggle('hidden'); $('newTask').title.focus(); };
+  $('cancelTask').onclick = () => $('newTask').classList.add('hidden');
+  $('newTask').onsubmit = async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const r = await api('/api/tasks', { title: f.title.value, description: f.description.value, priority: Number(f.priority.value), category: f.category.value });
+    if (!r.ok) return toast(r.data.error, true);
+    f.reset();
+    f.classList.add('hidden');
+    toast('Added to the queue.');
+    loadTasks();
+  };
+
+  async function openTask(id) {
+    const r = await api(`/api/tasks/${id}`);
+    if (!r.ok) return toast(r.data.error || 'Could not load', true);
+    const t = r.data;
+    const d = $('detail');
+    d.classList.remove('hidden');
+    d.innerHTML = `
+      <button class="close" aria-label="Close">✕</button>
+      <p class="eyebrow">Task #${t.id} · ${sourceTag(t)}</p>
+      <form id="taskForm" class="task-form">
+        <input name="title" class="title-input" maxlength="140" value="${esc(t.title)}" aria-label="Title">
+        <div class="tf-row">
+          <label>Status<select name="status">${['pending', 'in_progress', 'done', 'cancelled'].map((s) => `<option value="${s}" ${t.status === s ? 'selected' : ''}>${{ pending: 'Queued', in_progress: 'In progress', done: 'Done', cancelled: 'Cancelled' }[s]}</option>`).join('')}</select></label>
+          <label>Priority<select name="priority">${[1, 2, 3, 4].map((p) => `<option value="${p}" ${t.priority === p ? 'selected' : ''}>${p} · ${PRIO[p]}</option>`).join('')}</select></label>
+          <label>Progress<input name="progress" type="number" min="0" max="100" value="${t.progress}"></label>
+        </div>
+        <label>Area<input name="category" maxlength="60" value="${esc(t.category || '')}" list="areas"></label>
+        <label>Details<textarea name="description" rows="7" maxlength="8000">${esc(t.description || '')}</textarea></label>
+        <div class="row-gap"><button class="btn btn-navy">Save changes</button><button type="button" class="btn danger" id="delTask">Delete</button></div>
+      </form>
+      <h3>History</h3>
+      <form id="noteForm" class="note-form"><input name="text" maxlength="4000" placeholder="Add a note or an instruction…"><button class="btn btn-outline">Add</button></form>
+      <ol class="timeline">${t.notes.slice().reverse().map((n) => `<li class="${n.kind}"><b>${esc(n.author || '—')}</b> <time>${when(n.created_at)}</time><p></p></li>`).join('')}</ol>
+      ${t.feedbackIds.length ? `<p class="fine">Linked feedback: ${t.feedbackIds.map((x) => '#' + x).join(', ')} — resolved automatically when this task is done.</p>` : ''}`;
+    // note texts are set as text, never HTML
+    const notes = t.notes.slice().reverse();
+    d.querySelectorAll('.timeline li p').forEach((p, i) => { p.textContent = notes[i].text; });
+    d.querySelector('.close').onclick = () => { d.classList.add('hidden'); loadTasks(); };
+    d.querySelector('#taskForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const f = e.target;
+      const x = await api(`/api/tasks/${id}`, { title: f.title.value, status: f.status.value, priority: Number(f.priority.value), progress: Number(f.progress.value), category: f.category.value, description: f.description.value });
+      if (!x.ok) return toast(x.data.error, true);
+      toast('Saved.');
+      openTask(id); loadTasks();
+    };
+    d.querySelector('#noteForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const text = e.target.text.value.trim();
+      if (!text) return;
+      await api(`/api/tasks/${id}/notes`, { text });
+      openTask(id);
+    };
+    d.querySelector('#delTask').onclick = async () => {
+      if (!confirm('Delete this task and its history?')) return;
+      await api(`/api/tasks/${id}/delete`, {});
+      d.classList.add('hidden');
+      loadTasks();
+    };
+  }
+
+  // ----- developer access -----
+  $('devBtn').onclick = async () => {
+    const d = $('detail');
+    d.classList.remove('hidden');
+    const r = await api('/api/admin/devkeys');
+    const keys = r.ok ? r.data.keys : [];
+    d.innerHTML = `
+      <button class="close" aria-label="Close">✕</button>
+      <p class="eyebrow">The Workshop</p>
+      <h2>Developer access</h2>
+      <p>A developer key lets Claude read this board and the ranked feedback, start and finish tasks and post progress notes. It cannot see player data, ban anyone or change balances.</p>
+      <ol class="steps"><li>Create a key below and copy it (it is shown only once).</li><li>When Claude asks for it, paste it into the <b>secure form</b> — never into the chat.</li><li>Revoke the key any time to cut access.</li></ol>
+      <form id="keyForm" class="note-form"><input name="name" maxlength="60" value="Claude" aria-label="Key name"><button class="btn btn-navy">Create key</button></form>
+      <div id="newKey"></div>
+      <h3>Keys</h3>
+      <ul class="keys">${keys.map((k) => `<li class="${k.revoked ? 'revoked' : ''}"><b>${esc(k.name)}</b><span>${k.revoked ? 'revoked' : k.last_used ? 'last used ' + when(k.last_used) : 'never used'} · created ${when(k.created_at)}</span>${k.revoked ? '' : `<button class="btn btn-outline small" data-revoke="${k.id}">Revoke</button>`}</li>`).join('') || '<li class="empty">No keys yet.</li>'}</ul>`;
+    d.querySelector('.close').onclick = () => d.classList.add('hidden');
+    d.querySelector('#keyForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const x = await api('/api/admin/devkeys', { name: e.target.name.value });
+      if (!x.ok) return toast(x.data.error, true);
+      d.querySelector('#newKey').innerHTML = `<div class="keybox"><p><b>Your new key</b> — copy it now, it won't be shown again:</p><code>${esc(x.data.key)}</code><button class="btn btn-outline small" id="copyKey">Copy</button></div>`;
+      d.querySelector('#copyKey').onclick = () => navigator.clipboard.writeText(x.data.key).then(() => toast('Copied.'));
+    };
+    d.querySelectorAll('[data-revoke]').forEach((b) => {
+      b.onclick = async () => {
+        if (!confirm('Revoke this key? Anyone using it loses access immediately.')) return;
+        await api(`/api/admin/devkeys/${b.dataset.revoke}/revoke`, {});
+        $('devBtn').click();
+      };
+    });
+  };
+
+  // ----- feedback by importance -----
+  window.loadPriorities = async function loadPriorities() {
+    const r = await api('/api/admin/feedback/overview');
+    if (!r.ok) return toast(r.data.error || 'Could not load', true);
+    const { summary, clusters } = r.data;
+    $('fbSummary').innerHTML = `
+      <div class="fs-levels">${['critical', 'high', 'medium', 'low'].map((l) => `<span class="lvl ${l}"><b>${summary.byLevel[l] || 0}</b>${LEVEL[l]}</span>`).join('')}</div>
+      <p class="fine">${summary.total} message${summary.total === 1 ? '' : 's'} · ${summary.open} open · grouped into ${summary.clusters} topic${summary.clusters === 1 ? '' : 's'} (similar reports are merged).
+      ${Object.entries(summary.byTopic).map(([k, v]) => `${esc(k)}: ${v}`).join(' · ')}</p>`;
+    const list = $('feedback');
+    if (!clusters.length) { list.innerHTML = '<p class="empty">No feedback yet.</p>'; return; }
+    let html = '';
+    for (const level of ['critical', 'high', 'medium', 'low']) {
+      const group = clusters.filter((c) => c.level === level && c.open);
+      if (!group.length) continue;
+      html += `<h2 class="lvl-head ${level}">${LEVEL[level]} <span>${group.length}</span></h2>`;
+      html += group.map((c, i) => `
+        <article class="fbc ${level}" data-k="${level}-${i}">
+          <header><span class="tag">${esc(c.topicLabel)}</span><span class="score" title="Importance score">${c.score}</span>
+            <span>${c.count} report${c.count === 1 ? '' : 's'} from ${c.reporters} ${c.reporters === 1 ? 'person' : 'people'} · latest ${when(c.latest)}</span></header>
+          <h3></h3>
+          <details><summary>Show ${c.count === 1 ? 'the message' : `all ${c.count} messages`}</summary><ul></ul></details>
+          <footer>${c.taskId ? `<span class="tag good">Task #${c.taskId}</span><button class="btn btn-outline small" data-open-task="${c.taskId}">Open task</button>` : `<button class="btn btn-navy small" data-totask="${c.ids.join(',')}" data-prio="${{ critical: 1, high: 2, medium: 3, low: 4 }[level]}">Turn into a task</button>`}</footer>
+        </article>`).join('');
+    }
+    const resolved = clusters.filter((c) => !c.open).length;
+    if (resolved) html += `<p class="fine">${resolved} resolved topic${resolved === 1 ? '' : 's'} hidden — see the Resolved filter.</p>`;
+    list.innerHTML = html || '<p class="empty">All feedback is resolved. 🎉</p>';
+    // texts as text
+    for (const level of ['critical', 'high', 'medium', 'low']) {
+      clusters.filter((c) => c.level === level && c.open).forEach((c, i) => {
+        const el = list.querySelector(`[data-k="${level}-${i}"]`);
+        el.querySelector('h3').textContent = c.title;
+        const ul = el.querySelector('ul');
+        c.items.forEach((it) => {
+          const li = document.createElement('li');
+          li.innerHTML = '<b></b> <time></time><p></p>';
+          li.querySelector('b').textContent = it.username || 'guest';
+          li.querySelector('time').textContent = `${when(it.created_at)} · ${it.category} · ${it.status}`;
+          li.querySelector('p').textContent = it.message;
+          ul.appendChild(li);
+        });
+      });
+    }
+    list.querySelectorAll('[data-totask]').forEach((b) => {
+      b.onclick = async () => {
+        const x = await api('/api/admin/feedback/totask', { ids: b.dataset.totask.split(',').map(Number), priority: Number(b.dataset.prio) });
+        if (!x.ok) return toast(x.data.error, true);
+        toast(`Task #${x.data.id} added to the queue.`);
+        loadPriorities();
+      };
+    });
+    list.querySelectorAll('[data-open-task]').forEach((b) => { b.onclick = () => { document.querySelector('[data-view=tasks]').click(); setTimeout(() => openTask(Number(b.dataset.openTask)), 300); }; });
+  };
 })();

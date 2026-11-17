@@ -6,6 +6,7 @@
   <meta name="robots" content="noindex">
   <title>Owner Dashboard · CardGames</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <script src="js/theme.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,600&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
@@ -17,16 +18,38 @@
   <header class="nav">
     <a class="brand" href="/"><span class="crest">CG</span><span class="wordmark">CardGames<small>OWNER'S OFFICE</small></span></a>
     <nav class="admin-tabs" id="adminTabs" aria-label="Dashboard sections">
-      <button data-view="overview" class="on">Overview</button>
-      <button data-view="players">Players</button>
+      <button data-view="tasks" class="on">Tasks <span class="count hidden" id="taskCount"></span></button>
       <button data-view="feedback">Feedback <span class="count hidden" id="fbCount"></span></button>
+      <button data-view="overview">Overview</button>
+      <button data-view="players">Players</button>
     </nav>
-    <div class="actions"><span class="who" id="who"></span><a class="btn btn-outline" href="/">Back to the club</a></div>
+    <div class="actions"><span class="who" id="who"></span><button class="theme-btn" onclick="Theme.toggle()" aria-label="Light or dark mode" title="Light / dark mode">◐</button><a class="btn btn-outline" href="/">Back to the club</a></div>
   </header>
   <div class="double-rule" aria-hidden="true"></div>
 
   <main class="admin-main">
     <section id="gate" class="gate hidden"></section>
+
+    <section data-section="tasks" class="hidden">
+      <div class="admin-head"><div><p class="eyebrow">The Workshop</p><h1>Development board</h1>
+        <p class="sub">Add tasks any time — they line up by priority. Claude works through the queue and reports progress here.</p></div>
+        <div class="row-gap"><button class="btn btn-outline" id="devBtn">Developer access</button><button class="btn btn-navy" id="newTaskBtn">New task</button></div></div>
+      <form class="panel new-task hidden" id="newTask">
+        <div class="nt-grid">
+          <label class="wide">Task<input name="title" maxlength="140" required placeholder="What should be done?"></label>
+          <label>Priority<select name="priority"><option value="1">1 · Highest</option><option value="2" selected>2 · High</option><option value="3">3 · Medium</option><option value="4">4 · Low</option></select></label>
+          <label>Area<input name="category" maxlength="60" placeholder="e.g. Design, Games, Shop" list="areas"></label>
+          <label class="wide">Details<textarea name="description" rows="4" maxlength="8000" placeholder="Describe the goal, what exactly should change, any examples…"></textarea></label>
+        </div>
+        <datalist id="areas"><option>Games & tables</option><option>Chips, coins & shop</option><option>Design & layout</option><option>Phones & tablets</option><option>Accounts & friends</option><option>Owner tools</option></datalist>
+        <div class="row-gap"><button class="btn btn-navy">Add to the queue</button><button type="button" class="btn btn-outline" id="cancelTask">Cancel</button></div>
+      </form>
+      <div class="board">
+        <div class="col-board"><h2>In progress <span id="cntDoing"></span></h2><div id="colDoing" class="cards"></div></div>
+        <div class="col-board"><h2>Queue <span id="cntQueue"></span></h2><div id="colQueue" class="cards"></div></div>
+        <div class="col-board"><h2>Completed <span id="cntDone"></span></h2><div id="colDone" class="cards"></div></div>
+      </div>
+    </section>
 
     <section data-section="overview" class="hidden">
       <div class="admin-head"><div><p class="eyebrow">The Ledger</p><h1>Overview</h1></div><button class="btn btn-outline" id="refresh">Refresh</button></div>
@@ -58,7 +81,8 @@
 
     <section data-section="feedback" class="hidden">
       <div class="admin-head"><div><p class="eyebrow">Correspondence</p><h1>Feedback</h1></div>
-        <div class="filters" id="fbFilters"><button data-status="new" class="on">New</button><button data-status="read">Read</button><button data-status="resolved">Resolved</button><button data-status="">All</button></div></div>
+        <div class="filters" id="fbFilters"><button data-status="priority" class="on">By importance</button><button data-status="new">New</button><button data-status="read">Read</button><button data-status="resolved">Resolved</button><button data-status="">All</button></div></div>
+      <div id="fbSummary" class="fb-summary"></div>
       <div id="feedback" class="fb-list"></div>
     </section>
   </main>
