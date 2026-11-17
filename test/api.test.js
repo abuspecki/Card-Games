@@ -7,7 +7,7 @@ const os = require('os');
 const { spawn } = require('child_process');
 const WebSocket = require('ws');
 
-const PORT = 4300 + Math.floor(Math.random() * 500);
+const PORT = 5100 + Math.floor(Math.random() * 800); // away from a dev server on 4400
 const BASE = `http://localhost:${PORT}`;
 const tag = Date.now().toString(36).slice(-5);
 const OWNER = `boss_${tag}`;
