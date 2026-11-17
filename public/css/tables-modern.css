@@ -1,0 +1,80 @@
+/* =========================================================
+   CardGames — the tables in the same modern app style as the lobby.
+   Only the frame changes (top bar, controls, name plates, side panel):
+   felts, cards, chips and the wheel keep their look. Loaded last.
+   ========================================================= */
+body.game { --m-font: 'Montserrat', system-ui, -apple-system, 'Segoe UI', sans-serif; --m-accent: #F2C14E; --m-ink: #231A02;
+  --m-bar: rgba(9, 16, 13, .94); --m-line: rgba(255, 255, 255, .1); --m-text: #F1F4F0; --m-muted: #9DB0A6; }
+body.game.flamingo { --m-bar: rgba(26, 7, 18, .95); --m-accent: #FF8CBF; --m-ink: #3A0620; }
+
+/* ---------- top bar ---------- */
+body.game .tbar { background: var(--m-bar) !important; border-bottom: 1px solid var(--m-line) !important; color: var(--m-text) !important; }
+body.game .tbar :is(small, strong, span, button) { font-family: var(--m-font) !important; font-style: normal !important; }
+body.game .tbar .tb-center small { font-size: 11px !important; font-weight: 600 !important; letter-spacing: .08em !important; text-transform: uppercase; color: var(--m-muted) !important; }
+body.game .tbar .tb-center strong { font-size: 17px !important; font-weight: 700 !important; letter-spacing: 0 !important; color: var(--m-text) !important; }
+body.game .tbar .lobby-link { font: 700 13px var(--m-font) !important; letter-spacing: .04em !important; color: var(--m-text) !important; padding: 8px 12px; border-radius: 12px; background: rgba(255, 255, 255, .06); }
+body.game .tbar .lobby-link svg { stroke: currentColor; }
+body.game .tbar .lobby-link { width: auto !important; justify-self: start; text-transform: uppercase; }
+body.game .tb-btn { border-radius: 12px !important; border: 1px solid var(--m-line) !important; background: rgba(255, 255, 255, .06); color: var(--m-text) !important; font-weight: 700 !important; }
+body.game .tb-wallet { border-radius: 12px !important; border: 1px solid var(--m-line) !important; background: rgba(255, 255, 255, .06); color: var(--m-text) !important; font: 700 14px var(--m-font) !important; }
+body.game .tb-guest { font: 600 13px var(--m-font) !important; color: var(--m-muted); }
+body.game .turn-clock { border-radius: 12px; }
+
+/* ---------- controls: one font, rounded, clear primary button ---------- */
+body.game .controls { background: var(--m-bar) !important; border-top: 1px solid var(--m-line) !important; }
+body.game .controls :is(button, small, strong, em, b, p, span, label) { font-family: var(--m-font) !important; letter-spacing: 0 !important; }
+body.game .controls em { font-style: normal !important; }
+/* hold'em */
+body.game .holdem .action-panel, body.holdem .action-panel { background: rgba(255, 255, 255, .04) !important; border: 1px solid var(--m-line) !important; border-radius: 18px !important; box-shadow: none !important; }
+body.holdem .action-panel.my-turn { border-color: var(--m-accent) !important; box-shadow: 0 0 0 1px var(--m-accent), 0 0 24px rgba(242, 193, 78, .25) !important; }
+body.holdem .panel-note { font-style: normal !important; color: var(--m-muted); }
+body.holdem .preset { border-radius: 10px !important; border: 1px solid var(--m-line) !important; background: rgba(255, 255, 255, .05); color: var(--m-text) !important; font-weight: 600 !important; }
+body.holdem .preset.allin { border-color: rgba(242, 193, 78, .6) !important; color: var(--m-accent) !important; }
+body.holdem .act { border-radius: 14px !important; font-weight: 700 !important; font-size: 15px !important; }
+body.holdem .act-fold { background: rgba(255, 255, 255, .06) !important; border: 1px solid var(--m-line) !important; color: var(--m-text) !important; }
+body.holdem .act-call { background: #1F5C40 !important; border: 0 !important; color: #fff !important; }
+body.holdem .act-raise { background: var(--m-accent) !important; color: var(--m-ink) !important; }
+body.holdem .act:disabled { opacity: .35; }
+/* blackjack */
+body.blackjack .bottom-bar .info small { font-size: 11px !important; font-weight: 600 !important; text-transform: uppercase; letter-spacing: .06em !important; color: var(--m-muted) !important; }
+body.blackjack .bottom-bar .info strong { font-weight: 800 !important; }
+body.blackjack .bottom-bar .info em { color: var(--m-muted) !important; font-size: 13px !important; }
+body.blackjack .plaque { border-radius: 14px !important; border: 1px solid var(--m-line) !important; background: rgba(255, 255, 255, .06) !important; color: var(--m-text) !important; }
+body.blackjack .plaque b { font: 700 15px var(--m-font) !important; letter-spacing: 0 !important; text-transform: none !important; }
+body.blackjack .plaque em { font-size: 11px !important; opacity: .7; }
+body.blackjack .plaque.gold { background: var(--m-accent) !important; color: var(--m-ink) !important; border: 0 !important; }
+body.blackjack .quick-bets button { border-radius: 10px !important; border-color: var(--m-line) !important; color: var(--m-text) !important; }
+/* roulette */
+body.roulette .r-buttons .pill { border-radius: 10px !important; border-color: var(--m-line) !important; background: rgba(255, 255, 255, .05); font-weight: 600 !important; }
+body.roulette .r-spin { border-radius: 14px !important; background: var(--m-accent) !important; color: var(--m-ink) !important; letter-spacing: .02em !important; font-weight: 800 !important; }
+body.roulette .r-bar .info small { font-size: 11px !important; letter-spacing: .06em !important; color: var(--m-muted) !important; }
+/* durak */
+body.durak .durak-actions button { border-radius: 14px !important; font: 700 15px var(--m-font) !important; }
+body.durak .durak-actions .btn-silver { background: var(--m-accent) !important; color: var(--m-ink) !important; }
+body.durak .durak-actions .btn-outline { border-color: var(--m-line) !important; background: rgba(255, 255, 255, .06); color: var(--m-text) !important; }
+body.durak .trump-pill { border-radius: 12px !important; }
+body.durak .trump-pill :is(small, em) { font-family: var(--m-font) !important; font-style: normal !important; }
+body.durak .d-hint { font-style: normal !important; color: var(--m-muted); }
+/* flamingo */
+body.flamingo .f-buttons button { border-radius: 14px !important; }
+body.flamingo .f-hint { font-style: normal !important; color: #E9B9CF; }
+
+/* ---------- on the table: name plates, hints, labels ---------- */
+body.game .stage :is(.seat, .plate, .r-plate, .spot-label, .center-msg, .hint, .hand-label, .act-tag, .pile-label, .count, .dealer-shows, .beat-tag, .bet span, .chip-stack .stack-amt) {
+  font-family: var(--m-font) !important; font-style: normal !important; letter-spacing: 0 !important; }
+body.game .stage .seat .name, body.game .stage .plate .name, body.game .stage .r-plate .name { font-weight: 700 !important; }
+body.game .stage .seat .chips, body.game .stage .plate :is(.role, .chips), body.game .stage .r-plate .chips { font-weight: 600 !important; font-style: normal !important; }
+body.game .stage :is(.center-msg, .hint) { border-radius: 14px !important; font-weight: 600 !important; font-size: 14px !important; }
+
+/* ---------- side panel (chat, log, odds, table) ---------- */
+body.game .drawer { background: #0E1712 !important; color: var(--m-text) !important; border-left: 1px solid var(--m-line) !important; }
+body.game.flamingo .drawer { background: #1E0915 !important; }
+body.game .drawer :is(button, p, span, b, small, em, h4, input, li, label, td, th) { font-family: var(--m-font) !important; font-style: normal !important; letter-spacing: 0 !important; }
+body.game .drawer .tabs button { font-size: 13px !important; font-weight: 700 !important; text-transform: none !important; color: var(--m-muted) !important; }
+body.game .drawer .tabs button.on { color: var(--m-text) !important; border-bottom-color: var(--m-accent) !important; }
+body.game .drawer h4 { font-size: 12px !important; font-weight: 700 !important; text-transform: uppercase; letter-spacing: .06em !important; color: var(--m-muted) !important; }
+body.game .drawer .pill { border-radius: 10px !important; }
+body.game .chat-form input { border-radius: 12px !important; }
+body.game .chat-form button { border-radius: 12px !important; background: var(--m-accent) !important; color: var(--m-ink) !important; border: 0 !important; font-weight: 700 !important; }
+html[data-theme="light"] body.game .drawer { background: #F6F8F6 !important; color: #12201A !important; }
+html[data-theme="light"] body.game .drawer .tabs button.on { color: #12201A !important; }
