@@ -178,10 +178,12 @@ function postgresStore(url) {
         net = stats.net + EXCLUDED.net, biggest_pot = GREATEST(stats.biggest_pot, EXCLUDED.biggest_pot)`,
       [userId, mode, won ? 1 : 0, net, won ? pot : 0]);
     },
+    // mode: one mode, or a list of modes added together (e.g. the lobby's overall ranking)
     async leaderboard(mode, limit = 50) {
-      const r = await q(`SELECT u.username, s.hands, s.wins, s.net::int AS net, s.biggest_pot
-        FROM stats s JOIN users u ON u.id = s.user_id WHERE s.mode = $1 AND s.hands > 0 AND NOT u.banned
-        ORDER BY s.net DESC, s.wins DESC LIMIT $2`, [mode, limit]);
+      const modes = Array.isArray(mode) ? mode : [mode];
+      const r = await q(`SELECT u.username, SUM(s.hands)::int AS hands, SUM(s.wins)::int AS wins, SUM(s.net)::int AS net, MAX(s.biggest_pot)::int AS biggest_pot
+        FROM stats s JOIN users u ON u.id = s.user_id WHERE s.mode = ANY($1) AND s.hands > 0 AND NOT u.banned
+        GROUP BY u.id, u.username ORDER BY SUM(s.net) DESC, SUM(s.wins) DESC LIMIT $2`, [modes, limit]);
       return r.rows;
     },
     async userStats(userId) {
@@ -397,8 +399,11 @@ function fileStore(file) {
       save();
     },
     async leaderboard(mode, limit = 50) {
+      const modes = Array.isArray(mode) ? mode : [mode];
       return db.users.filter((u) => !u.banned)
-        .map((u) => ({ username: u.username, ...(db.stats[statKey(u.id, mode)] || { hands: 0 }) }))
+        .map((u) => modes.map((m) => db.stats[statKey(u.id, m)]).filter(Boolean).reduce((a, x) => ({
+          username: u.username, hands: a.hands + x.hands, wins: a.wins + x.wins, net: a.net + x.net, biggest_pot: Math.max(a.biggest_pot, x.biggest_pot || 0),
+        }), { username: u.username, hands: 0, wins: 0, net: 0, biggest_pot: 0 }))
         .filter((r) => r.hands > 0)
         .sort((a, b) => b.net - a.net || b.wins - a.wins)
         .slice(0, limit);

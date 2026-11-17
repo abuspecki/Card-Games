@@ -884,3 +884,8 @@ html[data-theme="dark"] .principle li::before { background: #DCC07A; color: #141
   .tb-wallet { gap: 10px; padding: 6px 12px; font-size: 15px; }
   .tb-btn { width: 40px; height: 40px; }
 }
+
+/* ================= OWNER WATCHING A TABLE ================= */
+body.spectating .controls, body.spectating [data-act=gesture], body.spectating .turn-clock,
+body.spectating #addBotBtn, body.spectating #removeBotBtn, body.spectating .chat-form { display: none !important; }
+body.spectating .tbar .tb-center small::after { content: ' · 👁 watching'; color: #F2C14E; }

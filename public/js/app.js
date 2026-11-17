@@ -409,12 +409,47 @@
         btn.disabled = full;
         btn.onclick = () => joinTable(t.id);
         row.appendChild(btn);
+        if (App.account && App.account.isOwner) {
+          const wb = h('button', 'rt-watch', '👁 Watch');
+          wb.title = 'Watch this table without taking a seat';
+          wb.onclick = () => watchTable(t.id);
+          row.appendChild(wb);
+        }
         list.appendChild(row);
       }
     }
     $('onlineLine').innerHTML = people ? `<i class="live-dot"></i>${people} playing now` : '<i class="live-dot"></i>Tables open — be the first';
   }
   setInterval(() => { if (!$('hub').classList.contains('hidden') && document.visibilityState === 'visible') loadTables(); }, 4000);
+
+  // ================= HOME LEADERBOARD =================
+  // Poker against real people (no bots), Blackjack and Roulette — chips won.
+  const HOME_LB = [['overall', 'All'], ['friends', 'Poker'], ['blackjack', 'Blackjack'], ['roulette', 'Roulette']];
+  let homeLbMode = 'overall';
+  async function loadHomeLb(mode = homeLbMode) {
+    homeLbMode = mode;
+    const box = $('homeLbList');
+    if (!box) return;
+    document.querySelectorAll('#homeLbTabs button').forEach((b) => b.classList.toggle('on', b.dataset.mode === mode));
+    const r = await api('/api/leaderboard?limit=10&mode=' + mode);
+    if (!r.ok) { box.innerHTML = '<li class="empty">Could not load the leaderboard.</li>'; return; }
+    const rows = r.data.rows;
+    box.innerHTML = rows.length ? rows.map((x, i) => `
+      <li class="${App.account && x.username.toLowerCase() === App.account.username.toLowerCase() ? 'me' : ''}">
+        <span class="pos p${i + 1}">${i + 1}</span>
+        <button class="name" data-prof="${esc(x.username)}">${esc(x.username)}</button>
+        <span class="net ${x.net >= 0 ? 'pos-net' : 'neg-net'}">${x.net > 0 ? '+' : ''}${fmt(x.net)}</span>
+        <span class="hands">${fmt(x.hands)} ${mode === 'roulette' ? 'spins' : 'hands'}</span>
+      </li>`).join('') : '<li class="empty">No results yet — the first winner takes the top spot.</li>';
+    box.querySelectorAll('[data-prof]').forEach((b) => { b.onclick = () => openProfile(b.dataset.prof); });
+  }
+  function buildHomeLb() {
+    const tabs = $('homeLbTabs');
+    if (!tabs) return;
+    tabs.replaceChildren(...HOME_LB.map(([m, label]) => { const b = h('button', '', label); b.dataset.mode = m; b.onclick = () => loadHomeLb(m); return b; }));
+    loadHomeLb();
+    setInterval(() => { if (!$('hub').classList.contains('hidden') && document.visibilityState === 'visible') loadHomeLb(); }, 60000);
+  }
 
   // ================= JOINING A TABLE =================
   function joinTable(id) {
@@ -426,20 +461,25 @@
   }
   App.joinTable = joinTable;
 
-  function connectAndJoin(id, guestName) {
+  // Owners: watch a table without a seat.
+  function watchTable(id) { connectAndJoin(id, null, true); }
+  App.watchTable = watchTable;
+
+  function connectAndJoin(id, guestName, watch) {
     Sound.unlock();
+    App.watching = !!watch;
     if (App.ws) { App.ws.onclose = null; App.ws.close(); }
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(`${proto}://${location.host}`);
     App.ws = ws;
     App.joining = id;
-    ws.onopen = () => ws.send(JSON.stringify({
+    ws.onopen = () => ws.send(JSON.stringify(watch ? { t: 'watch', room: id, session: App.session } : {
       t: 'join', room: id, session: App.session, name: guestName || localStorage.getItem('cg.guestName') || 'Guest',
       token: localStorage.getItem('cg.seat.' + id),
     }));
     ws.onmessage = (e) => onMessage(JSON.parse(e.data));
     ws.onclose = () => {
-      if (App.tableId && App.ws === ws) { toast('Connection lost — reconnecting…'); setTimeout(() => { if (App.tableId) connectAndJoin(App.tableId, guestName); }, 1500); }
+      if (App.tableId && App.ws === ws) { toast('Connection lost — reconnecting…'); setTimeout(() => { if (App.tableId) connectAndJoin(App.tableId, guestName, App.watching); }, 1500); }
     };
   }
 
@@ -447,7 +487,14 @@
   App.send = send;
 
   function onMessage(m) {
+    if (m.t === 'watching') {
+      App.tableId = m.room;
+      App.watching = true;
+      if (new URLSearchParams(location.search).get('table') !== m.room) history.pushState(null, '', '?table=' + m.room);
+      return;
+    }
     if (m.t === 'joined') {
+      App.watching = false;
       localStorage.setItem('cg.seat.' + m.room, m.token);
       App.tableId = m.room;
       if (new URLSearchParams(location.search).get('table') === m.room) history.replaceState(null, '', '?table=' + m.room);
@@ -494,6 +541,7 @@
   function leaveTable() {
     const S = App.S;
     const st = S && S.state;
+    if (App.watching) { send({ t: 'leave' }); backToHub(); return; }
     const me = st && st.mySeat !== -1 ? st.seats[st.mySeat] : null;
     const playing = st && me && me.inHand && ['preflop', 'flop', 'turn', 'river', 'betting', 'playing', 'spinning'].includes(st.stage);
     if (playing && !confirm(st.game === 'durak' ? 'Leave in the middle of a game? You will be the durak.' : st.game === 'flamingo' ? 'Leave in the middle of a game? You give up this round.' : 'Leave in the middle of a hand? You lose what you have bet.')) return;
@@ -524,7 +572,7 @@
 
   function backToHub() {
     if (App.tableId) localStorage.removeItem('cg.seat.' + App.tableId);
-    App.tableId = null; App.S = null; App.game = null;
+    App.tableId = null; App.S = null; App.game = null; App.watching = false;
     if (App.ws) { App.ws.onclose = null; App.ws.close(); App.ws = null; }
     $('tableScreen').classList.add('hidden');
     $('hub').classList.remove('hidden');
@@ -574,7 +622,7 @@
     const layout = computeLayout();
     const ui = window.TableUI[game];
     if (!ui) return;
-    document.body.className = `game ${game} ${layout === 'port' ? 'portrait' : 'landscape'}${$('drawer').classList.contains('open') ? ' drawer-open' : ''}`;
+    document.body.className = `game ${game} ${layout === 'port' ? 'portrait' : 'landscape'}${$('drawer').classList.contains('open') ? ' drawer-open' : ''}${S.watching ? ' spectating' : ''}`;
     if (App.game !== game || App.layout !== layout) {
       App.game = game;
       App.layout = layout;
@@ -1458,6 +1506,7 @@
   // ================= START =================
   buildTrio();
   buildRooms();
+  buildHomeLb();
   applyCosmetics();
   loadTables();
   loadAccount().then(() => {

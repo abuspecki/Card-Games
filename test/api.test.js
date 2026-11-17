@@ -226,6 +226,26 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const readNow = (await call('GET', '/api/admin/feedback?status=read', to)).data.feedback;
   assert(crash.ids.every((x) => readNow.some((f) => f.id === x)), 'turned-into-task feedback is marked read');
 
+  // ----- owners can watch a table without a seat -----
+  const watch = (session) => new Promise((resolve) => {
+    const ws = new WebSocket(`ws://localhost:${PORT}`);
+    const got = [];
+    ws.on('message', (d) => { const m = JSON.parse(d); got.push(m); if (m.t === 'error' || (m.t === 'state' && m.watching)) resolve({ ws, m, got }); });
+    ws.on('open', () => ws.send(JSON.stringify({ t: 'watch', room: 'HOLDEM-1', session })));
+  });
+  const notOwner = await watch(ta);
+  assert.strictEqual(notOwner.m.t, 'error', 'only owners may watch');
+  notOwner.ws.close();
+  const hum0 = (await call('GET', '/api/tables', null)).data.tables.find((x) => x.id === 'HOLDEM-1').humans;
+  const w1 = await watch(to);
+  assert.strictEqual(w1.m.state.mySeat, -1, 'watcher has no seat');
+  assert(w1.got.some((x) => x.t === 'watching'));
+  assert.strictEqual((await call('GET', '/api/tables', null)).data.tables.find((x) => x.id === 'HOLDEM-1').humans, hum0, 'watching takes no seat');
+  w1.ws.send(JSON.stringify({ t: 'addBot' }));
+  await wait(200);
+  assert.strictEqual((await call('GET', '/api/tables', null)).data.tables.find((x) => x.id === 'HOLDEM-1').bots, 0, 'watchers cannot act');
+  w1.ws.close();
+
   // ----- leaving over HTTP: works even when the game connection is gone -----
   const seatsAt = async (id) => (await call('GET', '/api/tables', null)).data.tables.find((x) => x.id === id).humans;
   const g1 = await sit('DURAK-1', null, 'Gast');
@@ -254,6 +274,13 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   await wait(300);
   w = (await call('GET', '/api/wallet', tb2)).data;
   assert.strictEqual(w.inPlay, 4900, 'high roller buy-in takes what you have');
+  // bet in the middle of a hand, then the server restarts: the hand is called off, the bet comes back
+  const betPlaced = new Promise((r) => s2.ws.on('message', (d) => {
+    const m = JSON.parse(d);
+    if (m.t === 'state' && m.state.limits && m.state.limits.phase === 'bet') s2.ws.send(JSON.stringify({ t: 'action', action: 'bet', amount: 500 }));
+    if (m.t === 'state' && m.state.seats[m.state.mySeat] && m.state.seats[m.state.mySeat].chips === 4400) r(true);
+  }));
+  assert(await Promise.race([betPlaced, wait(8000).then(() => false)]), '500 bet placed');
   await stop('SIGTERM');
   await start();
   w = (await call('GET', '/api/wallet', tb2)).data;

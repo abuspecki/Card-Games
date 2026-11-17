@@ -143,8 +143,11 @@ function createApi(ctx) {
     // ===== public data =====
     if (method === 'GET' && url === '/api/leaderboard') {
       const mode = new URL(req.url, 'http://x').searchParams.get('mode');
-      const m = MODES.includes(mode) ? mode : 'friends';
-      return json(res, 200, { mode: m, persistent: store.kind === 'postgres', databaseError: ctx.databaseError(), rows: await store.leaderboard(m) });
+      // 'overall': chips won in poker against real people, blackjack and roulette together
+      const OVERALL = ['friends', 'blackjack', 'roulette'];
+      const m = mode === 'overall' ? 'overall' : MODES.includes(mode) ? mode : 'friends';
+      const limit = Math.max(1, Math.min(50, Number(new URL(req.url, 'http://x').searchParams.get('limit')) || 50));
+      return json(res, 200, { mode: m, persistent: store.kind === 'postgres', databaseError: ctx.databaseError(), rows: await store.leaderboard(m === 'overall' ? OVERALL : m, limit) });
     }
     if (method === 'GET' && url === '/api/tables') return json(res, 200, { tables: [...ctx.lobby.rooms.values()].map(ctx.lobby.tableSummary) });
     if (method === 'GET' && url === '/api/status') {

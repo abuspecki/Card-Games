@@ -44,7 +44,7 @@ function createLobby(ctx) {
 
   for (const def of TABLES) {
     const settings = { ...(def.settings || {}), startingStack: def.buyIn || 1000 };
-    const room = { ...def, code: def.id, table: GAMES[def.game].make(settings), clients: new Map(), nextTimer: null, turnTimer: null, startTimer: null, phaseTimer: null };
+    const room = { ...def, code: def.id, table: GAMES[def.game].make(settings), clients: new Map(), watchers: new Map(), nextTimer: null, turnTimer: null, startTimer: null, phaseTimer: null };
     wireTable(room);
     rooms.set(def.id, room);
   }
@@ -60,7 +60,7 @@ function createLobby(ctx) {
   const seatedCount = (t) => t.seats.filter(Boolean).length;
 
   function send(ws, msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
-  function broadcast(room, msg) { for (const ws of room.clients.values()) send(ws, msg); }
+  function broadcast(room, msg) { for (const ws of [...room.clients.values(), ...room.watchers.values()]) send(ws, msg); }
 
   // What the lobby shows for each table.
   function tableSummary(room) {
@@ -97,8 +97,8 @@ function createLobby(ctx) {
       room.turn = turnInfo(room);
       scheduleTimers(room);
       const t = room.table;
-      for (const [pid, ws] of room.clients) {
-        send(ws, { t: 'state', room: room.code, tableName: room.name, highRoller: !!room.highRoller, usesChips: usesChips(room), state: t.view(pid), turn: room.turn ? { key: room.turn.key, seat: room.turn.seat, msLeft: Math.max(0, room.turn.endsAt - Date.now()) } : null });
+      for (const [pid, ws] of [...room.clients, ...room.watchers]) {
+        send(ws, { t: 'state', room: room.code, tableName: room.name, highRoller: !!room.highRoller, usesChips: usesChips(room), state: t.view(pid), watching: room.watchers.has(pid), turn: room.turn ? { key: room.turn.key, seat: room.turn.seat, msLeft: Math.max(0, room.turn.endsAt - Date.now()) } : null });
       }
     } catch (e) {
       console.error('pushState error', e);
@@ -294,6 +294,7 @@ function createLobby(ctx) {
   function handleConnection(ws) {
     let room = null;
     let pid = null;
+    let watching = false;   // owners can watch a table without a seat
 
     ws.on('message', async (raw) => {
       try {
@@ -308,7 +309,25 @@ function createLobby(ctx) {
       let m;
       try { m = JSON.parse(raw); } catch { return; }
 
+      // Owners only: watch a table without taking a seat (sees what any onlooker would).
+      if (m.t === 'watch') {
+        let user = null;
+        if (m.session) { try { user = await ctx.store().getUserBySession(String(m.session)); } catch (e) { console.error('session lookup', e); } }
+        if (!user || !ctx.owners || !ctx.owners.has(user.username.toLowerCase())) return send(ws, { t: 'error', msg: 'Only the owner can watch tables' });
+        const target = rooms.get(String(m.room || '').toUpperCase().trim());
+        if (!target) return send(ws, { t: 'error', msg: 'That table doesn\'t exist' });
+        if (room && watching) room.watchers.delete(pid);
+        room = target;
+        pid = 'watch-' + crypto.randomUUID();
+        watching = true;
+        room.watchers.set(pid, ws);
+        send(ws, { t: 'watching', room: room.code });
+        pushState(room);
+        return;
+      }
+
       if (m.t === 'join') {
+        if (watching) { room.watchers.delete(pid); watching = false; room = null; pid = null; }
         let user = null;
         if (m.session) {
           try { user = await ctx.store().getUserBySession(String(m.session)); } catch (e) { console.error('session lookup', e); }
@@ -371,6 +390,10 @@ function createLobby(ctx) {
       }
 
       if (!room || !pid) return;
+      if (watching) {
+        if (m.t === 'leave') { room.watchers.delete(pid); room = null; pid = null; watching = false; send(ws, { t: 'left' }); }
+        return; // onlookers cannot act, chat or add bots
+      }
       const t = room.table;
       const me = t.seats[t.seatOf(pid)];
       if (!me) return;
@@ -437,6 +460,7 @@ function createLobby(ctx) {
 
     ws.on('close', () => {
       if (!room || !pid) return;
+      if (watching) { room.watchers.delete(pid); return; }
       if (room.clients.get(pid) !== ws) return; // replaced by a newer connection
       room.clients.delete(pid);
       const i = room.table.seatOf(pid);
@@ -501,9 +525,22 @@ function createLobby(ctx) {
   }
 
   // Server shutting down (e.g. a new deploy): give everyone their chips back.
+  // A hand that is still running is called off: everyone gets back what they
+  // had when it started (including what is already in the pot / on the layout).
   async function cashOutAll() {
     const jobs = [];
-    for (const room of rooms.values()) for (const s of room.table.seats) if (s) jobs.push(cashOutSeat(room, s));
+    for (const room of rooms.values()) {
+      const t = room.table;
+      const running = t.isPlaying();
+      broadcast(room, { t: 'notice', msg: 'The server is restarting for an update — your chips are safe in your bankroll. Rejoin in a moment.' });
+      for (const s of t.seats) {
+        if (!s) continue;
+        const chips = running && s.inHand && Number.isFinite(s.startChips) && s.startChips > 0 ? s.startChips : s.chips;
+        const copy = { ...s, chips };
+        s.buyIn = 0;                      // never paid out twice
+        jobs.push(cashOutSeat(room, copy));
+      }
+    }
     await Promise.all(jobs);
   }
 
