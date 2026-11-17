@@ -143,6 +143,12 @@ function postgresStore(url) {
         last_used TIMESTAMPTZ,
         revoked BOOLEAN NOT NULL DEFAULT false)`);
       await q(`CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT, at TIMESTAMPTZ NOT NULL DEFAULT now())`);
+      await q(`CREATE TABLE IF NOT EXISTS hand_log (
+        id BIGSERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        mode TEXT NOT NULL, net INTEGER NOT NULL, won BOOLEAN NOT NULL, at TIMESTAMPTZ NOT NULL DEFAULT now())`);
+      await q('CREATE INDEX IF NOT EXISTS hand_log_user ON hand_log (user_id, id DESC)');
+      await q(`CREATE TABLE IF NOT EXISTS admin_log (
+        id BIGSERIAL PRIMARY KEY, by_user TEXT NOT NULL, action TEXT NOT NULL, at TIMESTAMPTZ NOT NULL DEFAULT now())`);
       await q(`CREATE TABLE IF NOT EXISTS error_log (
         key TEXT PRIMARY KEY, source TEXT NOT NULL, message TEXT NOT NULL, stack TEXT, context TEXT,
         count INTEGER NOT NULL DEFAULT 1, first_at BIGINT NOT NULL, last_at BIGINT NOT NULL)`);
@@ -202,7 +208,21 @@ function postgresStore(url) {
         ON CONFLICT (user_id, mode) DO UPDATE SET hands = stats.hands + 1, wins = stats.wins + EXCLUDED.wins,
         net = stats.net + EXCLUDED.net, biggest_pot = GREATEST(stats.biggest_pot, EXCLUDED.biggest_pot)`,
       [userId, mode, won ? 1 : 0, net, won ? pot : 0]);
+      await q('INSERT INTO hand_log (user_id, mode, net, won) VALUES ($1, $2, $3, $4)', [userId, mode, Math.round(net) || 0, !!won]);
+      // keep the history short: the newest 200 per player
+      if (Math.random() < 0.05) await q('DELETE FROM hand_log WHERE user_id = $1 AND id < (SELECT MIN(id) FROM (SELECT id FROM hand_log WHERE user_id = $1 ORDER BY id DESC LIMIT 200) t)', [userId]);
     },
+    async handHistory(userId, limit = 50) {
+      const r = await q('SELECT mode, net, won, at FROM hand_log WHERE user_id = $1 ORDER BY id DESC LIMIT $2', [userId, limit]);
+      return r.rows;
+    },
+    async recentHands(limit = 60) {
+      const r = await q(`SELECT u.username, h.mode, h.net, h.won, h.at FROM hand_log h JOIN users u ON u.id = h.user_id ORDER BY h.id DESC LIMIT $1`, [limit]);
+      return r.rows;
+    },
+    async allUserIds() { return (await q('SELECT id FROM users WHERE NOT banned')).rows.map((r) => r.id); },
+    async logAdmin(by, action) { await q('INSERT INTO admin_log (by_user, action) VALUES ($1, $2)', [by, String(action).slice(0, 300)]); },
+    async adminLog(limit = 40) { return (await q('SELECT by_user, action, at FROM admin_log ORDER BY id DESC LIMIT $1', [limit])).rows; },
     // mode: one mode, or a list of modes added together (e.g. the lobby's overall ranking)
     async leaderboard(mode, limit = 50) {
       const modes = Array.isArray(mode) ? mode : [mode];
@@ -425,8 +445,20 @@ function fileStore(file) {
       const s = db.stats[k] || (db.stats[k] = { hands: 0, wins: 0, net: 0, biggest_pot: 0 });
       s.hands++; s.net += net;
       if (won) { s.wins++; s.biggest_pot = Math.max(s.biggest_pot, pot); }
+      db.handLog = db.handLog || [];
+      db.handLog.push({ user_id: userId, mode, net: Math.round(net) || 0, won: !!won, at: new Date().toISOString() });
+      if (db.handLog.length > 5000) db.handLog = db.handLog.slice(-4000);
       save();
     },
+    async handHistory(userId, limit = 50) {
+      return (db.handLog || []).filter((h) => h.user_id === userId).slice(-limit).reverse().map(({ user_id, ...h }) => h);
+    },
+    async recentHands(limit = 60) {
+      return (db.handLog || []).slice(-limit).reverse().map(({ user_id, ...h }) => ({ username: (userById(user_id) || {}).username || '?', ...h }));
+    },
+    async allUserIds() { return db.users.filter((u) => !u.banned).map((u) => u.id); },
+    async logAdmin(by, action) { db.adminLog = db.adminLog || []; db.adminLog.push({ by_user: by, action: String(action).slice(0, 300), at: new Date().toISOString() }); if (db.adminLog.length > 500) db.adminLog.shift(); save(); },
+    async adminLog(limit = 40) { return (db.adminLog || []).slice(-limit).reverse(); },
     async leaderboard(mode, limit = 50) {
       const modes = Array.isArray(mode) ? mode : [mode];
       return db.users.filter((u) => !u.banned)

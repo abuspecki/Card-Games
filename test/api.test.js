@@ -240,6 +240,26 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   assert.strictEqual(gres.data.wallet.chips, gw0);
   assert.strictEqual((await call('POST', '/api/goldrush/dig', ta)).status, 400, 'no dig without a round');
 
+  // ----- owner tools: history, gift for all, announcement -----
+  const annId = (await call('GET', '/api/admin/players?search=' + A, to)).data.players[0].id;
+  const file = (await call('GET', `/api/admin/players/${annId}`, to)).data;
+  assert(Array.isArray(file.history), 'player history');
+  const before1 = (await call('GET', '/api/wallet', ta)).data.chips;
+  assert.strictEqual((await call('POST', '/api/admin/gift', ta, { chips: 100 })).status, 403);
+  assert.strictEqual((await call('POST', '/api/admin/gift', to, { chips: -5 })).status, 400);
+  const gift = await call('POST', '/api/admin/gift', to, { chips: 250, announce: true });
+  assert(gift.data.members >= 2);
+  assert.strictEqual((await call('GET', '/api/wallet', ta)).data.chips, before1 + 250, 'everyone got the gift');
+  assert(/250 chips/.test((await call('GET', '/api/tables', null)).data.announcement.text), 'gift announced');
+  await call('POST', '/api/admin/announce', to, { text: 'Poker at 8!', minutes: 5 });
+  assert.strictEqual((await call('GET', '/api/tables', null)).data.announcement.text, 'Poker at 8!');
+  await call('POST', '/api/admin/announce', to, { text: '' });
+  assert.strictEqual((await call('GET', '/api/tables', null)).data.announcement, null);
+  const act = (await call('GET', '/api/admin/activity', to)).data;
+  assert(act.log.some((x) => /gift to all/.test(x.action)), 'owner actions are logged');
+  // take the gift back so the later checks keep their numbers
+  for (const who of (await call('GET', '/api/admin/players', to)).data.players) await call('POST', `/api/admin/players/${who.id}/adjust`, to, { chips: -250 });
+
   // ----- error monitoring: browser reports are grouped and shown to owners -----
   for (let k = 0; k < 3; k++) await call('POST', '/api/client-error', ta, { message: `TypeError: x is undefined (id ${k}23)`, stack: 'at app.js:1:2', where: '/?table=HOLDEM-1' });
   assert.strictEqual((await call('GET', '/api/admin/errors', ta)).status, 403, 'owners only');

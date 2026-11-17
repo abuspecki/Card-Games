@@ -161,7 +161,7 @@ function createApi(ctx) {
       const limit = Math.max(1, Math.min(50, Number(new URL(req.url, 'http://x').searchParams.get('limit')) || 50));
       return json(res, 200, { mode: m, persistent: store.kind === 'postgres', databaseError: ctx.databaseError(), rows: await store.leaderboard(m === 'overall' ? OVERALL : m, limit) });
     }
-    if (method === 'GET' && url === '/api/tables') return json(res, 200, { tables: [...ctx.lobby.rooms.values()].map(ctx.lobby.tableSummary), maintenance: ctx.lobby.maintenanceInfo() });
+    if (method === 'GET' && url === '/api/tables') return json(res, 200, { tables: [...ctx.lobby.rooms.values()].map(ctx.lobby.tableSummary), maintenance: ctx.lobby.maintenanceInfo(), announcement: ctx.lobby.currentAnnouncement() });
     if (method === 'GET' && url === '/api/status') {
       return json(res, 200, {
         database: store.kind === 'postgres' ? 'connected' : (process.env.DATABASE_URL ? 'failed' : 'not configured'),
@@ -348,6 +348,28 @@ function createApi(ctx) {
         return json(res, 200, { ok: true, url: taskboard.links({ title: lead.title, beschreibung }).newTask });
       }
 
+      // ----- owner tools: everyone at once -----
+      if (method === 'POST' && url === '/api/admin/gift') {
+        const body = await readBody(req);
+        const chips = Math.floor(Number(body.chips) || 0), cns = Math.floor(Number(body.coins) || 0);
+        if ((!chips && !cns) || chips < 0 || cns < 0 || chips > 100000 || cns > 10000) return json(res, 400, { error: 'Choose a gift of up to 100,000 chips and 10,000 coins' });
+        const ids = await store.allUserIds();
+        for (const id of ids) await coins.adjust(id, cns, chips);
+        const what = [chips && `${chips.toLocaleString('en-US')} chips`, cns && `${cns.toLocaleString('en-US')} coins`].filter(Boolean).join(' and ');
+        await store.logAdmin(user.username, `gift to all ${ids.length} members: ${what}`);
+        if (body.announce !== false) ctx.lobby.announce(`🎁 A gift from the house: ${what} for every member!`, 30);
+        return json(res, 200, { ok: true, members: ids.length });
+      }
+      if (method === 'POST' && url === '/api/admin/announce') {
+        const body = await readBody(req);
+        const text = String(body.text || '').trim();
+        const a = ctx.lobby.announce(text, Math.max(1, Math.min(240, Number(body.minutes) || 15)));
+        if (text) await store.logAdmin(user.username, `announcement: ${text}`);
+        return json(res, 200, { ok: true, announcement: a });
+      }
+      if (method === 'GET' && url === '/api/admin/activity') {
+        return json(res, 200, { hands: await store.recentHands(60), log: await store.adminLog(40) });
+      }
       // Error monitoring
       if (method === 'GET' && url === '/api/admin/errors') return json(res, 200, { errors: ctx.errors.list() });
       if (method === 'POST' && url === '/api/admin/errors/clear') {
@@ -389,6 +411,8 @@ function createApi(ctx) {
             player: { ...target, ...presence(id, target.last_seen), isOwner: ctx.owners.has(target.username.toLowerCase()) },
             wallet: await coins.getStatus(id),
             stats: await store.userStats(id),
+            history: await store.handHistory(id, 50),
+            seat: ctx.lobby.locate(id),
             friends: await store.countFriends(id),
           });
         }
@@ -412,6 +436,7 @@ function createApi(ctx) {
           const r = await coins.adjust(id, body.coins, body.chips);
           if (r.error) return json(res, 400, r);
           console.log(`[admin] ${user.username} adjusted ${target.username}: coins ${body.coins || 0}, chips ${body.chips || 0}`);
+          await store.logAdmin(user.username, `adjusted ${target.username}: ${body.chips ? `${body.chips > 0 ? '+' : ''}${body.chips} chips ` : ''}${body.coins ? `${body.coins > 0 ? '+' : ''}${body.coins} coins` : ''}`.trim());
           return json(res, 200, { ok: true, ...r });
         }
       }

@@ -584,6 +584,15 @@ function createLobby(ctx) {
     await Promise.all(jobs);
   }
 
+  // Owner announcement: shown to everyone at a table (and in the lobby via /api/tables).
+  let announcement = null;
+  function announce(text, minutes = 10) {
+    announcement = text ? { text: String(text).slice(0, 300), until: Date.now() + minutes * 60000, at: Date.now() } : null;
+    if (announcement) for (const room of rooms.values()) broadcast(room, { t: 'announcement', text: announcement.text });
+    return announcement;
+  }
+  const currentAnnouncement = () => (announcement && Date.now() < announcement.until ? { text: announcement.text, at: announcement.at } : null);
+
   // Members sitting at any table right now (for the update bonus).
   function seatedAccounts() {
     const ids = new Set();
@@ -602,7 +611,7 @@ function createLobby(ctx) {
     return { humans, bots: botsN, tablesPlaying: playing, tables: [...rooms.values()].map(tableSummary) };
   }
 
-  return { rooms, tableSummary, handleConnection, locate, leaveBy, seatedAccounts, refreshLook, kick, cashOutAll, liveStats, GAMES, setMaintenance, maintenanceInfo, drain, isIdle, playerCount };
+  return { rooms, tableSummary, handleConnection, locate, leaveBy, seatedAccounts, refreshLook, kick, cashOutAll, liveStats, GAMES, announce, currentAnnouncement, setMaintenance, maintenanceInfo, drain, isIdle, playerCount };
 }
 
 module.exports = { createLobby, TABLES, GAMES };

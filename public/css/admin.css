@@ -198,3 +198,16 @@ html[data-theme="dark"] body.admin .nt-grid label, html[data-theme="dark"] body.
 .err .ctx { font-size: 12px; opacity: .7; word-break: break-word; }
 .err pre { white-space: pre-wrap; font-size: 12px; max-height: 260px; overflow: auto; background: rgba(0,0,0,.06); padding: 8px; }
 html[data-theme="dark"] .err pre { background: rgba(255,255,255,.05); }
+
+/* ---------- owner tools ---------- */
+.owner-tools { margin-bottom: 16px; }
+.owner-tools form { display: flex; flex-direction: column; gap: 10px; }
+.owner-tools textarea, .owner-tools input[type=number], .owner-tools select, .maint-panel select { padding: 10px 12px; border: 1px solid rgba(15,59,38,.25); background: #fff; font: inherit; font-size: 15px; color: var(--ink); }
+.owner-tools input[type=number] { width: 120px; margin-left: 6px; }
+.owner-tools .check { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+html[data-theme="dark"] .owner-tools :is(textarea, input[type=number], select), html[data-theme="dark"] .maint-panel select { background: #10291C; color: #E8E0CC; border-color: rgba(232,224,204,.25); }
+#activity { margin-bottom: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+#activity h3 { grid-column: span 1; }
+.alog { list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 14px; padding: 0; }
+.alog time { opacity: .6; font-size: 12px; }
+@media (max-width: 900px) { #activity { grid-template-columns: 1fr; } }

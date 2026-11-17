@@ -9,7 +9,7 @@
   const fmt = (n) => Number(n || 0).toLocaleString('en-US');
   const session = localStorage.getItem('cg.session') || localStorage.getItem('poker.session');
   const GAME = { holdem: "Hold'em", blackjack: 'Blackjack', durak: 'Durak' };
-  const MODE = { friends: "Hold'em (friends)", bots: "Hold'em (bots)", blackjack: 'Blackjack', durak: 'Durak' };
+  const MODE = { friends: "Hold'em (friends)", bots: "Hold'em (bots)", blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette', flamingo: 'Flamingo', goldrush: 'Gold Rush' };
   const CAT = { bug: 'Bug report', suggestion: 'Suggestion', feature: 'Feature request', general: 'General' };
 
   async function api(path, body) {
@@ -30,7 +30,7 @@
   }
 
   const ago = (t) => {
-    t = Number(t);
+    t = typeof t === 'string' && !/^\d+$/.test(t) ? Date.parse(t) : Number(t);
     if (!t) return 'never';
     const s = (Date.now() - t) / 1000;
     if (s < 90) return 'just now';
@@ -140,7 +140,7 @@
   async function openPlayer(id) {
     const r = await api(`/api/admin/players/${id}`);
     if (!r.ok) return toast(r.data.error || 'Could not load', true);
-    const { player: p, wallet: w, stats, friends } = r.data;
+    const { player: p, wallet: w, stats, friends, history = [], seat } = r.data;
     const d = $('detail');
     d.classList.remove('hidden');
     d.innerHTML = `
@@ -155,6 +155,10 @@
       <h3>Record</h3>
       ${stats.length ? `<table class="grid small"><thead><tr><th>Game</th><th class="num">Hands</th><th class="num">Won</th><th class="num">Result</th></tr></thead><tbody>
         ${stats.map((s) => `<tr><td>${MODE[s.mode] || esc(s.mode)}</td><td class="num">${fmt(s.hands)}</td><td class="num">${s.hands ? Math.round((s.wins / s.hands) * 100) : 0}%</td><td class="num ${s.net >= 0 ? 'pos' : 'neg'}">${s.net > 0 ? '+' : ''}${fmt(s.net)}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">No hands played yet.</p>'}
+      ${seat ? `<p class="muted">Now at <b>${esc(seat.tableName)}</b>${seat.connected ? '' : ' (disconnected)'}</p>` : ''}
+      <h3>Recent games</h3>
+      ${history.length ? `<table class="grid small"><thead><tr><th>When</th><th>Game</th><th class="num">Result</th></tr></thead><tbody>
+        ${history.slice(0, 25).map((x) => `<tr><td>${ago(x.at)}</td><td>${MODE[x.mode] || esc(x.mode)}</td><td class="num ${x.net >= 0 ? 'pos' : 'neg'}">${x.mode === 'durak' || x.mode === 'flamingo' ? (x.won ? 'won' : 'lost') : `${x.net > 0 ? '+' : ''}${fmt(x.net)}`}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">No games recorded yet.</p>'}
       <h3>Adjust balances</h3>
       <form class="adjust" id="adjForm">
         <label>Coins<input type="number" name="coins" value="0" step="1"></label>
@@ -248,6 +252,35 @@
     const r = await api('/api/admin/feedback?status=new');
     if (r.ok) { $('fbCount').textContent = r.data.feedback.length; $('fbCount').classList.toggle('hidden', !r.data.feedback.length); }
   }
+
+  // ---------- owner tools: gift, announce, activity ----------
+  async function paintActivity() {
+    const r = await api('/api/admin/activity');
+    if (!r.ok || !$('activity')) return;
+    const { hands, log } = r.data;
+    $('activity').innerHTML = `
+      <div><h3>Latest games</h3>${hands.length ? `<table class="grid small"><tbody>${hands.slice(0, 20).map((x) => `<tr><td>${ago(x.at)}</td><td>${esc(x.username)}</td><td>${MODE[x.mode] || esc(x.mode)}</td>
+        <td class="num ${x.net >= 0 ? 'pos' : 'neg'}">${x.mode === 'durak' || x.mode === 'flamingo' ? (x.won ? 'won' : 'lost') : `${x.net > 0 ? '+' : ''}${fmt(x.net)}`}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">No games yet.</p>'}</div>
+      <div><h3>Owner actions</h3>${log.length ? `<ul class="alog">${log.slice(0, 15).map((x) => `<li><time>${ago(x.at)}</time> <b>${esc(x.by_user)}</b> ${esc(x.action)}</li>`).join('')}</ul>` : '<p class="muted">Nothing yet.</p>'}</div>`;
+  }
+  $('giftForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const f = e.target, chips = Number(f.chips.value) || 0, coins = Number(f.coins.value) || 0;
+    if (!confirm(`Give every member ${chips ? fmt(chips) + ' chips' : ''}${chips && coins ? ' and ' : ''}${coins ? fmt(coins) + ' coins' : ''}?`)) return;
+    const x = await api('/api/admin/gift', { chips, coins, announce: f.ann.checked });
+    toast(x.ok ? `Sent to ${x.data.members} members.` : x.data.error, !x.ok);
+    paintActivity();
+  };
+  $('annForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const x = await api('/api/admin/announce', { text: f.text.value, minutes: Number(f.minutes.value) });
+    toast(x.ok ? (f.text.value.trim() ? 'Announcement sent to everyone online.' : 'Announcement removed.') : x.data.error, !x.ok);
+    if (x.ok) f.text.value = '';
+    paintActivity();
+  };
+  paintActivity();
+  setInterval(() => { if (document.visibilityState === 'visible' && !document.querySelector('[data-section=overview].hidden')) paintActivity(); }, 30000);
 
   // ---------- errors ----------
   async function loadErrors() {

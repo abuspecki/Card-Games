@@ -46,6 +46,24 @@
 
     <section data-section="overview" class="hidden">
       <div class="admin-head"><div><p class="eyebrow">The Ledger</p><h1>Overview</h1></div><button class="btn btn-outline" id="refresh">Refresh</button></div>
+      <div class="admin-grid owner-tools">
+        <form class="panel" id="annForm">
+          <h2>Message to everyone</h2>
+          <p class="sub">Shown at every table right away and on the home page for everyone who comes in.</p>
+          <textarea name="text" rows="2" maxlength="300" placeholder="e.g. Poker night at 8 pm — see you at Table 1!"></textarea>
+          <div class="row-gap"><select name="minutes"><option value="15">for 15 minutes</option><option value="60" selected>for 1 hour</option><option value="240">for 4 hours</option></select>
+            <button class="btn btn-navy">Send</button><span class="sub">Send an empty message to remove it.</span></div>
+        </form>
+        <form class="panel" id="giftForm">
+          <h2>Gift for everyone</h2>
+          <p class="sub">Every member gets it straight into their account.</p>
+          <div class="row-gap"><label>Chips <input type="number" name="chips" min="0" max="100000" step="100" value="1000"></label>
+            <label>Coins <input type="number" name="coins" min="0" max="10000" step="10" value="0"></label></div>
+          <label class="check"><input type="checkbox" name="ann" checked> Tell everyone about it</label>
+          <button class="btn btn-navy">Give to all members</button>
+        </form>
+      </div>
+      <div class="panel" id="activity"></div>
       <div class="panel maint-panel">
         <h2>Update notice</h2>
         <p class="sub">Warn everyone before an update: a countdown appears for all players, hands in progress finish, and no new hands start once it runs out.</p>

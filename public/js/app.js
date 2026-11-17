@@ -392,7 +392,7 @@
   async function loadTables() {
     if (!$('hub').classList.contains('hidden') || !App.tables.length) {
       const r = await api('/api/tables');
-      if (r.ok) { App.tables = r.data.tables; renderTables(); showMaintenance(r.data.maintenance); }
+      if (r.ok) { App.tables = r.data.tables; renderTables(); showMaintenance(r.data.maintenance); showAnnouncement(r.data.announcement); }
     }
   }
 
@@ -471,6 +471,21 @@
     if (s && window.I18n) I18n.set(s.dataset.setLang);
   });
   paintLang();
+
+  // ================= OWNER ANNOUNCEMENT (lobby) =================
+  function showAnnouncement(a) {
+    let el = $('announceBar');
+    const seen = localStorage.getItem('cg.announce.seen');
+    if (!a || String(a.at) === seen) { if (el) el.remove(); return; }
+    if (!el) {
+      el = h('div', 'announce-bar'); el.id = 'announceBar';
+      const main = document.querySelector('.app-main');
+      if (main) main.prepend(el); else return;
+    }
+    el.innerHTML = '<span></span><button aria-label="Dismiss">✕</button>';
+    el.querySelector('span').textContent = '📣 ' + a.text;
+    el.querySelector('button').onclick = () => { localStorage.setItem('cg.announce.seen', String(a.at)); el.remove(); };
+  }
 
   // ================= UPDATE NOTICE (maintenance) =================
   let maintEnds = 0, maintTimer = null, maintInfo = null;
@@ -599,6 +614,7 @@
       return;
     }
     if (m.t === 'notice') { toast(m.msg, { kind: 'good', timeout: 7000 }); return; }
+    if (m.t === 'announcement') { toast('📣 ' + m.text, { kind: 'good', timeout: 12000 }); loadWallet(); return; }
     if (m.t === 'left') { backToHub(); return; }
     if (m.t === 'kicked') { toast(m.msg, { kind: 'bad', timeout: 10000 }); backToHub(); signedOut(); }
   }
