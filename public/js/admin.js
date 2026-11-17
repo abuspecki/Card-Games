@@ -49,6 +49,7 @@
     $('detail').classList.add('hidden');
     if (v === 'tasks') loadTasks();
     if (v === 'errors') loadErrors();
+    if (v === 'backups') loadBackups();
     if (v === 'overview') loadOverview();
     if (v === 'players') loadPlayers();
     if (v === 'feedback') loadFeedback();
@@ -166,6 +167,10 @@
         <button class="btn btn-navy">Apply</button>
       </form>
       <p class="fine">Use negative numbers to remove. Balances never go below zero.</p>
+      <h3>Passwort</h3>
+      ${p.isOwner ? '<p class="muted">Dein eigenes Passwort änderst du im Spiel unter Lounge → „Change password“.</p>'
+    : `<p class="fine">Hat ${esc(p.username)} das Passwort vergessen? Erstelle ein vorläufiges und gib es weiter. Beim nächsten Anmelden muss ${esc(p.username)} ein eigenes wählen. Alle Geräte werden abgemeldet.</p>
+      <button class="btn btn-navy" id="pwReset">Vorläufiges Passwort erstellen</button><div id="pwOut"></div>`}
       <h3>Membership</h3>
       ${p.isOwner ? '<p class="muted">Owners cannot be banned.</p>' : p.banned
     ? '<button class="btn btn-outline" id="unban">Lift the ban</button>'
@@ -191,6 +196,16 @@
       toast(`${p.username} has been banned.`);
       openPlayer(id); loadPlayers();
     };
+    const pwReset = d.querySelector('#pwReset');
+    if (pwReset) pwReset.onclick = async () => {
+      if (!confirm(`Ein vorläufiges Passwort für ${p.username} erstellen? Das alte Passwort gilt dann nicht mehr.`)) return;
+      const x = await api(`/api/admin/players/${id}/password`, {});
+      if (!x.ok) return toast(x.data.error || 'Ging nicht', true);
+      d.querySelector('#pwOut').innerHTML = `<div class="pw-box"><span>Vorläufiges Passwort für <b>${esc(p.username)}</b>:</span>
+        <code>${esc(x.data.password)}</code><button class="btn btn-navy" type="button">Kopieren</button>
+        <small>Wird nur jetzt angezeigt. Schick es ${esc(p.username)} privat.</small></div>`;
+      d.querySelector('#pwOut button').onclick = () => navigator.clipboard.writeText(x.data.password).then(() => toast('Kopiert.'), () => toast('Bitte von Hand kopieren', true));
+    };
     const unban = d.querySelector('#unban');
     if (unban) unban.onclick = async () => {
       const x = await api(`/api/admin/players/${id}/unban`, {});
@@ -199,6 +214,58 @@
       openPlayer(id); loadPlayers();
     };
   }
+
+  // ---------- backups ----------
+  const KIND = { auto: 'Täglich (automatisch)', manual: 'Von Hand', 'before-restore': 'Vor einer Wiederherstellung' };
+  const kb = (n) => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+  const when = (t) => new Date(t).toLocaleString('de-DE', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  async function loadBackups() {
+    const r = await api('/api/admin/backups');
+    const box = $('bkList');
+    if (!r.ok) { box.innerHTML = `<p class="muted">${esc(r.data.error || 'Konnte nicht laden')}</p>`; return; }
+    const list = r.data.backups;
+    box.innerHTML = list.length ? `<table class="grid small"><thead><tr><th>Wann</th><th>Art</th><th class="num">Konten</th><th class="num">Größe</th><th></th></tr></thead><tbody>
+      ${list.map((b) => `<tr><td>${when(b.at)} <span class="muted">· ${ago(b.at)}</span></td><td>${KIND[b.kind] || esc(b.kind)}</td>
+        <td class="num">${fmt((b.summary || {}).users)}</td><td class="num">${kb(b.size)}</td>
+        <td class="num"><button class="btn btn-outline" data-dl="${esc(b.id)}">Herunterladen</button> <button class="btn btn-outline" data-rs="${esc(b.id)}" data-at="${esc(b.at)}">Wiederherstellen</button></td></tr>`).join('')}</tbody></table>
+      <p class="fine">Datenbank: ${r.data.database === 'postgres' ? 'live (Neon)' : 'lokale Testdatei'}.</p>`
+      : '<p class="muted">Noch keine Sicherung. Die erste tägliche entsteht eine Minute nach dem Serverstart – oder klick auf „Jetzt sichern“.</p>';
+    box.querySelectorAll('[data-dl]').forEach((b) => { b.onclick = () => download(b.dataset.dl); });
+    box.querySelectorAll('[data-rs]').forEach((b) => { b.onclick = () => restore(`/api/admin/backups/${b.dataset.rs}/restore`, {}, `vom ${when(b.dataset.at)}`); });
+  }
+  async function download(id) {
+    const r = await fetch(`/api/admin/backups/${id}/download`, { headers: { Authorization: 'Bearer ' + session } });
+    if (!r.ok) return toast('Download ging nicht', true);
+    const name = (/filename="([^"]+)"/.exec(r.headers.get('Content-Disposition') || '') || [])[1] || 'cardgames-backup.json';
+    const url = URL.createObjectURL(await r.blob());
+    const a = document.createElement('a');
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+  async function restore(path, extra, label) {
+    const typed = prompt(`Wirklich ALLE Daten auf den Stand ${label} zurücksetzen?\n\nAlles, was seitdem passiert ist (neue Konten, Gewinne, Käufe), geht verloren. Alle Spieler werden abgemeldet. Vorher wird der jetzige Stand gesichert, du kannst es also rückgängig machen.\n\nTippe RESTORE zum Bestätigen:`);
+    if (typed !== 'RESTORE') return;
+    const x = await api(path, { confirm: 'RESTORE', ...extra });
+    if (!x.ok) return toast(x.data.error || 'Wiederherstellen ging nicht', true);
+    toast(`Wiederhergestellt: ${fmt(x.data.summary.users)} Konten. Der vorherige Stand ist als Sicherung gespeichert.`);
+    if (!x.data.signedIn) { setTimeout(() => { location.href = '/'; }, 2500); return; }
+    loadBackups();
+  }
+  $('bkMake').onclick = async () => {
+    $('bkMake').disabled = true;
+    const x = await api('/api/admin/backups', {});
+    $('bkMake').disabled = false;
+    if (!x.ok) return toast(x.data.error || 'Sichern ging nicht', true);
+    toast(`Gesichert: ${fmt(x.data.backup.summary.users)} Konten, ${kb(x.data.backup.size)}.`);
+    loadBackups();
+  };
+  $('bkUpload').onclick = async () => {
+    const f = $('bkFile').files[0];
+    if (!f) return toast('Wähle zuerst eine Backup-Datei', true);
+    let backup;
+    try { backup = JSON.parse(await f.text()); } catch { return toast('Die Datei ist keine Backup-Datei', true); }
+    restore('/api/admin/restore-upload', { backup }, `aus der Datei „${f.name}“`);
+  };
 
   // ---------- feedback ----------
   let fbStatus = 'priority';
@@ -343,7 +410,7 @@
     }
     $('who').textContent = `Signed in as ${me.data.username}`;
     const initial = (location.hash || '#tasks').slice(1);
-    show(['tasks', 'overview', 'players', 'feedback', 'errors'].includes(initial) ? initial : 'tasks');
+    show(['tasks', 'overview', 'players', 'feedback', 'errors', 'backups'].includes(initial) ? initial : 'tasks');
     refreshCount();
     setInterval(() => {
       if (document.visibilityState !== 'visible') return;

@@ -19,10 +19,10 @@ function createApi(ctx) {
     res.end(JSON.stringify(body));
   };
 
-  function readBody(req) {
+  function readBody(req, max = 20000) {
     return new Promise((resolve, reject) => {
       let data = '';
-      req.on('data', (c) => { data += c; if (data.length > 20000) { reject(new Error('too large')); req.destroy(); } });
+      req.on('data', (c) => { data += c; if (data.length > max) { reject(new Error('too large')); req.destroy(); } });
       req.on('end', () => { try { resolve(JSON.parse(data || '{}')); } catch { reject(new Error('bad json')); } });
     });
   }
@@ -61,7 +61,13 @@ function createApi(ctx) {
   async function newSession(user) {
     const token = crypto.randomBytes(32).toString('hex');
     await ctx.store().createSession(token, user.id);
-    return { token, username: user.username, isOwner: isOwner(user) };
+    return { token, username: user.username, isOwner: isOwner(user), mustChange: !!user.must_change };
+  }
+  // Easy to read out loud or type on a phone: no 0/O, 1/l/I.
+  function tempPassword() {
+    const abc = 'abcdefghjkmnpqrstuvwxyz23456789';
+    const pick = () => Array.from({ length: 4 }, () => abc[crypto.randomInt(abc.length)]).join('');
+    return `${pick()}-${pick()}`;
   }
 
   // Online if seen recently or sitting at a table with a live connection.
@@ -129,7 +135,26 @@ function createApi(ctx) {
     if (method === 'GET' && url === '/api/me') {
       const user = await currentUser(req);
       if (!user) return json(res, 401, { error: 'Not logged in' });
-      return json(res, 200, { username: user.username, isOwner: isOwner(user), theme: await store.getTheme(user.id), stats: await store.userStats(user.id), seat: ctx.lobby.locate(user.id) });
+      return json(res, 200, { username: user.username, isOwner: isOwner(user), mustChange: !!user.must_change, theme: await store.getTheme(user.id), stats: await store.userStats(user.id), seat: ctx.lobby.locate(user.id) });
+    }
+    // Change your own password. After an owner reset the old (temporary) one isn't asked again.
+    if (method === 'POST' && url === '/api/me/password') {
+      const user = await currentUser(req);
+      if (!user) return json(res, 401, { error: 'Please sign in first' });
+      if (limited(`pw:${user.id}`, 10, 10 * 60 * 1000)) return json(res, 429, { error: 'Too many attempts. Try again in a few minutes.' });
+      const body = await readBody(req);
+      const password = String(body.password || '');
+      if (password.length < 6 || password.length > 100) return json(res, 400, { error: 'The new password needs at least 6 characters' });
+      const full = await store.getUserByName(user.username);
+      if (!full) return json(res, 404, { error: 'Account not found' });
+      if (!full.must_change && !checkPassword(String(body.current || ''), full.pass)) return json(res, 400, { error: 'Your current password is not right' });
+      if (checkPassword(password, full.pass)) return json(res, 400, { error: 'Please choose a password different from the old one' });
+      await store.setPassword(user.id, hashPassword(password), false);
+      // sign out every other device, keep this one
+      const token = bearer(req);
+      await store.deleteUserSessions(user.id);
+      await store.createSession(token, user.id);
+      return json(res, 200, { ok: true });
     }
     if (method === 'POST' && url === '/api/me/theme') {
       const user = await currentUser(req);
@@ -409,6 +434,42 @@ function createApi(ctx) {
         console.log(`[admin] ${user.username} ${minutes ? `announced an update in ${minutes} min` : 'cancelled the update notice'}`);
         return json(res, 200, { ok: true, maintenance: ctx.lobby.setMaintenance(minutes) });
       }
+      // ----- backups -----
+      if (method === 'GET' && url === '/api/admin/backups') {
+        return json(res, 200, { backups: await ctx.backups.list(), database: store.kind });
+      }
+      if (method === 'POST' && url === '/api/admin/backups') {
+        const b = await ctx.backups.make('manual');
+        await store.logAdmin(user.username, `made a backup (${b.summary.users} accounts)`);
+        return json(res, 200, { ok: true, backup: b });
+      }
+      const bm = url.match(/^\/api\/admin\/backups\/(\d+)\/(download|restore)$/);
+      const isUpload = method === 'POST' && url === '/api/admin/restore-upload';
+      if (bm && bm[2] === 'download' && method === 'GET') {
+        const data = await ctx.backups.read(bm[1]);
+        if (!data) return json(res, 404, { error: 'Backup not found' });
+        const name = `cardgames-backup-${String(data.at || '').slice(0, 16).replace(/[:T]/g, '-')}.json`;
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Disposition': `attachment; filename="${name}"`, 'Cache-Control': 'no-store' });
+        return res.end(JSON.stringify(data));
+      }
+      if ((bm && bm[2] === 'restore' && method === 'POST') || isUpload) {
+        const body = await readBody(req, isUpload ? 60 * 1024 * 1024 : 20000).catch((e) => ({ _err: e.message }));
+        if (body._err) return json(res, 400, { error: body._err === 'too large' ? 'The file is too large' : 'That file could not be read' });
+        if (body.confirm !== 'RESTORE') return json(res, 400, { error: 'Please confirm the restore' });
+        const seated = ctx.lobby.playerCount() + (ctx.goldrush._rounds ? ctx.goldrush._rounds.size : 0);
+        if (seated) return json(res, 409, { error: `${seated} player${seated === 1 ? ' is' : 's are'} still playing. Announce an update and wait until the tables are empty.` });
+        const data = isUpload ? body.backup : await ctx.backups.read(bm[1]);
+        if (!data) return json(res, 404, { error: 'Backup not found' });
+        let r;
+        try { r = await ctx.backups.restore(data); } catch (e) { console.error('restore failed', e); return json(res, 500, { error: `The restore failed, nothing was changed (${String(e.message).slice(0, 120)})` }); }
+        if (r.error) return json(res, 400, r);
+        // every login was cleared; keep the owner who did this signed in
+        const me = await store.getUserByName(user.username);
+        if (me) await store.createSession(bearer(req), me.id);
+        await store.logAdmin(user.username, `restored the backup from ${String(data.at || '?').slice(0, 16).replace('T', ' ')} (${r.summary.users} accounts)`);
+        console.log(`[admin] ${user.username} restored a backup from ${data.at}`);
+        return json(res, 200, { ...r, signedIn: !!me });
+      }
       if (method === 'GET' && url === '/api/admin/overview') {
         const since = dayString(now - 13 * 86400000);
         return json(res, 200, {
@@ -426,7 +487,7 @@ function createApi(ctx) {
         r.players = r.players.map((p) => ({ ...p, ...presence(p.id, p.last_seen), isOwner: ctx.owners.has(p.username.toLowerCase()) }));
         return json(res, 200, r);
       }
-      const pm = url.match(/^\/api\/admin\/players\/(\d+)(?:\/(ban|unban|adjust))?$/);
+      const pm = url.match(/^\/api\/admin\/players\/(\d+)(?:\/(ban|unban|adjust|password))?$/);
       if (pm) {
         const id = Number(pm[1]);
         const target = await store.getUser(id);
@@ -451,6 +512,15 @@ function createApi(ctx) {
           await ctx.lobby.kick(id, `Your account has been suspended${reason ? `: ${reason}` : ''}`);
           console.log(`[admin] ${user.username} banned ${target.username}${reason ? ` (${reason})` : ''}`);
           return json(res, 200, { ok: true });
+        }
+        if (pm[2] === 'password') {
+          if (ctx.owners.has(target.username.toLowerCase())) return json(res, 400, { error: 'Owner passwords can only be changed by the owner' });
+          const password = tempPassword();
+          await store.setPassword(id, hashPassword(password), true);
+          await store.deleteUserSessions(id);
+          await store.logAdmin(user.username, `set a temporary password for ${target.username}`);
+          console.log(`[admin] ${user.username} reset the password of ${target.username}`);
+          return json(res, 200, { ok: true, password });
         }
         if (pm[2] === 'unban') {
           await store.setBanned(id, false, null);

@@ -187,7 +187,7 @@
         form.querySelector('button').textContent = mode === 'login' ? 'Sign in' : 'Create my membership';
         form.p.autocomplete = mode === 'login' ? 'current-password' : 'new-password';
         form.querySelector('.fine').textContent = mode === 'login'
-          ? 'Forgotten your details? Send us a note via Feedback.'
+          ? 'Forgotten your password? Send the owner a note via Feedback with your name — you will get a temporary password.'
           : 'Members receive 5,000 chips and 200 coins, keep their winnings and appear on the leaderboard. 3–16 characters (letters incl. ä ö ü, numbers, spaces); password of 6+ characters.';
         form.querySelector('.merror').textContent = '';
       };
@@ -205,6 +205,39 @@
       };
     });
   }
+
+  // Change the password. "forced" after the owner set a temporary one.
+  function passwordModal(forced) {
+    openModal((card) => {
+      modalHead(card, 'Your account', forced ? 'Choose a new password' : 'Change your password');
+      if (forced) card.appendChild(h('p', 'modal-note', 'You signed in with a temporary password. Please choose your own now — only you will know it.'));
+      const form = h('form', 'mform');
+      form.innerHTML = `
+        ${forced ? '' : '<label>Current password<input name="c" type="password" maxlength="100" autocomplete="current-password" required></label>'}
+        <label>New password<input name="p" type="password" minlength="6" maxlength="100" autocomplete="new-password" required></label>
+        <label>Repeat the new password<input name="p2" type="password" minlength="6" maxlength="100" autocomplete="new-password" required></label>
+        <p class="merror" role="alert"></p>
+        <button class="btn btn-navy wide" type="submit">Save my new password</button>
+        <p class="fine">At least 6 characters. Other devices will be signed out.</p>
+        <input name="u" autocomplete="username" value="${esc(App.account ? App.account.username : '')}" hidden>`;
+      card.appendChild(form);
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        const err = form.querySelector('.merror');
+        if (form.p.value !== form.p2.value) { err.textContent = 'The two new passwords are not the same'; return; }
+        const r = await api('/api/me/password', { current: form.c ? form.c.value : '', password: form.p.value });
+        if (!r.ok) { err.textContent = r.data.error || 'Something went wrong'; return; }
+        if (App.account) App.account.mustChange = false;
+        modalOnClose = null;
+        closeModal();
+        toast('Your new password is saved.', { kind: 'good' });
+      };
+    }, forced ? {
+      // a temporary password must be replaced: re-open if closed early
+      onClose: () => { if (App.account && App.account.mustChange) setTimeout(() => passwordModal(true), 300); },
+    } : {});
+  }
+  App.passwordModal = passwordModal;
 
   function guestModal(tableId) {
     openModal((card) => {
@@ -231,7 +264,7 @@
     if (!App.session) { renderAccount(); return; }
     const r = await api('/api/me');
     if (r.ok) {
-      App.account = { username: r.data.username, isOwner: r.data.isOwner };
+      App.account = { username: r.data.username, isOwner: r.data.isOwner, mustChange: !!r.data.mustChange };
       App.seat = r.data.seat || null;   // still seated somewhere (e.g. on another device)?
       // The appearance saved on the account follows you to every device.
       if (r.data.theme && r.data.theme !== Theme.mode()) Theme.set(r.data.theme);
@@ -239,6 +272,7 @@
     else if (r.status === 401) { App.session = null; localStorage.removeItem('cg.session'); App.account = null; }
     renderAccount();
     if (App.account) { await loadWallet(); pollPresence(); loadQuestSummary(); }
+    if (App.account && App.account.mustChange) passwordModal(true);
   }
 
   function signedOut() {
@@ -1139,6 +1173,9 @@
       card.appendChild(body);
       const foot = h('div', 'lounge-foot');
       if (App.account.isOwner) foot.appendChild(h('a', 'btn btn-outline', 'Owner dashboard')).setAttribute('href', '/admin');
+      const pw = h('button', 'btn btn-outline', 'Change password');
+      pw.onclick = () => passwordModal(false);
+      foot.appendChild(pw);
       const out = h('button', 'btn btn-outline', 'Sign out');
       out.onclick = logout;
       foot.appendChild(out);

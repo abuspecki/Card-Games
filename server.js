@@ -12,6 +12,7 @@ const { makeCoins, rewardFor } = require('./coins');
 const { createGoldRush } = require('./goldrush');
 const { createErrorLog } = require('./errorlog');
 const { createQuests } = require('./quests');
+const { createBackups } = require('./backups');
 // Error monitoring first, so every console.error from here on is recorded.
 const errors = createErrorLog();
 errors.hookConsole();
@@ -43,6 +44,7 @@ ctx.lobby = createLobby(ctx);
 ctx.reward = (userId, result) => { const n = rewardFor(result); return n ? coins.earn(userId, n) : null; };
 ctx.goldrush = createGoldRush(ctx);
 ctx.quests = createQuests(ctx);
+ctx.backups = createBackups(ctx);
 const api = createApi(ctx);
 
 const SECURITY_HEADERS = {
@@ -183,6 +185,8 @@ openStore()
     // Chips left at tables by a crash go back to their owners.
     const refunded = await store.refundInPlay();
     if (refunded) console.log(`Refunded table chips for ${refunded} player(s) after a restart`);
+    // a full backup every day
+    ctx.backups.start();
     // One-time thank-you for the players interrupted by the Gold Rush update
     // (the old server could not pay the update bonus yet). Runs only once.
     if (await store.claimOnce('update-bonus-2026-11-17-goldrush')) {

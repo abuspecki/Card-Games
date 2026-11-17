@@ -211,3 +211,8 @@ html[data-theme="dark"] .owner-tools :is(textarea, input[type=number], select), 
 .alog { list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 14px; padding: 0; }
 .alog time { opacity: .6; font-size: 12px; }
 @media (max-width: 900px) { #activity { grid-template-columns: 1fr; } }
+
+/* temporary password */
+.pw-box { margin-top: 10px; padding: 12px 14px; border: 1px solid var(--gold, #C9A45C); border-radius: 12px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.pw-box code { font: 700 20px ui-monospace, Menlo, monospace; letter-spacing: .08em; padding: 4px 10px; border-radius: 8px; background: rgba(201, 164, 92, .15); user-select: all; }
+.pw-box small { flex-basis: 100%; opacity: .75; }

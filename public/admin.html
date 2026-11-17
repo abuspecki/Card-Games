@@ -23,6 +23,7 @@
       <button data-view="overview">Overview</button>
       <button data-view="players">Players</button>
       <button data-view="errors">Errors <span class="count hidden" id="errCount"></span></button>
+      <button data-view="backups">Backups</button>
     </nav>
     <div class="actions"><span class="who" id="who"></span><button class="theme-btn" onclick="Theme.toggle()" aria-label="Light or dark mode" title="Light / dark mode">◐</button><a class="btn btn-outline" href="/">Back to the club</a></div>
   </header>
@@ -42,6 +43,18 @@
         <div class="col-board"><h2>Erledigt <span id="cntDone"></span></h2><div id="colDone" class="cards"></div></div>
       </div>
       <p class="fine" id="tbFoot"></p>
+    </section>
+
+    <section data-section="backups" class="hidden">
+      <div class="admin-head"><div><p class="eyebrow">Der Tresor</p><h1>Backups</h1>
+        <p class="sub">Eine Sicherung aller Daten – Konten, Chips, Münzen, Shop-Sachen, Freunde, Statistiken, Feedback. Jeden Tag wird automatisch eine gemacht; die letzten 7 bleiben. Lade ab und zu eine herunter und heb sie auf deinem Gerät auf – dann ist sie auch sicher, wenn die Datenbank selbst kaputtgeht.</p></div>
+        <div class="row-gap"><button class="btn btn-navy" id="bkMake">Jetzt sichern</button></div></div>
+      <div class="panel"><div id="bkList"></div></div>
+      <div class="panel">
+        <h2>Aus einer Datei wiederherstellen</h2>
+        <p class="sub">Für den Notfall: eine heruntergeladene Backup-Datei (.json) zurückspielen. Geht nur, wenn niemand spielt – kündige vorher ein Update an. Vorher wird automatisch eine Sicherung vom jetzigen Stand gemacht.</p>
+        <div class="row-gap"><input type="file" id="bkFile" accept=".json,application/json"><button class="btn btn-outline" id="bkUpload">Datei zurückspielen</button></div>
+      </div>
     </section>
 
     <section data-section="overview" class="hidden">

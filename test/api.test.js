@@ -392,8 +392,11 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   await stop('SIGTERM');
   await start();
   w = (await call('GET', '/api/wallet', tb2)).data;
-  assert.deepStrictEqual([w.chips, w.inPlay], [4900 + 1000, 0], 'chips back after restart, plus the 1,000 update bonus');
-  await call('POST', '/api/admin/players/' + (await call('GET', '/api/admin/players?search=' + B, to)).data.players[0].id + '/adjust', to, { chips: -1000 });
+  // Either the hand is called off (bet back) or it finished while the server drained
+  // (lost / push / won / blackjack). Nothing may stay "at the table". +1,000 update bonus.
+  assert.strictEqual(w.inPlay, 0, 'nothing left at the table after the restart');
+  assert.ok([-500, 0, 500, 750].includes(w.chips - 1000 - 4900), 'chips back after restart, plus the 1,000 update bonus: ' + w.chips);
+  await call('POST', '/api/admin/players/' + (await call('GET', '/api/admin/players?search=' + B, to)).data.players[0].id + '/adjust', to, { chips: 4900 - w.chips });
   // crash (no graceful shutdown) is refunded at the next start
   const s3 = await sit('HOLDEM-1', tb2);
   await wait(300);

@@ -28,6 +28,9 @@ function checkPassword(password, stored) {
 
 const WALLET_FIELDS = ['coins', 'chips', 'in_play', 'last_daily', 'streak', 'last_refill', 'last_bankrupt',
   'earned_day', 'earned_today', 'converted_day', 'converted_today'];
+// Restore order: parents before the tables that point at them.
+const BACKUP_TABLES = ['users', 'stats', 'wallets', 'user_items', 'equipped', 'friends', 'feedback', 'activity',
+  'tasks', 'task_notes', 'dev_keys', 'meta', 'hand_log', 'quests', 'admin_log', 'error_log'];
 const pair = (x, y) => (x < y ? [x, y] : [y, x]);
 
 // ---------- Postgres backend ----------
@@ -153,6 +156,59 @@ function postgresStore(url) {
       await q(`CREATE TABLE IF NOT EXISTS error_log (
         key TEXT PRIMARY KEY, source TEXT NOT NULL, message TEXT NOT NULL, stack TEXT, context TEXT,
         count INTEGER NOT NULL DEFAULT 1, first_at BIGINT NOT NULL, last_at BIGINT NOT NULL)`);
+      await q('ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change BOOLEAN NOT NULL DEFAULT false');
+      await q(`CREATE TABLE IF NOT EXISTS backups (
+        id BIGSERIAL PRIMARY KEY, kind TEXT NOT NULL, at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        size INTEGER NOT NULL, summary JSONB, data BYTEA NOT NULL)`);
+    },
+
+    // ----- backups: every table except sessions (and the backups themselves) -----
+    async dump() {
+      const tables = {};
+      for (const t of BACKUP_TABLES) tables[t] = (await q(`SELECT * FROM ${t}`)).rows;
+      return { app: 'cardgames', version: 1, kind: 'postgres', at: new Date().toISOString(), tables };
+    },
+    async restore(data) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(`TRUNCATE ${['sessions', ...BACKUP_TABLES].join(', ')} RESTART IDENTITY CASCADE`);
+        for (const t of BACKUP_TABLES) {
+          const rows = data.tables[t] || [];
+          const cols = (await client.query('SELECT column_name, column_default FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1', [t])).rows;
+          const known = new Set(cols.map((c) => c.column_name));
+          const present = new Set();
+          for (const r of rows) for (const k of Object.keys(r)) if (known.has(k)) present.add(k);
+          const list = [...present].map((c) => `"${c}"`).join(', ');
+          for (let i = 0; rows.length && i < rows.length; i += 1000) {
+            await client.query(`INSERT INTO ${t} (${list}) SELECT ${list} FROM json_populate_recordset(NULL::${t}, $1::json)`, [JSON.stringify(rows.slice(i, i + 1000))]);
+          }
+          for (const c of cols.filter((x) => /^nextval/.test(x.column_default || ''))) {
+            await client.query(`SELECT setval(pg_get_serial_sequence('${t}', '${c.column_name}'), COALESCE((SELECT MAX("${c.column_name}") FROM ${t}), 1), (SELECT MAX("${c.column_name}") FROM ${t}) IS NOT NULL)`);
+          }
+        }
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw e;
+      } finally { client.release(); }
+    },
+    async saveBackup({ kind, size, summary, gz }) {
+      const r = await q('INSERT INTO backups (kind, size, summary, data) VALUES ($1, $2, $3, $4) RETURNING id', [kind, size, JSON.stringify(summary), gz]);
+      return String(r.rows[0].id);
+    },
+    async listBackups() {
+      return (await q('SELECT id::text AS id, kind, at, size, summary FROM backups ORDER BY id DESC')).rows;
+    },
+    async getBackup(id) {
+      const r = await q('SELECT data FROM backups WHERE id = $1', [Number(id) || 0]);
+      return r.rows[0] ? r.rows[0].data : null;
+    },
+    async deleteBackup(id) { await q('DELETE FROM backups WHERE id = $1', [Number(id) || 0]); },
+
+    // ----- passwords -----
+    async setPassword(userId, pass, mustChange) {
+      await q('UPDATE users SET pass = $2, must_change = $3 WHERE id = $1', [userId, pass, !!mustChange]);
     },
 
     // ----- error monitoring -----
@@ -184,7 +240,7 @@ function postgresStore(url) {
       return r.rows[0] || null;
     },
     async getUserByName(username) {
-      const r = await q('SELECT id, username, pass, banned, ban_reason FROM users WHERE username_key = $1', [String(username).toLowerCase()]);
+      const r = await q('SELECT id, username, pass, banned, ban_reason, must_change FROM users WHERE username_key = $1', [String(username).toLowerCase()]);
       return r.rows[0] || null;
     },
     async getUser(id) {
@@ -193,7 +249,7 @@ function postgresStore(url) {
     },
     async createSession(token, userId) { await q('INSERT INTO sessions (token, user_id) VALUES ($1, $2)', [token, userId]); },
     async getUserBySession(token) {
-      const r = await q('SELECT u.id, u.username FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = $1 AND NOT u.banned', [token]);
+      const r = await q('SELECT u.id, u.username, u.must_change FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = $1 AND NOT u.banned', [token]);
       return r.rows[0] || null;
     },
     async deleteSession(token) { await q('DELETE FROM sessions WHERE token = $1', [token]); },
@@ -392,6 +448,8 @@ function fileStore(file) {
     saveTimer = setTimeout(writeNow, 200);
   };
   const statKey = (id, mode) => `${id}:${mode}`;
+  const backupDir = path.join(path.dirname(file), `${path.basename(file, '.json')}-backups`);
+  let seq = 0;
   const userById = (id) => db.users.find((u) => u.id === id);
   const freshWallet = (init) => ({ coins: init.coins, chips: init.chips, in_play: 0, last_daily: null, streak: 0, last_refill: 0,
     last_bankrupt: 0, earned_day: null, earned_today: 0, converted_day: null, converted_today: 0 });
@@ -429,7 +487,7 @@ function fileStore(file) {
     async createSession(token, userId) { db.sessions[token] = userId; save(); },
     async getUserBySession(token) {
       const u = userById(db.sessions[token]);
-      return u && !u.banned ? { id: u.id, username: u.username } : null;
+      return u && !u.banned ? { id: u.id, username: u.username, must_change: !!u.must_change } : null;
     },
     async deleteSession(token) { delete db.sessions[token]; save(); },
     async deleteUserSessions(userId) {
@@ -437,6 +495,40 @@ function fileStore(file) {
       save();
     },
     async touchUser(userId, now) { const u = userById(userId); if (u) { u.last_seen = now; save(); } },
+    async setPassword(userId, pass, mustChange) { const u = userById(userId); if (u) { u.pass = pass; u.must_change = !!mustChange; save(); } },
+
+    // ----- backups: the whole file except sessions, kept as .json.gz next to it -----
+    async dump() {
+      const copy = JSON.parse(JSON.stringify(db));
+      copy.sessions = {};
+      return { app: 'cardgames', version: 1, kind: 'file', at: new Date().toISOString(), tables: { file: copy } };
+    },
+    async restore(data) {
+      const next = JSON.parse(JSON.stringify(data.tables.file));
+      db = { ...db, ...next, sessions: {} };
+      writeNow();
+    },
+    async saveBackup({ kind, size, summary, gz }) {
+      fs.mkdirSync(backupDir, { recursive: true });
+      const id = String(Date.now() + (seq++ % 1000));
+      fs.writeFileSync(path.join(backupDir, `${id}.json.gz`), gz);
+      fs.writeFileSync(path.join(backupDir, `${id}.meta.json`), JSON.stringify({ id, kind, at: new Date().toISOString(), size, summary }));
+      return id;
+    },
+    async listBackups() {
+      let names = [];
+      try { names = fs.readdirSync(backupDir).filter((n) => n.endsWith('.meta.json')); } catch { return []; }
+      return names.map((n) => { try { return JSON.parse(fs.readFileSync(path.join(backupDir, n), 'utf8')); } catch { return null; } })
+        .filter(Boolean).sort((a, b) => Number(b.id) - Number(a.id));
+    },
+    async getBackup(id) {
+      if (!/^\d+$/.test(String(id))) return null;
+      try { return fs.readFileSync(path.join(backupDir, `${id}.json.gz`)); } catch { return null; }
+    },
+    async deleteBackup(id) {
+      if (!/^\d+$/.test(String(id))) return;
+      for (const n of [`${id}.json.gz`, `${id}.meta.json`]) { try { fs.unlinkSync(path.join(backupDir, n)); } catch {} }
+    },
     async setBanned(userId, banned, reason) {
       const u = userById(userId);
       if (u) { u.banned = banned; u.ban_reason = banned ? reason || null : null; save(); }
@@ -639,4 +731,4 @@ async function openStore() {
   }
 }
 
-module.exports = { openStore, hashPassword, checkPassword, MODES, FEEDBACK_CATEGORIES, FEEDBACK_STATUSES, safeError };
+module.exports = { BACKUP_TABLES, openStore, hashPassword, checkPassword, MODES, FEEDBACK_CATEGORIES, FEEDBACK_STATUSES, safeError };
