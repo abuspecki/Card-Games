@@ -54,6 +54,8 @@
   function chip(value, opts = {}) {
     const el = document.createElement('div');
     el.className = 'chip v' + value;
+    const set = opts.set !== undefined ? opts.set : window.CardUI.chipSet; // chip set bought in the shop
+    if (set) el.classList.add('cs-' + set);
     el.dataset.v = value;
     if (opts.size) el.style.setProperty('--s', opts.size + 'px');
     el.setAttribute('aria-hidden', 'true');
@@ -118,5 +120,5 @@
     return el;
   }
 
-  window.CardUI = { card, back, chip, chipsFor, fitStage, emit, fmt, place, suitSvg, fromCode, nameOf, rankOf, suitOf, SUIT_NAMES, RANK_NAMES, backOverride: null };
+  window.CardUI = { card, back, chip, chipsFor, fitStage, emit, fmt, place, suitSvg, fromCode, nameOf, rankOf, suitOf, SUIT_NAMES, RANK_NAMES, backOverride: null, chipSet: null };
 })();

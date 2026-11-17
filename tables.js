@@ -5,7 +5,7 @@ const { Table } = require('./poker');
 const bots = require('./bots');
 const { Blackjack } = require('./games/blackjack');
 const { Durak } = require('./games/durak');
-const { rewardFor, dayString } = require('./coins');
+const { rewardFor, dayString, GESTURE_COOLDOWN } = require('./coins');
 
 const GAMES = {
   holdem: { name: "Texas Hold'em", make: (settings) => new Table({ ...settings, variant: 'holdem', rotate: false }) },
@@ -365,6 +365,15 @@ function createLobby(ctx) {
           t.addLog(`${me.name} rebuys for ${me.chips}`);
           broadcast(room, { t: 'sfx', name: 'chips' });
           break;
+        }
+        case 'gesture': {
+          // Only members who own the gesture; one every few seconds.
+          if (!me.accountId || Date.now() - (me.lastGesture || 0) < GESTURE_COOLDOWN) return;
+          const g = await ctx.coins().gestureOf(me.accountId, String(m.item || '')).catch(() => null);
+          if (!g) return send(ws, { t: 'error', msg: 'You don\'t own that gesture — find it in the Shop' });
+          me.lastGesture = Date.now();
+          broadcast(room, { t: 'gesture', seat: t.seatOf(pid), name: me.name, text: g.preview });
+          return;
         }
         case 'chat':
           if (String(m.text || '').trim()) {

@@ -99,15 +99,33 @@ const C = require('../coins');
   // ----- shop -----
   const s = await newUser('shopper');
   await coins.adjust(s, 2000, 0);
-  r = await coins.buy(s, 'avatar-lion');
-  assert.strictEqual(r.coins, C.WELCOME_COINS + 2000 - 400);
-  assert((await coins.buy(s, 'avatar-lion')).error, 'no double buy');
+  r = await coins.buy(s, 'pf-crest');
+  assert.strictEqual(r.coins, C.WELCOME_COINS + 2000 - 450);
+  assert((await coins.buy(s, 'pf-crest')).error, 'no double buy');
   const dup = await Promise.all([coins.buy(s, 'bg-marble'), coins.buy(s, 'bg-marble'), coins.buy(s, 'bg-marble')]);
   assert.strictEqual(dup.filter((x) => x.item).length, 1, 'concurrent double buy prevented');
-  assert((await coins.equip(s, 'badge', 'badge-diamond')).error, 'cannot equip unowned');
-  assert((await coins.equip(s, 'felt', 'avatar-lion')).error, 'wrong slot');
-  assert.ok((await coins.equip(s, 'avatar', 'avatar-lion')).ok);
-  assert.deepStrictEqual(await coins.lookOf(s), { avatar: '🦁', badge: null });
+  assert((await coins.equip(s, 'badge', 'title-duke')).error, 'cannot equip unowned');
+  assert((await coins.equip(s, 'felt', 'pf-crest')).error, 'wrong slot');
+  assert.ok((await coins.equip(s, 'avatar', 'pf-crest')).ok);
+  assert.ok((await coins.buy(s, 'title-baron')).item);
+  assert.ok((await coins.equip(s, 'badge', 'title-baron')).ok);
+  assert.deepStrictEqual(await coins.lookOf(s), { avatar: 'pf:crest', badge: 't:Baron' });
+  // retired items can't be bought any more…
+  assert((await coins.buy(s, 'avatar-lion')).error, 'retired items are not sold');
+  // …but players who own one keep it and can still use it
+  await store.updateWallet(s, { coins: 0, chips: 0 }, () => ({ addItem: 'avatar-lion', result: true }));
+  assert.ok((await coins.equip(s, 'avatar', 'avatar-lion')).ok, 'owned retired item still usable');
+  assert.strictEqual((await coins.lookOf(s)).avatar, '🦁');
+  // gestures: only owned ones can be used, and they can't be equipped
+  assert.strictEqual(await coins.gestureOf(s, 'gesture-hat'), null);
+  assert.ok((await coins.buy(s, 'gesture-hat')).item);
+  assert.strictEqual((await coins.gestureOf(s, 'gesture-hat')).preview, 'tips the hat');
+  assert.strictEqual(await coins.gestureOf(s, 'pf-crest'), null, 'only gestures');
+  assert((await coins.equip(s, 'gesture', 'gesture-hat')).error, 'gestures are not a slot');
+  // every item has a unique id and a known slot
+  assert.strictEqual(new Set(C.CATALOG.map((i) => i.id)).size, C.CATALOG.length, 'unique ids');
+  assert(C.CATALOG.every((i) => C.SHOP_TABS.includes(i.slot)), 'every item belongs to a shop tab');
+  assert(C.SHOP_TABS.every((slot) => C.CATALOG.some((i) => i.slot === slot && !i.retired)), 'every tab has items for sale');
   assert((await coins.buy(s, 'nope')).error);
   assert(C.SLOTS.every((slot) => C.CATALOG.some((i) => i.slot === slot)), 'every slot has items');
 
