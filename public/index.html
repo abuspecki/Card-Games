@@ -19,9 +19,9 @@
   <link rel="stylesheet" href="css/roulette.css">
   <link rel="stylesheet" href="css/flamingo.css">
   <link rel="stylesheet" href="css/app.css">
-  <link rel="stylesheet" href="css/vegas.css">
+  <link rel="stylesheet" href="css/modern.css">
 </head>
-<body class="hub">
+<body class="hub app">
 
   <!-- ================= HUB ================= -->
   <div id="hub">
@@ -65,50 +65,42 @@
       <div class="appearance" role="group" aria-label="Appearance"><span>Appearance</span>
         <button data-set-theme="light">Light</button><button data-set-theme="dark">Dark</button><button data-set-theme="system">Automatic</button></div>
     </div>
-    <div class="double-rule" aria-hidden="true"></div>
+    <main class="app-main" id="top">
+      <section class="member-bar hidden" id="memberBar" aria-label="Your account"></section>
 
-    <section class="member-bar hidden" id="memberBar" aria-label="Your evening"></section>
+      <section class="welcome guest-only">
+        <h1>Card games with your friends</h1>
+        <p>Poker, Blackjack, Durak, Roulette and Flamingo — free, with play money.</p>
+        <div class="welcome-cta"><a class="btn btn-gold" href="#" data-open="register">Join free</a><a class="btn btn-ghost" href="#rooms">Play as guest</a></div>
+      </section>
 
-    <section class="hero" id="top">
-      <div class="hero-fx" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="marquee">
-        <div class="bulbs" aria-hidden="true"></div>
-        <p class="eyebrow">★ Live card room ★</p>
-        <h1><span class="shine">CardGames</span></h1>
-        <p class="lede">Poker · Blackjack · Durak · Roulette · Flamingo</p>
-      </div>
-      <div class="cta-row">
-        <a class="btn btn-gold" href="#rooms">Play now</a>
-        <button class="btn btn-ghost" data-open="howto">How to play</button>
-      </div>
-      <p class="online-pill" id="onlineLine">&nbsp;</p>
-      <div class="trio" id="trio" aria-hidden="true"></div>
-    </section>
+      <section class="rooms" id="rooms">
+        <header class="games-head">
+          <h2>Games</h2>
+          <p class="online-pill" id="onlineLine">&nbsp;</p>
+        </header>
+        <p class="lobby-error" id="lobbyError" role="alert"></p>
+        <div class="room-grid" id="roomGrid"></div>
+      </section>
 
-    <section class="rooms" id="rooms">
-      <header class="section-head">
-        <h2>Pick your game</h2>
-      </header>
-      <p class="lobby-error" id="lobbyError" role="alert"></p>
-      <div class="room-grid" id="roomGrid"></div>
-    </section>
-
-    <section class="perks" id="rules">
-      <div class="perk"><b>♠ Fair deal</b><span>Shuffled by the house, every hand</span></div>
-      <div class="perk"><b>◉ Play money</b><span>Chips to play, coins as rewards</span></div>
-      <div class="perk"><b>♥ Friends &amp; bots</b><span>Invite friends or fill seats with bots</span></div>
-    </section>
-
-    <footer class="footer">
-      <a class="brand" href="#top"><span class="crest">CG</span><span class="wordmark">CardGames</span></a>
-      <nav class="footer-links">
+      <footer class="app-foot">
         <a href="#" data-open="howto">How to play</a>
         <a href="#" data-open="leaderboard">Ranks</a>
         <a href="#" data-open="feedback">Feedback</a>
         <a href="/admin" class="owner-only hidden">Owner dashboard</a>
-      </nav>
-      <small>Play money only — play responsibly. © 2026</small>
-    </footer>
+        <span>Play money only.</span>
+      </footer>
+    </main>
+
+    <!-- phones: app tab bar -->
+    <nav class="tabbar" aria-label="Main">
+      <a href="#rooms" class="tab on"><i>♠</i><span>Games</span></a>
+      <a href="#" class="tab" data-open="shop"><i>◆</i><span>Shop</span></a>
+      <a href="#" class="tab" data-open="bank"><i>◉</i><span>Bank</span></a>
+      <a href="#" class="tab" data-open="friends"><i>♥</i><span>Friends</span></a>
+      <a href="#" class="tab member-only" data-open="lounge"><i>☺</i><span>Me</span></a>
+      <a href="#" class="tab guest-only" data-open="signin"><i>☺</i><span>Sign in</span></a>
+    </nav>
   </div>
 
   <!-- ================= TABLE ================= -->

@@ -329,6 +329,7 @@
   // ================= HUB: rooms & tables =================
   function buildTrio() {
     const trio = $('trio');
+    if (!trio) return;
     [['holdem', -16], ['durak', 16], ['blackjack', 0]].forEach(([theme, deg]) => {
       const b = CardUI.back(theme, { size: 150, noOverride: true });
       b.style.setProperty('--rot', deg + 'deg');
