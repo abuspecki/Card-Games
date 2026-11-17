@@ -391,7 +391,11 @@ function createApi(ctx) {
 
   // Who may use the task board: an owner (session) or a developer key.
   async function taskActor(req) {
-    const key = String(req.headers['x-dev-key'] || '');
+    // Accept the key as "X-Dev-Key: cgk_…", with an optional "Bearer " prefix,
+    // or as "Authorization: Bearer cgk_…".
+    const auth = String(req.headers.authorization || '');
+    let key = String(req.headers['x-dev-key'] || '').trim().replace(/^bearer\s+/i, '');
+    if (!key && /^bearer\s+cgk_/i.test(auth)) key = auth.replace(/^bearer\s+/i, '').trim();
     if (key) {
       if (key.length > 200) return null;
       const k = await ctx.store().findDevKey(hashKey(key));
