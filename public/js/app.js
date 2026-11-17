@@ -731,7 +731,7 @@
       <button class="lobby-link" data-act="lobby"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg><span>Lobby</span></button>
       <div class="tb-center"><small>${esc(game === 'durak' ? 'Durak' : title)} · ${esc(room)}</small><strong data-tb-title></strong></div>
       <div class="tb-right"><span class="turn-clock hidden" data-turn-clock aria-live="polite"></span><span data-topbar-wallet></span>
-        <button class="tb-btn" data-act="gesture" title="Gestures" aria-label="Gestures"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v11H7z M3 15h18v2.5H3z"/></svg></button>
+        <button class="tb-btn tb-react" data-act="gesture" title="Quick chat & gestures" aria-label="Quick chat and gestures">💬</button>
         <button class="tb-btn" data-act="rules" title="How to play" aria-label="How to play">?</button>
         <button class="tb-btn" data-act="panel" title="Chat & table" aria-label="Open chat and table panel">☰<span class="dot hidden" data-chat-dot></span></button></div>`;
     tb.querySelector('[data-act=lobby]').onclick = leaveTable;
@@ -740,20 +740,33 @@
     tb.querySelector('[data-act=panel]').onclick = () => setDrawer(!$('drawer').classList.contains('open'));
   }
 
-  // Gestures: a small menu of the gestures you own.
+  // Quick chat: emojis and ready-made phrases (no typing on phones), plus your gestures.
+  const QUICK_EMOJI = ['👍', '😂', '😮', '😎', '🔥', '🎉', '😅', '🙏', '😡', '🍀'];
+  const QUICK_TEXT = ['Good luck all!', 'Nice hand!', 'Well played', 'Unlucky…', 'Your turn 🙂', 'One more round?', 'GG', 'Thanks!'];
+  let lastQuick = 0;
+  function quickSend(text) {
+    if (Date.now() - lastQuick < 1200) return;      // a small pause between messages
+    lastQuick = Date.now();
+    send({ t: 'chat', text });
+  }
   function toggleGestureMenu() {
     const old = document.querySelector('.gesture-menu');
     if (old) { old.remove(); return; }
-    const menu = h('div', 'gesture-menu');
+    const menu = h('div', 'gesture-menu quick-menu');
+    const emo = h('div', 'quick-emoji');
+    QUICK_EMOJI.forEach((e) => { const b = h('button', '', e); b.setAttribute('aria-label', 'Send ' + e); b.onclick = () => { quickSend(e); menu.remove(); }; emo.appendChild(b); });
+    menu.appendChild(emo);
+    const txt = h('div', 'quick-text');
+    QUICK_TEXT.forEach((t) => { const b = h('button', '', esc(t)); b.onclick = () => { quickSend(t); menu.remove(); }; txt.appendChild(b); });
+    menu.appendChild(txt);
     const owned = App.account && App.wallet && App.shop ? App.shop.items.filter((i) => i.slot === 'gesture' && App.wallet.owned.includes(i.id)) : [];
-    if (!App.account) menu.appendChild(h('p', '', 'Gestures are for members. Sign in to use them.'));
+    menu.appendChild(h('small', '', 'Gestures'));
+    if (!App.account) menu.appendChild(h('p', '', 'Gestures are for members.'));
     else if (!owned.length) {
-      menu.appendChild(h('p', '', 'You have no gestures yet.'));
-      const b = h('button', 'pill gold', 'Visit the Shop');
+      const b = h('button', 'pill gold', 'Get gestures in the Shop');
       b.onclick = () => { menu.remove(); shopSlot = 'gesture'; openLounge('shop'); };
       menu.appendChild(b);
     } else {
-      menu.appendChild(h('small', '', 'Gestures'));
       for (const g of owned) {
         const b = h('button', '', `<b>${esc(g.name)}</b><em>${esc(g.preview)}</em>`);
         b.onclick = () => { send({ t: 'gesture', item: g.id }); menu.remove(); };

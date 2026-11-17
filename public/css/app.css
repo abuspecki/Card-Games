@@ -894,3 +894,18 @@ body.spectating .tbar .tb-center small::after { content: ' · 👁 watching'; co
 .maint-bar { position: fixed; left: 50%; top: 10px; transform: translateX(-50%); z-index: 300; max-width: 92vw; padding: 8px 16px; border-radius: 999px; white-space: nowrap;
   background: #F2C14E; color: #231A02; font: 600 14px/1.35 'Montserrat', system-ui, sans-serif; box-shadow: 0 10px 30px rgba(0, 0, 0, .45); text-align: center; pointer-events: none; }
 @media (max-width: 760px) { .maint-bar { top: auto; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); font-size: 13px; } body.game .maint-bar { bottom: auto; top: 6px; } }
+
+/* ================= QUICK CHAT ================= */
+.tb-react { font-size: 18px !important; }
+.quick-menu { width: min(320px, calc(100vw - 16px)); gap: 8px; }
+.quick-emoji { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.quick-emoji button { font-size: 24px; padding: 6px 0; border-radius: 10px; }
+.quick-emoji button:hover, .quick-emoji button:active { background: rgba(255,255,255,.1); }
+.quick-text { display: flex; flex-wrap: wrap; gap: 6px; }
+.quick-text button { flex: 1 1 auto; padding: 8px 10px; border-radius: 999px; border: 1px solid rgba(232,196,104,.45); font: 600 13px 'Montserrat', system-ui, sans-serif; white-space: nowrap; }
+.quick-text button:hover, .quick-text button:active { background: rgba(232,196,104,.15); }
+body.spectating [data-act=gesture] { display: none !important; }
+.gesture-menu.quick-menu { background: #0F1E17 !important; color: #F1F4F0; border: 1px solid rgba(232,196,104,.4); border-radius: 18px; box-shadow: 0 20px 50px rgba(0,0,0,.6); opacity: 1; backdrop-filter: none; }
+.quick-menu small { color: #E8C468; }
+.quick-menu .quick-text button { color: #F1F4F0; }
+.quick-menu .pill.gold { background: #F2C14E; color: #231A02; font: 700 14px 'Montserrat', system-ui, sans-serif; border-radius: 12px; }

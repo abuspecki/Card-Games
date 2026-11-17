@@ -474,6 +474,9 @@ function createLobby(ctx) {
           return;
         }
         case 'chat':
+          // at most one message per second per player
+          if (Date.now() - (me.lastChat || 0) < 1000) return;
+          me.lastChat = Date.now();
           if (String(m.text || '').trim()) {
             t.addChat(t.seatOf(pid), me.name, String(m.text).trim());
             broadcast(room, { t: 'sfx', name: 'chat' });
