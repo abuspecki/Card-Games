@@ -532,7 +532,7 @@ function createLobby(ctx) {
     for (const room of rooms.values()) {
       const t = room.table;
       const running = t.isPlaying();
-      broadcast(room, { t: 'notice', msg: 'The server is restarting for an update — your chips are safe in your bankroll. Rejoin in a moment.' });
+      broadcast(room, { t: 'notice', msg: 'The server is restarting for an update — your chips are safe in your bankroll, plus 1,000 bonus chips for the interruption. Rejoin in a moment.' });
       for (const s of t.seats) {
         if (!s) continue;
         const chips = running && s.inHand && Number.isFinite(s.startChips) && s.startChips > 0 ? s.startChips : s.chips;
@@ -542,6 +542,13 @@ function createLobby(ctx) {
       }
     }
     await Promise.all(jobs);
+  }
+
+  // Members sitting at any table right now (for the update bonus).
+  function seatedAccounts() {
+    const ids = new Set();
+    for (const room of rooms.values()) for (const s of room.table.seats) if (s && !s.isBot && s.accountId) ids.add(s.accountId);
+    return [...ids];
   }
 
   function liveStats() {
@@ -555,7 +562,7 @@ function createLobby(ctx) {
     return { humans, bots: botsN, tablesPlaying: playing, tables: [...rooms.values()].map(tableSummary) };
   }
 
-  return { rooms, tableSummary, handleConnection, locate, leaveBy, refreshLook, kick, cashOutAll, liveStats, GAMES };
+  return { rooms, tableSummary, handleConnection, locate, leaveBy, seatedAccounts, refreshLook, kick, cashOutAll, liveStats, GAMES };
 }
 
 module.exports = { createLobby, TABLES, GAMES };

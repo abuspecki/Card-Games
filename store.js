@@ -43,6 +43,7 @@ function postgresStore(url) {
 
   return {
     kind: 'postgres',
+    flush() {},
     async init() {
       await q(`CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -141,6 +142,13 @@ function postgresStore(url) {
         created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         last_used TIMESTAMPTZ,
         revoked BOOLEAN NOT NULL DEFAULT false)`);
+      await q(`CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT, at TIMESTAMPTZ NOT NULL DEFAULT now())`);
+    },
+
+    // ----- one-time jobs: returns true the first time a key is claimed -----
+    async claimOnce(key) {
+      const r = await q('INSERT INTO meta (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING RETURNING key', [key, 'done']);
+      return r.rowCount === 1;
     },
 
     // ----- users & sessions -----
@@ -332,13 +340,16 @@ function postgresStore(url) {
 function fileStore(file) {
   let db = null;
   let saveTimer = null;
+  const writeNow = () => {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file + '.tmp', JSON.stringify(db));
+    fs.renameSync(file + '.tmp', file);
+  };
   const save = () => {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(file + '.tmp', JSON.stringify(db));
-      fs.renameSync(file + '.tmp', file);
-    }, 200);
+    saveTimer = setTimeout(writeNow, 200);
   };
   const statKey = (id, mode) => `${id}:${mode}`;
   const userById = (id) => db.users.find((u) => u.id === id);
@@ -347,6 +358,7 @@ function fileStore(file) {
 
   return {
     kind: 'file',
+    flush() { if (db) writeNow(); },
     async init() {
       try { db = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { db = null; }
       db = { nextId: 1, users: [], sessions: {}, stats: {}, wallets: {}, items: {}, equipped: {},
@@ -423,6 +435,13 @@ function fileStore(file) {
       }
       save();
       return out.result;
+    },
+    async claimOnce(key) {
+      db.meta = db.meta || {};
+      if (db.meta[key]) return false;
+      db.meta[key] = Date.now();
+      save();
+      return true;
     },
     async refundInPlay() {
       let n = 0;

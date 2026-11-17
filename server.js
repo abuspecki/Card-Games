@@ -10,6 +10,7 @@ const { WebSocketServer } = require('ws');
 const { openStore } = require('./store');
 const { makeCoins, rewardFor } = require('./coins');
 const { createGoldRush } = require('./goldrush');
+const UPDATE_BONUS = 1000; // chips for every member who is playing when the server restarts
 const { createLobby } = require('./tables');
 const { createApi } = require('./api');
 
@@ -131,7 +132,17 @@ async function shutdown(signal) {
   if (stopping) return;
   stopping = true;
   console.log(`${signal}: returning table chips to bankrolls…`);
-  try { if (coins) await Promise.race([Promise.all([ctx.lobby.cashOutAll(), ctx.goldrush.cashOutAll()]), new Promise((r) => setTimeout(r, 8000))]); } catch (e) { console.error(e); }
+  try {
+    if (coins) {
+      // Everyone playing right now gets a thank-you for the interruption.
+      const playing = new Set([...ctx.lobby.seatedAccounts(), ...ctx.goldrush._rounds.keys()]);
+      const work = Promise.all([ctx.lobby.cashOutAll(), ctx.goldrush.cashOutAll()])
+        .then(() => Promise.all([...playing].map((id) => coins.adjust(id, 0, UPDATE_BONUS).catch((e) => console.error('update bonus', e)))))
+        .then(() => console.log(`Update bonus: ${UPDATE_BONUS} chips for ${playing.size} player(s)`));
+      await Promise.race([work, new Promise((r) => setTimeout(r, 8000))]);
+    }
+  } catch (e) { console.error(e); }
+  try { if (store && store.flush) store.flush(); } catch (e) { console.error('flush', e); }
   process.exit(0);
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));
@@ -146,6 +157,14 @@ openStore()
     // Chips left at tables by a crash go back to their owners.
     const refunded = await store.refundInPlay();
     if (refunded) console.log(`Refunded table chips for ${refunded} player(s) after a restart`);
+    // One-time thank-you for the players interrupted by the Gold Rush update
+    // (the old server could not pay the update bonus yet). Runs only once.
+    if (await store.claimOnce('update-bonus-2026-11-17-goldrush')) {
+      for (const name of ['Eule_Mit_Keule', 'Flöti']) {
+        const u = await store.getUserByName(name);
+        if (u) { await coins.adjust(u.id, 0, UPDATE_BONUS); console.log(`Update bonus: ${UPDATE_BONUS} chips for ${u.username}`); }
+      }
+    }
   })
   .catch((e) => console.error('Storage error:', e.message))
   .finally(() => server.listen(PORT, () => {

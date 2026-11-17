@@ -297,7 +297,8 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   await stop('SIGTERM');
   await start();
   w = (await call('GET', '/api/wallet', tb2)).data;
-  assert.deepStrictEqual([w.chips, w.inPlay], [4900, 0], 'chips back after restart');
+  assert.deepStrictEqual([w.chips, w.inPlay], [4900 + 1000, 0], 'chips back after restart, plus the 1,000 update bonus');
+  await call('POST', '/api/admin/players/' + (await call('GET', '/api/admin/players?search=' + B, to)).data.players[0].id + '/adjust', to, { chips: -1000 });
   // crash (no graceful shutdown) is refunded at the next start
   const s3 = await sit('HOLDEM-1', tb2);
   await wait(300);
