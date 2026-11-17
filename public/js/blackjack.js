@@ -7,7 +7,7 @@
 
   const L = {
     land: { W: 1440, H: 780, table: [100, 0, 1240, 660], dealerY: 66, dealer: 84, showsY: 194, printY: 232, arc: [620, 150, 540, 420], cards: 70, circle: 70, pays: true },
-    port: { W: 440, H: 760, table: [0, 0, 440, 720], dealerY: 40, dealer: 56, showsY: 128, printY: 160, arc: [220, 300, 178, 300], cards: 44, circle: 44, pays: true },
+    port: { W: 440, H: 760, table: [-70, 0, 580, 690], dealerY: 40, dealer: 56, showsY: 128, printY: 160, arc: [290, 285, 168, 262], cards: 44, circle: 44, pays: true },
   };
   const ARC_STEPS = [160, 137, 113, 90, 67, 43, 20]; // degrees; index 3 = centre (you)
 

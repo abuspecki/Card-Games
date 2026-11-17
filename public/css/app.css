@@ -651,6 +651,45 @@ body.portrait.durak .hand-card.is-trump::after { font-size: 9px; }
   .blackjack .bet-chips button .chip { --s: 36px !important; }
 }
 
+/* Tablets held sideways (and small laptops): one compact row of controls,
+   so the table gets the height instead of the buttons. */
+@media (min-width: 761px) and (max-height: 900px) and (orientation: landscape), (min-width: 700px) and (max-width: 1100px) and (orientation: portrait) {
+  .controls { padding: 6px 14px calc(6px + var(--safe-b)); }
+  .panel-note { display: none; }
+  .holdem .action-panel { flex-direction: row; align-items: center; flex-wrap: nowrap; width: 100%; max-width: 1240px; padding: 8px 12px; gap: 12px; }
+  .holdem .action-panel .sizing { flex: none; gap: 6px; }
+  .holdem .action-panel .chip-row { flex: 1; min-width: 0; gap: 8px; }
+  .holdem .action-panel .chip-row input[type=range] { min-width: 60px; }
+  .holdem .action-panel .buttons { flex: none; gap: 8px; }
+  .holdem .act { padding: 10px 14px; min-height: 44px !important; font-size: 15px; }
+  .holdem .act-raise { min-width: 130px; }
+  .holdem .preset { padding: 6px 10px; min-height: 36px; font-size: 13px; }
+  .holdem .chip-add .chip { --s: 36px !important; }
+  .blackjack .bottom-bar { flex-wrap: nowrap; padding: 0; gap: 12px; }
+  .blackjack .bottom-bar .info { width: auto; min-width: 90px; }
+  .blackjack .bottom-bar .info small { font-size: 10px; }
+  .blackjack .bottom-bar .info strong { font-size: 26px; }
+  .blackjack .bottom-bar .info em { font-size: 12px; }
+  .blackjack .actions { flex-wrap: nowrap; }
+  .blackjack .quick-bets { flex-direction: row; }
+  .blackjack .quick-bets button { padding: 6px 10px; font-size: 13px; }
+  .blackjack .bet-chips { gap: 6px; margin-right: 4px; }
+  .blackjack .bet-chips button .chip { --s: 42px !important; }
+  .blackjack .plaque { min-height: 46px; padding: 8px 16px; }
+  .blackjack .plaque em { display: none; }
+  .roulette .r-bar { flex-wrap: nowrap; padding: 6px 14px; gap: 12px; }
+  .roulette .r-chip .chip { --s: 40px !important; }
+}
+
+/* Upright tablets: the Hold'em controls take two rows (sizing, then actions). */
+@media (min-width: 700px) and (max-width: 1100px) and (orientation: portrait) {
+  .holdem .action-panel { flex-wrap: wrap; max-width: 760px; }
+  .holdem .action-panel .buttons { flex: 1 1 100%; }
+  .holdem .action-panel .buttons .act { flex: 1; }
+  .blackjack .bottom-bar { flex-wrap: wrap; justify-content: center; }
+  .blackjack .actions { flex-wrap: wrap; justify-content: center; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }

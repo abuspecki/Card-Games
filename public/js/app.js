@@ -517,10 +517,13 @@
   }
 
   function computeLayout() {
-    const wrap = $('stageWrap');
-    const w = wrap.clientWidth || window.innerWidth;
-    const hgt = wrap.clientHeight || window.innerHeight;
-    return w / hgt < 1.15 ? 'port' : 'land'; // upright unless clearly wider than tall
+    // Decide by the screen itself (not the space left by the controls, which
+    // depends on the layout we pick): upright screens get the upright table.
+    const drawer = $('drawer');
+    const side = drawer && drawer.classList.contains('open') && window.innerWidth >= 1280 ? drawer.offsetWidth : 0;
+    const w = window.innerWidth - side;
+    const hgt = window.innerHeight;
+    return w / hgt < 1.05 ? 'port' : 'land';
   }
 
   // Shared helpers every table view receives.
