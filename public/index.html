@@ -45,6 +45,7 @@
         <a href="/admin" class="owner-only hidden nav-owner">♛ Owner</a>
       </nav>
       <div class="actions">
+        <button class="theme-toggle lang-toggle" data-lang-toggle data-no-i18n aria-label="Deutsch / English" title="Deutsch / English">DE</button>
         <button class="theme-toggle" data-theme-toggle aria-label="Switch between light and dark mode" title="Light / dark mode"><span class="ti-sun">☀</span><span class="ti-moon">☾</span></button>
         <div id="navGuest" class="nav-guest">
           <a class="signin" href="#" data-open="signin">Sign in</a>
@@ -71,6 +72,8 @@
       <a href="/admin" class="owner-only hidden nav-owner">♛ Owner dashboard</a>
       <div class="appearance" role="group" aria-label="Appearance"><span>Appearance</span>
         <button data-set-theme="light">Light</button><button data-set-theme="dark">Dark</button><button data-set-theme="system">Automatic</button></div>
+      <div class="appearance" role="group" aria-label="Language"><span>Language</span>
+        <button data-set-lang="de" data-no-i18n>Deutsch</button><button data-set-lang="en" data-no-i18n>English</button></div>
     </div>
     <main class="app-main" id="top">
       <section class="member-bar hidden" id="memberBar" aria-label="Your account"></section>
@@ -160,6 +163,7 @@
         <div class="row gap"><button class="pill" data-open="howto">How to play</button><button class="pill" data-open="feedback">Report a problem</button></div>
         <h4>Appearance</h4>
         <div class="row gap appearance-row"><button class="pill" data-set-theme="light">Light</button><button class="pill" data-set-theme="dark">Dark</button><button class="pill" data-set-theme="system">Automatic</button></div>
+        <div class="row gap appearance-row"><button class="pill" data-set-lang="de" data-no-i18n>Deutsch</button><button class="pill" data-set-lang="en" data-no-i18n>English</button></div>
         <h4>Sound</h4>
         <div class="row gap"><button class="pill" id="muteBtn">Sound on</button><input type="range" id="volume" min="0" max="1" step="0.05" aria-label="Volume"></div>
       </section>
@@ -174,6 +178,7 @@
   <div id="toasts" class="toasts" aria-live="polite"></div>
   <div id="coinPop" class="coin-pop" aria-hidden="true"></div>
 
+  <script src="js/i18n.js"></script>
   <script src="js/cards.js"></script>
   <script src="sound.js"></script>
   <script src="js/flamingo.js"></script>

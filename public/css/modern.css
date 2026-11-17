@@ -305,3 +305,6 @@ body.is-app .install-link { display: none !important; }
 /* full-screen app: keep clear of the notch / home indicator */
 body.is-app #hub > .nav { padding-top: max(12px, env(safe-area-inset-top, 0px)); }
 body.is-app .tbar { padding-top: max(6px, env(safe-area-inset-top, 0px)); }
+#hub .lang-toggle { font: 800 13px var(--a-font) !important; letter-spacing: .02em; }
+@media (max-width: 760px) { #hub .lang-toggle { display: none; } }
+.appearance button.on { background: var(--a-accent, #F2C14E); color: #231A02; }

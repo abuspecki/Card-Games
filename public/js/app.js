@@ -458,6 +458,20 @@
   }
   App.installApp = installApp;
 
+  // ================= LANGUAGE =================
+  function paintLang() {
+    const l = window.I18n ? I18n.lang() : 'en';
+    document.querySelectorAll('[data-lang-toggle]').forEach((b) => { b.textContent = l === 'de' ? 'EN' : 'DE'; });
+    document.querySelectorAll('[data-set-lang]').forEach((b) => b.classList.toggle('on', b.dataset.setLang === l));
+  }
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-lang-toggle]');
+    if (t && window.I18n) { I18n.set(I18n.lang() === 'de' ? 'en' : 'de'); return; }
+    const s = e.target.closest('[data-set-lang]');
+    if (s && window.I18n) I18n.set(s.dataset.setLang);
+  });
+  paintLang();
+
   // ================= UPDATE NOTICE (maintenance) =================
   let maintEnds = 0, maintTimer = null, maintInfo = null;
   function showMaintenance(info) {
@@ -1648,6 +1662,46 @@
       <li>Every <b>Dig deeper</b> takes the miner one tunnel down and raises the multiplier — but the tunnel may cave in: Easy 8 %, Medium 16 %, Hard 28 %, Extreme 45 % per tunnel.</li>
       <li><b>Cash out</b> whenever you like: you get stake × multiplier. Reach the bottom and you are paid automatically.</li>
       <li>A cave-in loses the stake. Every dig is decided by the server; the house keeps 3 % on average.</li></ol>`;
+  // German rules (shown when the site is in German).
+  const RULES_DE = {
+    holdem: `<ol class="rules-list">
+      <li>Jeder bekommt <b>zwei eigene Karten</b>. In die Mitte kommen fünf gemeinsame Karten: drei (Flop), eine (Turn), eine (River).</li>
+      <li>Bilde die beste Fünf-Karten-Hand aus deinen zwei Karten und den fünf in der Mitte, in beliebiger Kombination.</li>
+      <li>In jeder Setzrunde kannst du <b>passen</b>, <b>schieben</b> (wenn niemand gesetzt hat), einen Einsatz <b>mitgehen</b> oder <b>erhöhen</b>. No-Limit: du darfst alles setzen, was du hast.</li>
+      <li>Die beste Hand beim Aufdecken – oder der letzte, der nicht gepasst hat – gewinnt den Pot.</li></ol><h4>Die Hände, von der besten zur schlechtesten</h4><div id="rankings"></div>`,
+    blackjack: `<ol class="rules-list">
+      <li><b>Ziel:</b> näher an 21 kommen als der Dealer, ohne drüber zu gehen. Du spielst nur gegen den Dealer.</li>
+      <li>2–10 zählen ihren Wert, Bube/Dame/König zählen 10, ein Ass 11 oder 1.</li>
+      <li>Setz deinen Einsatz, dann bekommen du und der Dealer zwei Karten (eine vom Dealer verdeckt).</li>
+      <li><b>Karte</b> zieht eine Karte, <b>Halten</b> beendet. Über 21 ist <b>überkauft</b>. <b>Verdoppeln</b> verdoppelt den Einsatz für genau eine Karte. <b>Teilen</b> macht aus einem Paar zwei Hände.</li>
+      <li>Der Dealer zieht bis 16 und bleibt ab 17 stehen. Ein Sieg zahlt 1:1, ein <b>Blackjack</b> (Ass + Zehnerkarte) zahlt <b>3:2</b>, Gleichstand gibt den Einsatz zurück.</li></ol>`,
+    durak: `<ol class="rules-list">
+      <li><b>Ziel:</b> alle Karten loswerden. Wer am Ende noch Karten hat, ist der <b>Durak</b> – der Dumme.</li>
+      <li>36 Karten, Sechs bis Ass. Jeder hält sechs; die Karte unter dem Stapel bestimmt die <b>Trumpf</b>-Farbe.</li>
+      <li>Der <b>Angreifer</b> spielt eine Karte gegen den <b>Verteidiger</b> (den nächsten Spieler), der sie mit einer höheren Karte gleicher Farbe oder einem Trumpf schlägt.</li>
+      <li>Andere dürfen Karten <b>zulegen</b>, deren Wert schon auf dem Tisch liegt – höchstens sechs pro Runde.</li>
+      <li>Alles geschlagen und niemand legt nach: die Karten sind weg (<i>бито</i>) und der Verteidiger greift als Nächstes an. Kann oder will er nicht schlagen, <b>nimmt</b> er alle Karten und verliert seinen Angriff.</li>
+      <li>Nach jeder Runde zieht jeder auf sechs nach. Ist der Stapel leer, sind Spieler ohne Karten raus.</li></ol>`,
+    roulette: `<ol class="rules-list">
+      <li><b>Ziel:</b> erraten, wo die Kugel landet. Das Rad hat die Zahlen <b>0 bis 36</b>; die Null ist grün, die anderen rot oder schwarz.</li>
+      <li>Wähle unten einen Chip und tippe aufs Tableau, um zu setzen – so oft und wohin du willst. <b>Zurück</b>, <b>Löschen</b>, <b>Wiederholen</b> und <b>×2</b> helfen.</li>
+      <li>Alle setzen gleichzeitig, bis die Uhr abläuft (oder alle <b>Drehen</b> gedrückt haben). Dann: <i>rien ne va plus</i> – das Rad dreht sich.</li>
+      <li><b>Auszahlung:</b> eine einzelne Zahl zahlt <b>35 zu 1</b>, ein Dutzend oder eine Kolonne <b>2 zu 1</b>, Rot/Schwarz, Gerade/Ungerade, 1–18/19–36 zahlen <b>1 zu 1</b>.</li>
+      <li>Landet die Kugel auf der <b>Null</b>, verlieren alle Einsätze außer einem auf die 0 – das ist der Vorteil des Hauses.</li></ol>`,
+    flamingo: `<ol class="rules-list">
+      <li><b>Ziel:</b> als Erster alle Karten ablegen. Jeder startet mit <b>7 rosa Karten</b>.</li>
+      <li>Vier Farben – <b>Kirsche, Violett, Sonne, Türkis</b> – mit Zahlen 0–9. Leg eine Karte, die zur <b>Farbe</b> oder zur <b>Zahl</b> der obersten Karte passt.</li>
+      <li>Nichts passt? <b>Zieh</b> eine Karte – passt sie, darfst du sie sofort legen, sonst <b>passt</b> du.</li>
+      <li><b>⊘ Aussetzen</b>: der Nächste setzt aus. <b>⇄ Richtungswechsel</b>: die Spielrichtung dreht sich. <b>+2</b>: der Nächste zieht zwei und setzt aus.</li>
+      <li><b>Farbwahl</b>: passt auf alles, du wählst die nächste Farbe. <b>Farbwahl +4</b>: dazu zieht der Nächste vier und setzt aus.</li>
+      <li>Nur noch eine Karte? Alle sehen „Letzte Karte!“. Wer zuerst keine Karten mehr hat, gewinnt 10 Münzen.</li></ol>`,
+    goldrush: `<ol class="rules-list">
+      <li><b>Ziel:</b> so tief graben, wie du dich traust, und auszahlen, bevor der Stollen einstürzt. Ein Einzelspiel mit deinen eigenen Chips.</li>
+      <li>Wähle eine Stufe und einen Einsatz (10–5.000 Chips), dann <b>Losgraben</b>.</li>
+      <li>Jedes <b>Tiefer graben</b> bringt den Goldsucher einen Stollen tiefer und erhöht den Multiplikator – aber der Stollen kann einstürzen: Leicht 8 %, Mittel 16 %, Schwer 28 %, Extrem 45 % pro Stollen.</li>
+      <li><b>Auszahlen</b>, wann du willst: du bekommst Einsatz × Multiplikator. Am Grund wird automatisch ausgezahlt.</li>
+      <li>Ein Einsturz kostet den Einsatz. Jeden Schritt entscheidet der Server; das Haus behält im Schnitt 3 %.</li></ol>`,
+  };
   const RANKINGS = [
     ['Royal Flush', 'As Ks Qs Js Ts', 'A, K, Q, J, 10 of one suit.'], ['Straight Flush', '9h 8h 7h 6h 5h', 'Five in a row, one suit.'],
     ['Four of a Kind', 'Qc Qd Qh Qs 4d', 'Four of one rank.'], ['Full House', 'Kh Kd Ks 7c 7h', 'Three of a kind and a pair.'],
@@ -1660,7 +1714,7 @@
       modalHead(card, 'The House Rules', 'How to play');
       const body = h('div', 'howto');
       const paint = (g) => {
-        body.innerHTML = RULES[g];
+        body.innerHTML = (window.I18n && I18n.lang() === 'de' && RULES_DE[g]) || RULES[g];
         const r = body.querySelector('#rankings');
         if (r) {
           RANKINGS.forEach(([name, cards, desc], i) => {
