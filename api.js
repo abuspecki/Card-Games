@@ -391,15 +391,19 @@ function createApi(ctx) {
 
   // Who may use the task board: an owner (session) or a developer key.
   async function taskActor(req) {
-    // Accept the key as "X-Dev-Key: cgk_…", with an optional "Bearer " prefix,
-    // or as "Authorization: Bearer cgk_…".
+    // Accept the key as "X-Dev-Key: cgk_…" (optionally with a "Bearer " prefix)
+    // or as "Authorization: Bearer cgk_…". If both are sent, either may be valid.
     const auth = String(req.headers.authorization || '');
-    let key = String(req.headers['x-dev-key'] || '').trim().replace(/^bearer\s+/i, '');
-    if (!key && /^bearer\s+cgk_/i.test(auth)) key = auth.replace(/^bearer\s+/i, '').trim();
-    if (key) {
-      if (key.length > 200) return null;
-      const k = await ctx.store().findDevKey(hashKey(key));
-      return k ? { name: `Claude · ${k.name}`, dev: true } : null;
+    const keys = [
+      String(req.headers['x-dev-key'] || '').trim().replace(/^bearer\s+/i, ''),
+      /^bearer\s+cgk_/i.test(auth) ? auth.replace(/^bearer\s+/i, '').trim() : '',
+    ].filter((k) => k && k.length <= 200);
+    if (keys.length) {
+      for (const key of keys) {
+        const k = await ctx.store().findDevKey(hashKey(key));
+        if (k) return { name: `Claude · ${k.name}`, dev: true };
+      }
+      return null;
     }
     const user = await currentUser(req);
     return isOwner(user) ? { name: user.username, dev: false } : null;
