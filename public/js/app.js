@@ -737,6 +737,7 @@
   function backToHub() {
     if (App.tableId) localStorage.removeItem('cg.seat.' + App.tableId);
     App.tableId = null; App.S = null; App.game = null; App.watching = false;
+    if ($('tourneyBar')) $('tourneyBar').remove();
     if (App.ws) { App.ws.onclose = null; App.ws.close(); App.ws = null; }
     $('tableScreen').classList.add('hidden');
     $('hub').classList.remove('hidden');
@@ -808,6 +809,7 @@
     renderLog(st);
     renderTableInfo(S, st);
     renderPrivateCode(S);
+    renderTourney(S);
     renderOdds(st);
     const title = document.querySelector('[data-tb-title]');
     if (title) title.textContent = S.tableName.replace(/^[^·]*·\s*/, '') + (st.game === 'holdem' ? ` · Blinds ${st.settings.smallBlind} / ${st.settings.bigBlind}` : st.game === 'blackjack' || st.game === 'roulette' ? ` · Bets from ${st.minBet}` : st.stage !== 'waiting' ? ` · Game ${st.handNo}` : '');
@@ -1007,6 +1009,29 @@
     list.replaceChildren();
     for (const line of st.log) if (typeof line === 'string') list.appendChild(h('p', line.startsWith('—') ? 'hand' : '', esc(line)));
     if (atBottom) list.scrollTop = list.scrollHeight;
+  }
+
+  // Sit & Go: status bar above the controls
+  function renderTourney(S) {
+    let bar = $('tourneyBar');
+    const T = S.tourney;
+    if (!T) { if (bar) bar.remove(); return; }
+    if (!bar) { bar = h('div', 'tourney-bar'); bar.id = 'tourneyBar'; $('controls').before(bar); }
+    const prizes = T.prizes.length > 1 ? `1st ${fmt(T.prizes[0])} · 2nd ${fmt(T.prizes[1])}` : `Winner takes ${fmt(T.prizes[0])}`;
+    const seated = S.state.mySeat !== -1;
+    if (T.state === 'open') {
+      bar.innerHTML = `<div><b>🏆 Sit & Go</b><span>Entry ${fmt(T.entry)} · ${T.players} player${T.players === 1 ? '' : 's'} · ${prizes}</span>
+        <small>Everyone starts with ${fmt(T.stack)} chips, blinds rise every few hands, last one standing wins. Bots may fill seats but win nothing.</small></div>
+        ${seated ? `<button class="btn btn-gold t-start" ${T.players < 2 ? 'disabled' : ''}>${T.players < 2 ? 'Waiting for players…' : 'Start tournament'}</button>` : ''}`;
+      const b = bar.querySelector('.t-start');
+      if (b) b.onclick = () => send({ t: 'tstart' });
+    } else if (T.state === 'running') {
+      bar.innerHTML = `<div><b>🏆 Level ${T.level} · Blinds ${T.blinds.join(' / ')}</b><span>Next: ${T.nextBlinds.join(' / ')} in ${T.handsToNext} hand${T.handsToNext === 1 ? '' : 's'} · ${prizes}</span>
+        ${T.out.length ? `<small>Out: ${T.out.map(esc).join(', ')}</small>` : ''}</div>`;
+    } else {
+      bar.innerHTML = `<div><b>🏆 Results</b><span>${(T.result ? T.result.order : []).map((o) => `${o.place}. ${esc(o.name)}${o.prize ? ` +${fmt(o.prize)}` : ''}`).join(' · ')}</span>
+        <small>A new tournament opens in a moment.</small></div>`;
+    }
   }
 
   function renderPrivateCode(S) {

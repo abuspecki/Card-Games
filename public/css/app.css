@@ -914,3 +914,13 @@ html[lang="de"] .blackjack .plaque b { letter-spacing: .06em; }
 html[lang="de"] .bottom-bar .info small { letter-spacing: .12em; }
 @media (max-width: 760px) { html[lang="de"] .blackjack .plaque b { font-size: 12px; letter-spacing: .02em; } }
 .priv-code { display: inline-block; margin-top: 2px; padding: 2px 10px; border-radius: 999px; background: #F2C14E; color: #231A02; font: 700 12px/1.6 'Montserrat', system-ui, sans-serif; letter-spacing: .04em; white-space: nowrap; }
+
+/* ================= SIT & GO BAR ================= */
+.tourney-bar { display: flex; align-items: center; gap: 14px; padding: 8px 18px; background: linear-gradient(90deg, rgba(242,193,78,.16), rgba(242,193,78,.06)); border-top: 1px solid rgba(242,193,78,.45);
+  color: #F3EBD2; font: 500 13px/1.4 'Montserrat', system-ui, sans-serif; }
+.tourney-bar > div { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.tourney-bar b { color: #F2C14E; font-size: 14px; }
+.tourney-bar small { opacity: .7; font-size: 11.5px; }
+.tourney-bar .btn-gold { padding: 10px 16px !important; border-radius: 12px; background: #F2C14E !important; color: #231A02 !important; font: 700 14px 'Montserrat', sans-serif; white-space: nowrap; }
+.tourney-bar .btn-gold:disabled { opacity: .5; }
+@media (max-width: 760px) { .tourney-bar { padding: 6px 10px; font-size: 12px; } .tourney-bar small { display: none; } }

@@ -27,6 +27,7 @@ const TABLES = [
   { id: 'DURAK-1', name: 'Durak · Table 1', game: 'durak', capacity: 6 },
   { id: 'DURAK-2', name: 'Durak · High Roller', game: 'durak', capacity: 6, highRoller: true, minBankroll: 10000 },
   { id: 'ROULETTE-1', name: 'Roulette · Table 1', game: 'roulette', capacity: 8, buyIn: 1000, minBuyIn: 100, settings: { bigBlind: 5 } },
+  { id: 'TOURNEY-1', name: "Hold'em · Sit & Go", game: 'holdem', capacity: 6, accountsOnly: true, tourney: { entry: 500, stack: 1500, handsPerLevel: 6 }, settings: { smallBlind: 10, bigBlind: 20 }, buyIn: 1500 },
   { id: 'FLAMINGO-1', name: 'Flamingo · Table 1', game: 'flamingo', capacity: 6 },
   { id: 'ROULETTE-2', name: 'Roulette · High Roller', game: 'roulette', capacity: 8, highRoller: true, buyIn: 5000, minBuyIn: 1000, settings: { bigBlind: 25 } },
 ];
@@ -45,6 +46,7 @@ function createLobby(ctx) {
   function makeRoom(def) {
     const settings = { ...(def.settings || {}), startingStack: def.buyIn || 1000 };
     const room = { ...def, code: def.id, table: GAMES[def.game].make(settings), clients: new Map(), watchers: new Map(), nextTimer: null, turnTimer: null, startTimer: null, phaseTimer: null };
+    if (def.tourney) room.T = freshTourney();
     wireTable(room);
     rooms.set(def.id, room);
     return room;
@@ -101,7 +103,105 @@ function createLobby(ctx) {
     };
   }
 
-  const usesChips = (room) => room.game !== 'durak' && room.game !== 'flamingo';
+  const usesChips = (room) => room.game !== 'durak' && room.game !== 'flamingo' && !room.tourney;
+
+  // ================= SIT & GO TOURNAMENT =================
+  // Members pay an entry (held like table chips), everyone starts with the same
+  // tournament chips, blinds rise every few hands, the last player standing
+  // wins. Prizes go to the best-placed members: 65 % / 35 % with 4+ members,
+  // otherwise winner takes all. Bots may fill seats but pay and win nothing.
+  const BLINDS = [[10, 20], [15, 30], [25, 50], [50, 100], [75, 150], [100, 200], [150, 300], [200, 400], [300, 600], [500, 1000]];
+  function freshTourney() { return { state: 'open', level: 0, hands: 0, entrants: [], out: [], finishedAt: 0, result: null }; }
+  function tourneyInfo(room) {
+    if (!room.tourney) return null;
+    const T = room.T, cfg = room.tourney;
+    const members = T.state === 'open' ? room.table.seats.filter((s) => s && s.accountId).length : T.entrants.filter((e) => e.accountId).length;
+    const pool = members * cfg.entry;
+    return {
+      state: T.state, entry: cfg.entry, stack: cfg.stack, level: T.level + 1, blinds: BLINDS[T.level],
+      nextBlinds: BLINDS[Math.min(T.level + 1, BLINDS.length - 1)], handsToNext: cfg.handsPerLevel - (T.hands % cfg.handsPerLevel),
+      pool, prizes: members >= 4 ? [Math.floor(pool * 0.65), pool - Math.floor(pool * 0.65)] : [pool],
+      players: room.table.seats.filter(Boolean).length, out: T.out.map((o) => o.name), result: T.result,
+    };
+  }
+  function startTourney(room) {
+    const T = room.T, t = room.table;
+    if (T.state !== 'open') return { error: 'The tournament is already running' };
+    if (seatedCount(t) < 2) return { error: 'You need at least 2 players — invite a friend or a bot' };
+    if (paused()) return { error: 'An update is coming — the tournament can start after it' };
+    T.state = 'running'; T.level = 0; T.hands = 0; T.out = []; T.result = null;
+    T.entrants = t.seats.filter(Boolean).map((s) => ({ id: s.id, name: s.name, accountId: s.accountId || null, isBot: !!s.isBot, entry: s.tEntry || 0, settled: false }));
+    for (const s of t.seats) if (s) s.chips = room.tourney.stack;
+    [t.settings.smallBlind, t.settings.bigBlind] = BLINDS[0];
+    t.addLog(`— Sit & Go starts: ${T.entrants.length} players, ${room.tourney.stack} chips each, blinds ${BLINDS[0].join('/')} —`);
+    broadcast(room, { t: 'sfx', name: 'deal' });
+    if (t.canStart()) t.startHand();
+    return { ok: true };
+  }
+  async function settleEntrant(room, e, prize) {
+    if (!e || e.settled || !e.accountId) return;
+    e.settled = true;
+    try { await ctx.coins().cashOut(e.accountId, prize, e.entry); } catch (err) { console.error('tourney payout', err); }
+  }
+  // A player is out (busted, or left while it runs).
+  async function eliminate(room, seat, why) {
+    const T = room.T;
+    T.out.unshift({ name: seat.name, accountId: seat.accountId || null, isBot: !!seat.isBot });
+    room.table.addLog(`${seat.name} is out${why ? ` (${why})` : ''} — place ${room.T.entrants.length - T.out.length + 1}`);
+  }
+  async function afterTourneyHand(room) {
+    const T = room.T, t = room.table, cfg = room.tourney;
+    // busted players leave the table (humans keep watching)
+    for (const s of t.seats.slice()) {
+      if (s && s.chips <= 0) {
+        await eliminate(room, s);
+        const ws = room.clients.get(s.id);
+        t.leave(s.id);
+        if (ws) send(ws, { t: 'notice', msg: `You are out of the tournament — place ${T.entrants.length - T.out.length + 1}. You can keep watching.` });
+      }
+    }
+    T.hands++;
+    if (T.hands % cfg.handsPerLevel === 0 && T.level < BLINDS.length - 1) {
+      T.level++;
+      [t.settings.smallBlind, t.settings.bigBlind] = BLINDS[T.level];
+      t.addLog(`Blinds go up: ${BLINDS[T.level].join(' / ')}`);
+    }
+    const left = t.seats.filter((s) => s && s.chips > 0);
+    if (left.length <= 1) await finishTourney(room, left[0]);
+  }
+  async function finishTourney(room, winnerSeat) {
+    const T = room.T, cfg = room.tourney, t = room.table;
+    const order = [...(winnerSeat ? [{ name: winnerSeat.name, accountId: winnerSeat.accountId || null, isBot: !!winnerSeat.isBot }] : []), ...T.out];
+    const members = T.entrants.filter((e) => e.accountId);
+    const pool = members.length * cfg.entry;
+    const shares = members.length >= 4 ? [0.65, 0.35] : [1];
+    const placedMembers = order.filter((o) => o.accountId);
+    const prizes = new Map();
+    let paid = 0;
+    shares.forEach((sh, k) => { const o = placedMembers[k]; if (!o) return; const amt = k === shares.length - 1 ? pool - paid : Math.floor(pool * sh); prizes.set(o.accountId, amt); paid += amt; });
+    for (const e of members) {
+      const prize = prizes.get(e.accountId) || 0;
+      await settleEntrant(room, e, prize);
+      ctx.store().recordHand(e.accountId, 'tourney', prize - e.entry, prize > e.entry, prize).catch((err) => console.error('record', err));
+      if (prize > e.entry) ctx.coins().adjust(e.accountId, prize === Math.max(...prizes.values()) ? 100 : 50, 0).catch(() => {});
+    }
+    T.result = { order: order.map((o, i) => ({ place: i + 1, name: o.name, bot: o.isBot, prize: o.accountId ? prizes.get(o.accountId) || 0 : 0 })) };
+    T.state = 'done';
+    T.finishedAt = Date.now();
+    t.stage = 'waiting';
+    t.addLog(`🏆 ${order[0] ? order[0].name : 'Nobody'} wins the Sit & Go!`);
+    broadcast(room, { t: 'notice', msg: `🏆 ${order[0] ? order[0].name : 'Nobody'} wins the Sit & Go!${prizes.size ? ' Prizes are in the winners\' accounts.' : ''}` });
+    broadcast(room, { t: 'sfx', name: 'win' });
+    // a fresh tournament opens in a moment; everyone left at the table is unseated
+    setTimeout(() => {
+      for (const s of t.seats.slice()) if (s) t.leave(s.id);
+      [t.settings.smallBlind, t.settings.bigBlind] = BLINDS[0];
+      room.T = freshTourney();
+      for (const ws of room.clients.values()) send(ws, { t: 'left' });
+      room.clients.clear();
+      pushState(room);
+    }, 20000);
+  }
   const seatedCount = (t) => t.seats.filter(Boolean).length;
 
   function send(ws, msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
@@ -123,7 +223,8 @@ function createLobby(ctx) {
       buyIn: room.buyIn || 0,
       minBuyIn: room.minBuyIn || 0,
       minBankroll: room.minBankroll || 0,
-      stakes: room.game === 'holdem' ? `Blinds ${s.smallBlind} / ${s.bigBlind}`
+      tourney: tourneyInfo(room),
+      stakes: room.tourney ? `Sit & Go · entry ${room.tourney.entry}` : room.game === 'holdem' ? `Blinds ${s.smallBlind} / ${s.bigBlind}`
         : room.game === 'blackjack' || room.game === 'roulette' ? `Bets from ${s.bigBlind}` : '2–6 players',
     };
   }
@@ -144,7 +245,7 @@ function createLobby(ctx) {
       scheduleTimers(room);
       const t = room.table;
       for (const [pid, ws] of [...room.clients, ...room.watchers]) {
-        send(ws, { t: 'state', room: room.code, tableName: room.name, highRoller: !!room.highRoller, usesChips: usesChips(room), state: t.view(pid), watching: room.watchers.has(pid), maintenance: maintenanceInfo(), turn: room.turn ? { key: room.turn.key, seat: room.turn.seat, msLeft: Math.max(0, room.turn.endsAt - Date.now()) } : null });
+        send(ws, { t: 'state', room: room.code, tableName: room.name, highRoller: !!room.highRoller, usesChips: usesChips(room), state: t.view(pid), watching: room.watchers.has(pid), maintenance: maintenanceInfo(), tourney: tourneyInfo(room), turn: room.turn ? { key: room.turn.key, seat: room.turn.seat, msLeft: Math.max(0, room.turn.endsAt - Date.now()) } : null });
       }
     } catch (e) {
       console.error('pushState error', e);
@@ -186,7 +287,7 @@ function createLobby(ctx) {
   function scheduleTimers(room) {
     const t = room.table;
     // Deal automatically once enough players are seated (no host needed).
-    if (t.stage === 'waiting' && !room.startTimer && hasHuman(room) && t.canStart() && !paused()) {
+    if (t.stage === 'waiting' && !room.startTimer && hasHuman(room) && t.canStart() && !paused() && (!room.tourney || room.T.state === 'running')) {
       room.startTimer = setTimeout(() => {
         room.startTimer = null;
         if (t.stage === 'waiting' && hasHuman(room) && !paused()) { rebuyBots(t); if (t.canStart()) t.startHand(); }
@@ -199,6 +300,10 @@ function createLobby(ctx) {
         room.nextTimer = null;
         if (t.stage !== 'showdown') return;
         await removeAwayPlayers(room);
+        if (room.tourney) {
+          if (room.T.state === 'running') await afterTourneyHand(room);
+          if (room.T.state !== 'running') { t.stage = 'waiting'; pushState(room); return; }
+        }
         if (paused()) t.stage = 'waiting';
         else if (hasHuman(room)) { rebuyBots(t); if (t.canStart()) t.startHand(); else t.stage = 'waiting'; }
         else t.stage = 'waiting';
@@ -259,6 +364,7 @@ function createLobby(ctx) {
 
   // Save each account's result, coin reward and the day's activity.
   function recordResults(room) {
+    if (room.tourney) return; // tournament chips are not real: only the final result counts
     const t = room.table;
     const store = ctx.store();
     const coins = ctx.coins();
@@ -302,7 +408,20 @@ function createLobby(ctx) {
     const accountId = seat.accountId;
     if (rec) seat.accountId = null; // already recorded; don't count this hand twice
     if (note) t.addLog(note);
+    if (room.tourney) {
+      const T = room.T;
+      if (T.state === 'open' && seat.tEntry && seat.accountId) await ctx.coins().cashOut(seat.accountId, seat.tEntry, seat.tEntry).catch((e) => console.error('refund', e));
+      if (T.state === 'running') {
+        await eliminate(room, seat, 'left');
+        await settleEntrant(room, T.entrants.find((e) => e.id === seatId), 0);
+        if (seat.accountId) ctx.store().recordHand(seat.accountId, 'tourney', -(seat.tEntry || 0), false, 0).catch(() => {});
+      }
+    }
     t.leave(seatId); // may fold/stand for them first
+    if (room.tourney && room.T.state === 'running') {
+      const left = t.seats.filter((x) => x && x.chips > 0);
+      if (left.length <= 1 && !t.isPlaying()) await finishTourney(room, left[0]);
+    }
     await cashOutSeat(room, { ...seat, accountId });
     const ws = room.clients.get(seatId);
     room.clients.delete(seatId);
@@ -336,6 +455,7 @@ function createLobby(ctx) {
   function hasHuman(room) { return room.table.seats.some((s) => s && !s.isBot && s.connected); }
 
   function rebuyBots(t) {
+    if ([...rooms.values()].some((r) => r.table === t && r.tourney)) return;
     for (const s of t.seats) {
       if (s && s.isBot && s.chips === 0) { s.chips = t.settings.startingStack; t.addLog(`${s.name} rebuys for ${s.chips}`); }
     }
@@ -441,10 +561,17 @@ function createLobby(ctx) {
               return send(ws, { t: 'error', msg: `👑 You need ${target.minBankroll.toLocaleString()} chips in your bankroll for this table (you have ${bal.chips.toLocaleString()})` });
             }
           }
+          if (target.tourney && target.T.state !== 'open') return send(ws, { t: 'error', msg: 'This tournament is already running — watch it or join the next one' });
           if (seatedCount(table) >= target.capacity) removeBot(target); // make room for a human
           if (seatedCount(table) >= target.capacity) return send(ws, { t: 'error', msg: 'This table is full — try the other one' });
           // Accounts bring chips from their bankroll; guests get a free table stack.
           let stack = null;
+          let entry = 0;
+          if (target.tourney) {
+            const r = await ctx.coins().buyIn(user.id, target.tourney.entry, target.tourney.entry);
+            if (r.error) return send(ws, { t: 'error', msg: `The entry is ${target.tourney.entry} chips — ${r.error}` });
+            entry = r.amount;
+          }
           if (user && usesChips(target)) {
             const r = await buyChips(target, user.id);
             if (r.error) return send(ws, { t: 'error', msg: r.error });
@@ -455,10 +582,12 @@ function createLobby(ctx) {
           const look = user ? await ctx.coins().lookOf(user.id).catch(() => ({})) : {};
           if (seatedCount(table) >= target.capacity || table.sit({ id: newPid, name, accountId: user ? user.id : null }) === -1) {
             if (stack) await ctx.coins().cashOut(user.id, stack, stack);
+            if (entry) await ctx.coins().cashOut(user.id, entry, entry);
             return send(ws, { t: 'error', msg: 'This table is full — try the other one' });
           }
           const seat = table.seats[table.seatOf(newPid)];
           if (stack !== null) { seat.chips = stack; seat.buyIn = stack; }
+          if (entry) seat.tEntry = entry;
           seat.avatar = look.avatar || null;
           seat.badge = look.badge || null;
           room = target;
@@ -479,7 +608,18 @@ function createLobby(ctx) {
       }
       const t = room.table;
       const me = t.seats[t.seatOf(pid)];
-      if (!me) return;
+      if (!me) {
+        // out of a tournament but still watching
+        if (m.t === 'leave') { room.clients.delete(pid); room = null; pid = null; send(ws, { t: 'left' }); }
+        return;
+      }
+      if (room.tourney && m.t === 'tstart') {
+        const r = startTourney(room);
+        if (r.error) send(ws, { t: 'error', msg: r.error });
+        pushState(room);
+        return;
+      }
+      if (room.tourney && room.T.state !== 'open' && (m.t === 'addBot' || m.t === 'removeBot')) return send(ws, { t: 'error', msg: 'Bots can only join before the tournament starts' });
 
       switch (m.t) {
         case 'action': {
@@ -616,6 +756,13 @@ function createLobby(ctx) {
   async function cashOutAll() {
     const jobs = [];
     for (const room of rooms.values()) {
+      if (room.tourney) {
+        // a tournament cannot survive a restart: everyone gets their entry back
+        if (room.T.state === 'running') for (const e of room.T.entrants) jobs.push(settleEntrant(room, e, e.entry));
+        else for (const s of room.table.seats) if (s && s.tEntry && s.accountId) { jobs.push(ctx.coins().cashOut(s.accountId, s.tEntry, s.tEntry)); s.tEntry = 0; }
+        broadcast(room, { t: 'notice', msg: 'The server is restarting — the tournament is called off and every entry is refunded.' });
+        continue;
+      }
       const t = room.table;
       const running = t.isPlaying();
       broadcast(room, { t: 'notice', msg: 'The server is restarting for an update — your chips are safe in your bankroll, plus 1,000 bonus chips for the interruption. Rejoin in a moment.' });

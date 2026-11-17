@@ -240,6 +240,40 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   assert.strictEqual(gres.data.wallet.chips, gw0);
   assert.strictEqual((await call('POST', '/api/goldrush/dig', ta)).status, 400, 'no dig without a round');
 
+  // ----- Sit & Go: entry held, play until one is left, winner takes the pool -----
+  {
+    const wa0 = (await call('GET', '/api/wallet', ta)).data.chips, wb0 = (await call('GET', '/api/wallet', tb2)).data.chips;
+    assert.strictEqual((await sit('TOURNEY-1', null, 'Gast')).first.t, 'error', 'members only');
+    const p1 = await sit('TOURNEY-1', ta), p2 = await sit('TOURNEY-1', tb2);
+    assert.strictEqual(p1.first.t, 'joined'); assert.strictEqual(p2.first.t, 'joined');
+    assert.strictEqual((await call('GET', '/api/wallet', ta)).data.chips, wa0 - 500, 'entry taken');
+    assert.strictEqual((await call('GET', '/api/wallet', ta)).data.inPlay, 500, 'entry held like table chips');
+    let winnerMsg = null;
+    for (const p of [p1, p2]) p.ws.on('message', (d) => {
+      const m = JSON.parse(d);
+      if (m.t === 'notice' && /wins the Sit & Go/.test(m.msg)) winnerMsg = m.msg;
+      if (m.t === 'state' && m.state.limits && m.state.toAct === m.state.mySeat && m.state.stage !== 'showdown') {
+        const lim = m.state.limits;
+        p.ws.send(JSON.stringify(lim.canRaise ? { t: 'action', action: 'raise', amount: lim.maxTo } : { t: 'action', action: lim.toCall > 0 ? 'call' : 'check' }));
+      }
+    });
+    p1.ws.send(JSON.stringify({ t: 'tstart' }));
+    for (let i = 0; i < 120 && !winnerMsg; i++) await wait(500);
+    assert(winnerMsg, 'tournament finished');
+    await wait(500);
+    const wa1 = (await call('GET', '/api/wallet', ta)).data, wb1 = (await call('GET', '/api/wallet', tb2)).data;
+    assert.strictEqual(wa1.inPlay + wb1.inPlay, 0, 'entries settled');
+    assert.strictEqual(wa1.chips + wb1.chips, wa0 + wb0, 'the pool goes to the winner, nothing created or lost');
+    assert(Math.abs(wa1.chips - wa0) === 500 && Math.abs(wb1.chips - wb0) === 500, 'winner +500, loser −500');
+    p1.ws.close(); p2.ws.close();
+    // put the balances back for the checks further down
+    for (const [name, diff] of [[A, wa0 - wa1.chips], [B, wb0 - wb1.chips]]) {
+      const pid = (await call('GET', '/api/admin/players?search=' + name, to)).data.players[0].id;
+      await call('POST', `/api/admin/players/${pid}/adjust`, to, { chips: diff });
+    }
+    await wait(20500); // the table resets for the next tournament
+  }
+
   // ----- private tables: open with a game, join with the code, hidden from the lobby -----
   assert.strictEqual((await call('POST', '/api/private', null, { game: 'holdem' })).status, 401, 'members open private tables');
   assert.strictEqual((await call('POST', '/api/private', ta, { game: 'chess' })).status, 400);
