@@ -1,3 +1,6 @@
+/* Full-height (lining) digits everywhere — easier to read than old-style figures. */
+html { font-variant-numeric: lining-nums; }
+
 /* =========================================================
    CardGames — shared base styles
    Cards, card backs, chips, buttons and the game "stage".
@@ -53,10 +56,14 @@ svg { display: block; }
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  font-family: 'Playfair Display', Georgia, serif;
-  font-weight: 700;
-  font-size: calc(var(--w) * .183);
+  font-family: 'Montserrat', 'Playfair Display', system-ui, sans-serif;  /* bold, clear digits (the thin 4 was hard to read) */
+  font-weight: 800;
+  font-size: calc(var(--w) * .19);
+  letter-spacing: -.04em;
   line-height: 1;
+  /* full-height digits: the classic old-style 4 sat below the line and was hard to read */
+  font-variant-numeric: lining-nums;
+  font-feature-settings: "lnum" 1;
 }
 .card .corner svg { width: calc(var(--w) * .11); height: calc(var(--w) * .11); }
 .card .corner.br { top: auto; left: auto; bottom: calc(var(--w) * .05); right: calc(var(--w) * .05); transform: rotate(180deg); }
