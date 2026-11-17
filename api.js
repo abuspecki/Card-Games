@@ -118,10 +118,18 @@ function createApi(ctx) {
       if (token) await store.deleteSession(token);
       return json(res, 200, { ok: true });
     }
+    // Leave a table seat — works without the game connection (sendBeacon / keepalive fetch).
+    if (method === 'POST' && url === '/api/leave') {
+      const user = await currentUser(req);
+      const body = await readBody(req).catch(() => ({}));
+      const token = body.token ? String(body.token).slice(0, 80) : null;
+      if (!user && !token) return json(res, 400, { error: 'Nothing to leave' });
+      return json(res, 200, await ctx.lobby.leaveBy({ userId: user ? user.id : null, token, table: body.table ? String(body.table).slice(0, 20) : null }));
+    }
     if (method === 'GET' && url === '/api/me') {
       const user = await currentUser(req);
       if (!user) return json(res, 401, { error: 'Not logged in' });
-      return json(res, 200, { username: user.username, isOwner: isOwner(user), theme: await store.getTheme(user.id), stats: await store.userStats(user.id) });
+      return json(res, 200, { username: user.username, isOwner: isOwner(user), theme: await store.getTheme(user.id), stats: await store.userStats(user.id), seat: ctx.lobby.locate(user.id) });
     }
     if (method === 'POST' && url === '/api/me/theme') {
       const user = await currentUser(req);

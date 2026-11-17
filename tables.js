@@ -36,7 +36,7 @@ const DISCONNECTED_TURN_TIMEOUT = 8000;
 const TURN_TIMEOUT = Number(process.env.TURN_TIMEOUT_MS) || 40000;            // a seated player who does nothing this long gets a safe default move
 const BOT_THINK_MS = [700, 1800];
 const AUTO_START_DELAY = 3000;          // deal this long after enough players sit down
-const AWAY_LIMIT = 3 * 60 * 1000;       // disconnected players lose their seat after this
+const AWAY_LIMIT = Number(process.env.AWAY_LIMIT_MS) || 90 * 1000; // disconnected players lose their seat after this (also mid-game)
 
 function createLobby(ctx) {
   // ctx: { store(), coins(), log }
@@ -230,7 +230,6 @@ function createLobby(ctx) {
   // and clear out the bots once no real player is left.
   async function removeAwayPlayers(room) {
     const t = room.table;
-    if (t.isPlaying()) return false;
     let changed = false;
     for (const s of t.seats.slice()) {
       if (s && !s.isBot && !s.connected && Date.now() - (s.awayAt || 0) > AWAY_LIMIT) {
@@ -238,7 +237,7 @@ function createLobby(ctx) {
         changed = true;
       }
     }
-    if (!t.seats.some((s) => s && !s.isBot)) {
+    if (!t.isPlaying() && !t.seats.some((s) => s && !s.isBot)) {
       for (const s of t.seats.slice()) if (s && s.isBot) { t.leave(s.id); changed = true; }
       if (changed) t.stage = 'waiting';
     }
@@ -446,6 +445,29 @@ function createLobby(ctx) {
     });
   }
 
+  // ----- leaving without the game connection (HTTP, also when the socket is gone) -----
+  // Finds the seat by its seat token (guests and members) or by account, and frees it.
+  async function leaveBy({ userId = null, token = null, table = null }) {
+    let left = 0;
+    for (const room of rooms.values()) {
+      if (table && room.id !== String(table).toUpperCase()) continue;
+      const t = room.table;
+      const ids = [];
+      if (token) {
+        const i = t.seatOf(String(token));
+        if (i !== -1 && (!t.seats[i].accountId || t.seats[i].accountId === userId)) ids.push(t.seats[i].id);
+      }
+      if (userId) for (const s of t.seats) if (s && s.accountId === userId && !ids.includes(s.id)) ids.push(s.id);
+      for (const id of ids) {
+        const ws = await removeSeat(room, id);
+        if (ws) { send(ws, { t: 'left' }); ws.close(); }
+        left++;
+      }
+      if (ids.length) { await removeAwayPlayers(room); pushState(room); }
+    }
+    return { ok: true, left };
+  }
+
   // ----- used by the API -----
   // Where is this account sitting right now?
   function locate(userId) {
@@ -496,7 +518,7 @@ function createLobby(ctx) {
     return { humans, bots: botsN, tablesPlaying: playing, tables: [...rooms.values()].map(tableSummary) };
   }
 
-  return { rooms, tableSummary, handleConnection, locate, refreshLook, kick, cashOutAll, liveStats, GAMES };
+  return { rooms, tableSummary, handleConnection, locate, leaveBy, refreshLook, kick, cashOutAll, liveStats, GAMES };
 }
 
 module.exports = { createLobby, TABLES, GAMES };

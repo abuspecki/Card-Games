@@ -226,6 +226,28 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const readNow = (await call('GET', '/api/admin/feedback?status=read', to)).data.feedback;
   assert(crash.ids.every((x) => readNow.some((f) => f.id === x)), 'turned-into-task feedback is marked read');
 
+  // ----- leaving over HTTP: works even when the game connection is gone -----
+  const seatsAt = async (id) => (await call('GET', '/api/tables', null)).data.tables.find((x) => x.id === id).humans;
+  const g1 = await sit('DURAK-1', null, 'Gast');
+  assert.strictEqual(g1.first.t, 'joined');
+  g1.ws.terminate();                                   // connection dropped
+  await wait(150);
+  assert.strictEqual(await seatsAt('DURAK-1'), 1, 'seat kept for a reconnect');
+  assert.strictEqual((await call('POST', '/api/leave', null, { table: 'DURAK-1', token: 'wrong' })).data.left, 0);
+  assert.strictEqual((await call('POST', '/api/leave', null, { table: 'DURAK-1', token: g1.first.token })).data.left, 1);
+  assert.strictEqual(await seatsAt('DURAK-1'), 0, 'guest seat freed by token');
+  let wb = (await call('GET', '/api/wallet', tb2)).data.chips;
+  const m1 = await sit('BLACKJACK-1', tb2);
+  assert.strictEqual(m1.first.t, 'joined');
+  assert.strictEqual((await call('GET', '/api/me', tb2)).data.seat.table, 'BLACKJACK-1', '/api/me shows where you sit');
+  const goneMsg = new Promise((r) => m1.ws.on('message', (d) => { if (JSON.parse(d).t === 'left') r(true); }));
+  assert.strictEqual((await call('POST', '/api/leave', tb2, {})).data.left, 1, 'members leave by account, no token needed');
+  assert(await Promise.race([goneMsg, wait(1000).then(() => false)]), 'the open table screen is told');
+  await wait(150);
+  assert.strictEqual((await call('GET', '/api/me', tb2)).data.seat, null);
+  assert.strictEqual((await call('GET', '/api/wallet', tb2)).data.chips, wb, 'chips back in the bankroll');
+  assert.strictEqual((await call('POST', '/api/leave', null, {})).status, 400);
+
   // ----- shutdown returns chips; restart refunds anything left -----
   const s2 = await sit('BLACKJACK-2', tb2);
   assert.strictEqual(s2.first.t, 'joined');

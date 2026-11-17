@@ -229,6 +229,7 @@
     const r = await api('/api/me');
     if (r.ok) {
       App.account = { username: r.data.username, isOwner: r.data.isOwner };
+      App.seat = r.data.seat || null;   // still seated somewhere (e.g. on another device)?
       // The appearance saved on the account follows you to every device.
       if (r.data.theme && r.data.theme !== Theme.mode()) Theme.set(r.data.theme);
     }
@@ -448,7 +449,8 @@
     if (m.t === 'joined') {
       localStorage.setItem('cg.seat.' + m.room, m.token);
       App.tableId = m.room;
-      history.replaceState(null, '', '?table=' + m.room);
+      if (new URLSearchParams(location.search).get('table') === m.room) history.replaceState(null, '', '?table=' + m.room);
+      else history.pushState(null, '', '?table=' + m.room);
       setTimeout(loadWallet, 300); // the buy-in moved chips from your bankroll
       return;
     }
@@ -494,10 +496,30 @@
     const me = st && st.mySeat !== -1 ? st.seats[st.mySeat] : null;
     const playing = st && me && me.inHand && ['preflop', 'flop', 'turn', 'river', 'betting', 'playing', 'spinning'].includes(st.stage);
     if (playing && !confirm(st.game === 'durak' ? 'Leave in the middle of a game? You will be the durak.' : st.game === 'flamingo' ? 'Leave in the middle of a game? You give up this round.' : 'Leave in the middle of a hand? You lose what you have bet.')) return;
-    send({ t: 'leave' });
-    setTimeout(() => { if (App.tableId) backToHub(); }, 1500);
+    const id = App.tableId;
+    send({ t: 'leave' });                                       // over the game connection, if it is up
+    apiLeave(id, id && localStorage.getItem('cg.seat.' + id));  // and over HTTP, which works even when it is not
+    backToHub();
   }
   App.leaveTable = leaveTable;
+
+  // Free a seat over HTTP (keepalive: still delivered while the page changes).
+  function apiLeave(table, token) {
+    if (!table && !token && !App.session) return Promise.resolve();
+    const headers = { 'Content-Type': 'application/json' };
+    if (App.session) headers.Authorization = 'Bearer ' + App.session;
+    return fetch('/api/leave', { method: 'POST', keepalive: true, headers, body: JSON.stringify({ table, token }) }).catch(() => {});
+  }
+  App.apiLeave = apiLeave;
+
+  // The browser's back button at a table means "leave the table".
+  window.addEventListener('popstate', () => {
+    if (!App.tableId) return;
+    if (new URLSearchParams(location.search).get('table')) return;
+    const before = App.tableId;
+    leaveTable();
+    if (App.tableId === before) history.pushState(null, '', '?table=' + before); // they chose to stay
+  });
 
   function backToHub() {
     if (App.tableId) localStorage.removeItem('cg.seat.' + App.tableId);
@@ -507,7 +529,7 @@
     $('hub').classList.remove('hidden');
     document.body.className = 'hub';
     applyCosmetics();
-    history.replaceState(null, '', location.pathname);
+    if (location.search) history.replaceState(null, '', location.pathname);
     lastChatId = null;
     loadTables();
     loadWallet();
@@ -1012,6 +1034,12 @@
     // the liveliest table with people at it, otherwise Hold'em Table 1
     return open.sort((a, b) => b.humans - a.humans || (b.playing - a.playing))[0] || App.tables[0];
   }
+  async function refreshSeat() {
+    if (!App.account) return;
+    const r = await api('/api/me');
+    if (r.ok) { App.seat = r.data.seat || null; renderMemberBar(); }
+  }
+
   function renderMemberBar() {
     const bar = $('memberBar');
     if (!bar) return;
@@ -1034,6 +1062,16 @@
       if (r) { coinPop(r.amount, r.streak > 1 ? `Day ${r.streak} in a row` : 'Daily bonus'); Sound.play('win'); }
     };
     bar.querySelector('[data-mb-play]').onclick = () => { const t = quickSeat(); if (t) joinTable(t.id); };
+    // Still holding a seat (another device, or the connection dropped)? Offer to return or free it.
+    if (App.seat && !App.tableId) {
+      const note = h('div', 'mb-seat', `<span>You still have a seat at <b>${esc(App.seat.tableName)}</b>.</span>`);
+      const back = h('button', 'btn btn-navy', 'Return');
+      back.onclick = () => joinTable(App.seat.table);
+      const free = h('button', 'btn btn-outline', 'Leave the table');
+      free.onclick = async () => { free.disabled = true; await apiLeave(App.seat.table, null); App.seat = null; renderMemberBar(); loadTables(); toast('Your seat is free again.', { kind: 'good' }); };
+      note.append(back, free);
+      bar.appendChild(note);
+    }
   }
 
   // ----- shop -----
@@ -1426,6 +1464,13 @@
     // Returning from a refresh or following an invite link: ?table=ID
     const params = new URLSearchParams(location.search);
     const id = (params.get('table') || '').toUpperCase();
+    if (!id) {
+      // Back in the lobby: seats this device still holds are stale — free them.
+      Object.keys(localStorage).filter((k) => k.startsWith('cg.seat.')).forEach((k) => {
+        apiLeave(k.slice(8), localStorage.getItem(k)).then(() => { refreshSeat(); });
+        localStorage.removeItem(k);
+      });
+    }
     if (id) {
       const seated = localStorage.getItem('cg.seat.' + id);
       if (seated && (App.account || localStorage.getItem('cg.guestName'))) connectAndJoin(id);
