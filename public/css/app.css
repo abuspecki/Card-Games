@@ -868,3 +868,19 @@ html[data-theme="dark"] .principle li::before { background: #DCC07A; color: #141
 /* ================= TURN CLOCK ================= */
 .turn-clock { padding: 6px 12px; border-radius: 999px; background: rgba(232, 196, 104, .16); border: 1px solid rgba(232, 196, 104, .6); color: #F3DDA2; font: 700 14px/1 'Montserrat', sans-serif; white-space: nowrap; }
 .turn-clock.soon { background: #A3202C; border-color: #FF8A8A; color: #fff; animation: v-pulse 1s ease-in-out infinite; }
+
+/* ================= TOP BAR AT THE TABLES: never squeezed ================= */
+.tbar { gap: 12px; }
+.tbar .tb-right, .blackjack .tb-right { width: auto !important; flex: none; flex-wrap: nowrap; gap: 8px; }
+.tbar .tb-center { flex: 1 1 auto; min-width: 0; }
+.tbar .tb-center small, .tbar .tb-center strong { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tb-btn { flex: none; aspect-ratio: 1; }
+.tb-wallet { flex: none; white-space: nowrap; align-items: center; }
+.tb-wallet > span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.turn-clock { flex: none; }
+@media (max-width: 1100px) {
+  .tbar .lobby-link span { display: none; }
+  .tbar .lobby-link { min-width: 44px; justify-content: center; letter-spacing: 0; }
+  .tb-wallet { gap: 10px; padding: 6px 12px; font-size: 15px; }
+  .tb-btn { width: 40px; height: 40px; }
+}
