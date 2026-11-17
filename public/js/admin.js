@@ -48,6 +48,7 @@
     document.querySelectorAll('#adminTabs button').forEach((b) => b.classList.toggle('on', b.dataset.view === v));
     $('detail').classList.add('hidden');
     if (v === 'tasks') loadTasks();
+    if (v === 'errors') loadErrors();
     if (v === 'overview') loadOverview();
     if (v === 'players') loadPlayers();
     if (v === 'feedback') loadFeedback();
@@ -248,6 +249,37 @@
     if (r.ok) { $('fbCount').textContent = r.data.feedback.length; $('fbCount').classList.toggle('hidden', !r.data.feedback.length); }
   }
 
+  // ---------- errors ----------
+  async function loadErrors() {
+    const r = await api('/api/admin/errors');
+    if (!r.ok) return;
+    const list = r.data.errors;
+    const recent = list.filter((e) => Date.now() - e.lastAt < 86400000).length;
+    $('errCount').textContent = recent;
+    $('errCount').classList.toggle('hidden', !recent);
+    const box = $('errList');
+    if (!box) return;
+    if (!list.length) { box.innerHTML = '<p class="empty">No errors recorded. 🎉</p>'; return; }
+    box.innerHTML = '';
+    for (const e of list) {
+      const el = document.createElement('article');
+      el.className = 'err ' + e.source;
+      el.innerHTML = '<header><span class="tag"></span><b class="cnt"></b><time></time><button class="btn btn-outline small">Resolved</button></header><p class="msg"></p><p class="ctx"></p><details><summary>Details</summary><pre></pre></details>';
+      el.querySelector('.tag').textContent = e.source === 'browser' ? 'Browser' : 'Server';
+      el.querySelector('.cnt').textContent = `${e.count}×`;
+      el.querySelector('time').textContent = `last ${ago(e.lastAt)} · first ${ago(e.firstAt)}`;
+      el.querySelector('.msg').textContent = e.message;
+      el.querySelector('.ctx').textContent = e.context || '';
+      el.querySelector('pre').textContent = e.stack || '(no stack trace)';
+      if (!e.stack) el.querySelector('details').remove();
+      el.querySelector('button').onclick = async () => { await api('/api/admin/errors/clear', { key: e.key }); loadErrors(); };
+      box.appendChild(el);
+    }
+  }
+  $('errRefresh').onclick = loadErrors;
+  $('errClear').onclick = async () => { if (!confirm('Clear all recorded errors?')) return; await api('/api/admin/errors/clear', {}); loadErrors(); };
+  setInterval(() => { if (document.visibilityState === 'visible') loadErrors(); }, 30000);
+
   // ---------- update notice ----------
   async function paintMaint() {
     const r = await fetch('/api/status').then((x) => x.json()).catch(() => null);
@@ -278,7 +310,7 @@
     }
     $('who').textContent = `Signed in as ${me.data.username}`;
     const initial = (location.hash || '#tasks').slice(1);
-    show(['tasks', 'overview', 'players', 'feedback'].includes(initial) ? initial : 'tasks');
+    show(['tasks', 'overview', 'players', 'feedback', 'errors'].includes(initial) ? initial : 'tasks');
     refreshCount();
     setInterval(() => {
       if (document.visibilityState !== 'visible') return;

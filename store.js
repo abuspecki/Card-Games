@@ -143,6 +143,23 @@ function postgresStore(url) {
         last_used TIMESTAMPTZ,
         revoked BOOLEAN NOT NULL DEFAULT false)`);
       await q(`CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT, at TIMESTAMPTZ NOT NULL DEFAULT now())`);
+      await q(`CREATE TABLE IF NOT EXISTS error_log (
+        key TEXT PRIMARY KEY, source TEXT NOT NULL, message TEXT NOT NULL, stack TEXT, context TEXT,
+        count INTEGER NOT NULL DEFAULT 1, first_at BIGINT NOT NULL, last_at BIGINT NOT NULL)`);
+    },
+
+    // ----- error monitoring -----
+    async saveError(g) {
+      await q(`INSERT INTO error_log (key, source, message, stack, context, count, first_at, last_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        ON CONFLICT (key) DO UPDATE SET message = $3, stack = COALESCE(NULLIF($4, ''), error_log.stack), context = COALESCE(NULLIF($5, ''), error_log.context), count = $6, last_at = $8`,
+      [g.key, g.source, g.message, g.stack || '', g.context || '', g.count, g.firstAt, g.lastAt]);
+    },
+    async loadErrors() {
+      const r = await q('SELECT * FROM error_log ORDER BY last_at DESC LIMIT 300');
+      return r.rows.map((x) => ({ key: x.key, source: x.source, message: x.message, stack: x.stack || '', context: x.context || '', count: x.count, firstAt: Number(x.first_at), lastAt: Number(x.last_at) }));
+    },
+    async clearErrors(key) {
+      if (key) await q('DELETE FROM error_log WHERE key = $1', [key]); else await q('DELETE FROM error_log');
     },
 
     // ----- one-time jobs: returns true the first time a key is claimed -----
@@ -436,6 +453,9 @@ function fileStore(file) {
       save();
       return out.result;
     },
+    async saveError(g) { db.errors = db.errors || {}; db.errors[g.key] = { ...g }; save(); },
+    async loadErrors() { return Object.values(db.errors || {}); },
+    async clearErrors(key) { db.errors = db.errors || {}; if (key) delete db.errors[key]; else db.errors = {}; save(); },
     async claimOnce(key) {
       db.meta = db.meta || {};
       if (db.meta[key]) return false;

@@ -140,6 +140,18 @@ function createApi(ctx) {
       return json(res, 200, { ok: true });
     }
 
+    // ===== error reports from players' browsers =====
+    if (method === 'POST' && url === '/api/client-error') {
+      if (limited(`clienterr:${ip}`, 30, 10 * 60 * 1000)) return json(res, 429, { error: 'Too many reports' });
+      const body = await readBody(req).catch(() => ({}));
+      const who = await currentUser(req).catch(() => null);
+      ctx.errors.record('browser', String(body.message || 'Unknown browser error').slice(0, 500), {
+        stack: String(body.stack || '').slice(0, 3000),
+        context: `${String(body.where || '').slice(0, 80)} · ${who ? who.username : 'guest'} · ${String(body.ua || req.headers['user-agent'] || '').slice(0, 140)}`,
+      });
+      return json(res, 200, { ok: true });
+    }
+
     // ===== public data =====
     if (method === 'GET' && url === '/api/leaderboard') {
       const mode = new URL(req.url, 'http://x').searchParams.get('mode');
@@ -336,6 +348,13 @@ function createApi(ctx) {
         return json(res, 200, { ok: true, url: taskboard.links({ title: lead.title, beschreibung }).newTask });
       }
 
+      // Error monitoring
+      if (method === 'GET' && url === '/api/admin/errors') return json(res, 200, { errors: ctx.errors.list() });
+      if (method === 'POST' && url === '/api/admin/errors/clear') {
+        const body = await readBody(req);
+        ctx.errors.clear(body.key ? String(body.key).slice(0, 40) : null);
+        return json(res, 200, { ok: true });
+      }
       // Announce an update: countdown for everyone, no new hands once it runs out.
       if (method === 'POST' && url === '/api/admin/maintenance') {
         const body = await readBody(req);

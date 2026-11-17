@@ -10,6 +10,10 @@ const { WebSocketServer } = require('ws');
 const { openStore } = require('./store');
 const { makeCoins, rewardFor } = require('./coins');
 const { createGoldRush } = require('./goldrush');
+const { createErrorLog } = require('./errorlog');
+// Error monitoring first, so every console.error from here on is recorded.
+const errors = createErrorLog();
+errors.hookConsole();
 const UPDATE_BONUS = 1000; // chips for every member who is playing when the server restarts
 const { createLobby } = require('./tables');
 const { createApi } = require('./api');
@@ -32,6 +36,7 @@ let store = null;
 let coins = null;
 let databaseError = null;
 const ctx = { store: () => store, coins: () => coins, databaseError: () => databaseError, owners };
+ctx.errors = errors;
 ctx.lobby = createLobby(ctx);
 // Coins for a win outside the tables (Gold Rush), with the same daily cap.
 ctx.reward = (userId, result) => { const n = rewardFor(result); return n ? coins.earn(userId, n) : null; };
@@ -145,6 +150,7 @@ async function shutdown(signal) {
       await Promise.race([work, new Promise((r) => setTimeout(r, 8000))]);
     }
   } catch (e) { console.error(e); }
+  try { await errors.flush(); } catch { /* ignore */ }
   try { if (store && store.flush) store.flush(); } catch (e) { console.error('flush', e); }
   process.exit(0);
 }
@@ -157,6 +163,7 @@ openStore()
     store = r.store;
     databaseError = r.error;
     coins = makeCoins(store);
+    await errors.attach(store);
     // Chips left at tables by a crash go back to their owners.
     const refunded = await store.refundInPlay();
     if (refunded) console.log(`Refunded table chips for ${refunded} player(s) after a restart`);

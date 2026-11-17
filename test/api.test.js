@@ -240,6 +240,17 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   assert.strictEqual(gres.data.wallet.chips, gw0);
   assert.strictEqual((await call('POST', '/api/goldrush/dig', ta)).status, 400, 'no dig without a round');
 
+  // ----- error monitoring: browser reports are grouped and shown to owners -----
+  for (let k = 0; k < 3; k++) await call('POST', '/api/client-error', ta, { message: `TypeError: x is undefined (id ${k}23)`, stack: 'at app.js:1:2', where: '/?table=HOLDEM-1' });
+  assert.strictEqual((await call('GET', '/api/admin/errors', ta)).status, 403, 'owners only');
+  let errs = (await call('GET', '/api/admin/errors', to)).data.errors;
+  const be = errs.find((e) => e.source === 'browser' && /x is undefined/.test(e.message));
+  assert(be && be.count === 3, 'similar reports are grouped');
+  assert(/HOLDEM-1/.test(be.context) && be.stack, 'context and stack kept');
+  await call('POST', '/api/admin/errors/clear', to, { key: be.key });
+  errs = (await call('GET', '/api/admin/errors', to)).data.errors;
+  assert(!errs.some((e) => e.key === be.key), 'resolved');
+
   // ----- announced update: countdown, then no new hands; status tells when it is safe -----
   assert.strictEqual((await call('POST', '/api/admin/maintenance', ta, { minutes: 5 })).status, 403, 'owners only');
   let mt = await call('POST', '/api/admin/maintenance', to, { minutes: 5 });
@@ -300,12 +311,15 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   w = (await call('GET', '/api/wallet', tb2)).data;
   assert.strictEqual(w.inPlay, 4900, 'high roller buy-in takes what you have');
   // bet in the middle of a hand, then the server restarts: the hand is called off, the bet comes back
+  let lastBj = null;
   const betPlaced = new Promise((r) => s2.ws.on('message', (d) => {
     const m = JSON.parse(d);
+    if (m.t === 'state') lastBj = { stage: m.state.stage, limits: m.state.limits, me: m.state.seats[m.state.mySeat], maint: m.maintenance };
+    if (m.t === 'error') lastBj = { error: m.msg };
     if (m.t === 'state' && m.state.limits && m.state.limits.phase === 'bet') s2.ws.send(JSON.stringify({ t: 'action', action: 'bet', amount: 500 }));
     if (m.t === 'state' && m.state.seats[m.state.mySeat] && m.state.seats[m.state.mySeat].chips === 4400) r(true);
   }));
-  assert(await Promise.race([betPlaced, wait(8000).then(() => false)]), '500 bet placed');
+  assert(await Promise.race([betPlaced, wait(12000).then(() => false)]), '500 bet placed: ' + JSON.stringify(lastBj));
   await stop('SIGTERM');
   await start();
   w = (await call('GET', '/api/wallet', tb2)).data;

@@ -22,6 +22,7 @@
       <button data-view="feedback">Feedback <span class="count hidden" id="fbCount"></span></button>
       <button data-view="overview">Overview</button>
       <button data-view="players">Players</button>
+      <button data-view="errors">Errors <span class="count hidden" id="errCount"></span></button>
     </nav>
     <div class="actions"><span class="who" id="who"></span><button class="theme-btn" onclick="Theme.toggle()" aria-label="Light or dark mode" title="Light / dark mode">◐</button><a class="btn btn-outline" href="/">Back to the club</a></div>
   </header>
@@ -75,6 +76,13 @@
         </table>
         <div class="pager"><button class="btn btn-outline" id="prev">Previous</button><span id="pageInfo"></span><button class="btn btn-outline" id="next">Next</button></div>
       </div>
+    </section>
+
+    <section data-section="errors" class="hidden">
+      <div class="admin-head"><div><p class="eyebrow">The Engine Room</p><h1>Errors</h1>
+        <p class="sub">Problems from the server and from players' browsers, grouped. New ones appear here automatically.</p></div>
+        <div class="row-gap"><button class="btn btn-outline" id="errRefresh">Refresh</button><button class="btn btn-outline" id="errClear">Clear all</button></div></div>
+      <div id="errList" class="err-list"></div>
     </section>
 
     <section data-section="feedback" class="hidden">
