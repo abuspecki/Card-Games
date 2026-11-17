@@ -1,0 +1,47 @@
+name: Aufgabe
+description: Eine neue Aufgabe für CardGames – Claude arbeitet sie nach Priorität ab.
+title: ""
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Je genauer du beschreibst, was du willst, desto besser wird das Ergebnis.
+        Wenn etwas unklar ist, stellt Claude hier eine Frage (Label **Frage**) und wartet auf deine Antwort.
+  - type: dropdown
+    id: prioritaet
+    attributes:
+      label: Priorität
+      options:
+        - "P1 · Höchste – sofort"
+        - "P2 · Hoch"
+        - "P3 · Mittel"
+        - "P4 · Niedrig – wenn Zeit ist"
+      default: 1
+    validations:
+      required: true
+  - type: dropdown
+    id: bereich
+    attributes:
+      label: Bereich
+      options:
+        - Spiele & Tische
+        - Chips, Münzen & Shop
+        - Design & Layout
+        - Handy & Tablet
+        - Konten & Freunde
+        - Owner-Werkzeuge
+        - Sonstiges
+    validations:
+      required: true
+  - type: textarea
+    id: beschreibung
+    attributes:
+      label: Was soll passieren?
+      description: Beschreibe das Ziel. Was genau soll sich ändern? Beispiele, Vorbilder, Screenshots helfen sehr.
+    validations:
+      required: true
+  - type: textarea
+    id: fertig
+    attributes:
+      label: Woran erkenne ich, dass es fertig ist?
+      description: "Optional: z. B. „Auf dem Handy sehe ich …“, „Ich kann …“."

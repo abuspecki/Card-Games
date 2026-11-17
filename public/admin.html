@@ -31,24 +31,16 @@
     <section id="gate" class="gate hidden"></section>
 
     <section data-section="tasks" class="hidden">
-      <div class="admin-head"><div><p class="eyebrow">The Workshop</p><h1>Development board</h1>
-        <p class="sub">Add tasks any time — they line up by priority. Claude works through the queue and reports progress here.</p></div>
-        <div class="row-gap"><button class="btn btn-outline" id="devBtn">Developer access</button><button class="btn btn-navy" id="newTaskBtn">New task</button></div></div>
-      <form class="panel new-task hidden" id="newTask">
-        <div class="nt-grid">
-          <label class="wide">Task<input name="title" maxlength="140" required placeholder="What should be done?"></label>
-          <label>Priority<select name="priority"><option value="1">1 · Highest</option><option value="2" selected>2 · High</option><option value="3">3 · Medium</option><option value="4">4 · Low</option></select></label>
-          <label>Area<input name="category" maxlength="60" placeholder="e.g. Design, Games, Shop" list="areas"></label>
-          <label class="wide">Details<textarea name="description" rows="4" maxlength="8000" placeholder="Describe the goal, what exactly should change, any examples…"></textarea></label>
-        </div>
-        <datalist id="areas"><option>Games & tables</option><option>Chips, coins & shop</option><option>Design & layout</option><option>Phones & tablets</option><option>Accounts & friends</option><option>Owner tools</option></datalist>
-        <div class="row-gap"><button class="btn btn-navy">Add to the queue</button><button type="button" class="btn btn-outline" id="cancelTask">Cancel</button></div>
-      </form>
+      <div class="admin-head"><div><p class="eyebrow">Die Werkstatt</p><h1>Aufgaben</h1>
+        <p class="sub">Schreib Aufgaben mit dem Formular – sie landen auf GitHub, und Claude arbeitet sie nach Priorität ab. Fragen von Claude erscheinen oben.</p></div>
+        <div class="row-gap"><a class="btn btn-outline" id="tbList" target="_blank" rel="noopener">Alle auf GitHub</a><a class="btn btn-navy" id="tbNew" target="_blank" rel="noopener">Neue Aufgabe</a></div></div>
+      <div id="tbQuestion" class="tb-question hidden"></div>
       <div class="board">
-        <div class="col-board"><h2>In progress <span id="cntDoing"></span></h2><div id="colDoing" class="cards"></div></div>
-        <div class="col-board"><h2>Queue <span id="cntQueue"></span></h2><div id="colQueue" class="cards"></div></div>
-        <div class="col-board"><h2>Completed <span id="cntDone"></span></h2><div id="colDone" class="cards"></div></div>
+        <div class="col-board"><h2>In Arbeit <span id="cntDoing"></span></h2><div id="colDoing" class="cards"></div></div>
+        <div class="col-board"><h2>Warteschlange <span id="cntQueue"></span></h2><div id="colQueue" class="cards"></div></div>
+        <div class="col-board"><h2>Erledigt <span id="cntDone"></span></h2><div id="colDone" class="cards"></div></div>
       </div>
+      <p class="fine" id="tbFoot"></p>
     </section>
 
     <section data-section="overview" class="hidden">

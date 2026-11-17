@@ -196,47 +196,9 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   // Trading in a circle always loses: chips bought with coins convert back at a worse rate.
   assert(before.buyChips.rate < before.convert.rate);
 
-  // ----- task board -----
-  assert.strictEqual((await call('GET', '/api/tasks', ta)).status, 401, 'players cannot see the board');
-  r = await call('POST', '/api/tasks', to, { title: 'Build the task board', description: 'Queue + history', priority: 1 });
-  const t1 = r.data.id;
-  const t2 = (await call('POST', '/api/tasks', to, { title: 'Dark mode', priority: 2 })).data.id;
-  const t3 = (await call('POST', '/api/tasks', to, { title: 'Polish the lobby', priority: 3 })).data.id;
-  assert.strictEqual((await call('POST', '/api/tasks', to, { title: 'x' })).status, 400, 'title required');
-  let board = (await call('GET', '/api/tasks', to)).data;
-  assert.deepStrictEqual(board.queue.filter((t) => [t1, t2, t3].includes(t.id)).map((t) => t.id), [t1, t2, t3], 'queue ordered by priority');
-  // reprioritise: t3 becomes most important
-  await call('POST', `/api/tasks/${t3}`, to, { priority: 1 });
-  board = (await call('GET', '/api/tasks', to)).data;
-  const order = board.queue.filter((t) => [t1, t2, t3].includes(t.id)).map((t) => t.id);
-  assert(order.indexOf(t3) < order.indexOf(t2), 'reprioritised');
-  // developer key: owners create it, Claude uses it
-  const keyRes = await call('POST', '/api/admin/devkeys', to, { name: 'Claude' });
-  const devKey = keyRes.data.key;
-  assert(/^cgk_/.test(devKey));
-  const dev = async (method, url, body) => {
-    const x = await fetch(BASE + url, { method, headers: { 'Content-Type': 'application/json', 'X-Dev-Key': devKey }, body: body ? JSON.stringify(body) : undefined });
-    return { status: x.status, data: await x.json().catch(() => ({})) };
-  };
-  assert.strictEqual((await dev('GET', '/api/tasks')).status, 200);
-  assert.strictEqual((await dev('POST', `/api/tasks/${t1}`, { status: 'in_progress', progress: 40 })).status, 200);
-  await dev('POST', `/api/tasks/${t1}/notes`, { text: 'Database tables done, API next.' });
-  let detail = (await call('GET', `/api/tasks/${t1}`, to)).data;
-  assert.strictEqual(detail.status, 'in_progress');
-  assert.strictEqual(detail.progress, 40);
-  assert(detail.started_at);
-  assert(detail.notes.some((n) => /Started/.test(n.text) && /Claude/.test(n.author)), 'history records who started it');
-  assert(detail.notes.some((n) => /Database tables done/.test(n.text)));
-  assert.strictEqual((await dev('POST', `/api/tasks/${t2}/delete`)).status, 403, 'developer cannot delete');
-  assert.strictEqual((await dev('GET', '/api/admin/overview')).status, 401, 'developer key gives no admin access');
-  assert.strictEqual((await dev('GET', '/api/tasks/feedback')).status, 200, 'developer can read ranked feedback');
-  assert.strictEqual((await fetch(BASE + '/api/tasks', { headers: { 'X-Dev-Key': 'cgk_wrong' } })).status, 401);
-  await call('POST', `/api/tasks/${t1}`, to, { status: 'done' });
-  board = (await call('GET', '/api/tasks', to)).data;
-  assert(board.done.some((t) => t.id === t1 && t.progress === 100 && t.completed_at), 'completed history');
-  await call('POST', `/api/admin/devkeys/${(await call('GET', '/api/admin/devkeys', to)).data.keys[0].id}/revoke`, to);
-  assert.strictEqual((await dev('GET', '/api/tasks')).status, 401, 'revoked key stops working');
-  assert.strictEqual((await call('POST', `/api/tasks/${t3}/delete`, to)).status, 200);
+  // ----- task board: owners only; the old developer-key board is gone -----
+  assert.strictEqual((await call('GET', '/api/admin/tasks', ta)).status, 403, 'players cannot see the board');
+  assert.strictEqual((await fetch(BASE + '/api/tasks')).status, 404, 'old board API removed');
 
   // ----- feedback centre: ranking, convert to task, auto-resolve -----
   await call('POST', '/api/feedback', ta, { category: 'bug', message: 'The game crashes when I fold on my phone and I lose chips' });
@@ -247,13 +209,9 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   assert.strictEqual(crash.level, 'critical');
   assert.strictEqual(fov.clusters[0].message, crash.message, 'most important first');
   r = await call('POST', '/api/admin/feedback/totask', to, { ids: crash.ids });
-  const tf = r.data.id;
-  detail = (await call('GET', `/api/tasks/${tf}`, to)).data;
-  assert.strictEqual(detail.priority, 1, 'critical feedback becomes a top-priority task');
-  assert.deepStrictEqual(detail.feedbackIds.sort(), crash.ids.slice().sort());
-  await call('POST', `/api/tasks/${tf}`, to, { status: 'done' });
-  const resolved = (await call('GET', '/api/admin/feedback?status=resolved', to)).data.feedback;
-  assert(crash.ids.every((x) => resolved.some((f) => f.id === x)), 'finishing the task resolves its feedback');
+  assert(r.data.url.startsWith('https://github.com/') && /template=aufgabe\.yml/.test(r.data.url) && /beschreibung=/.test(r.data.url), 'feedback opens a pre-filled task form');
+  const readNow = (await call('GET', '/api/admin/feedback?status=read', to)).data.feedback;
+  assert(crash.ids.every((x) => readNow.some((f) => f.id === x)), 'turned-into-task feedback is marked read');
 
   // ----- shutdown returns chips; restart refunds anything left -----
   const s2 = await sit('BLACKJACK-2', tb2);

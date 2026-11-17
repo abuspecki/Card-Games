@@ -123,6 +123,10 @@ table.grid.small th, table.grid.small td { padding: 8px 6px; }
 .tcard header { display: flex; gap: 6px; flex-wrap: wrap; }
 .tcard h3 { font: 600 19px/1.25 'Cormorant Garamond', serif; color: var(--navy); }
 .tcard .meta { font-size: 13px; opacity: .7; font-style: italic; }
+a.tcard { text-decoration: none; color: inherit; }
+.tcard .task-sum { font-size: 15px; opacity: .8; white-space: pre-line; }
+.tb-question { border: 1px solid #C9752B; background: rgba(201,117,43,.08); padding: 14px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 10px; }
+.tb-question h2 { font: 600 22px 'Cormorant Garamond', serif; color: #C9752B; }
 .tcard footer { display: flex; justify-content: space-between; font-size: 12px; opacity: .6; }
 .prio { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; color: #fff; }
 .prio.p1 { background: #8E1B24; } .prio.p2 { background: #C9752B; } .prio.p3 { background: var(--gold); color: #1A1208; } .prio.p4 { background: #8A9AB2; }
