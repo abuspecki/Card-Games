@@ -194,6 +194,14 @@ openStore()
     ctx.weekly.start();
     // One-time thank-you for the players interrupted by the Gold Rush update
     // (the old server could not pay the update bonus yet). Runs only once.
+    // One-time apology for the skins update, which went out while these two were
+    // playing in the Diamond Room: 1,000 coins each. Runs only once.
+    if (await store.claimOnce('update-bonus-2026-11-18-skins')) {
+      for (const name of ['Flöti', 'Knecht Ruprecht']) {
+        const u = await store.getUserByName(name);
+        if (u) { await coins.adjust(u.id, 1000, 0, 'bonus'); console.log(`Update bonus: 1000 coins for ${u.username}`); }
+      }
+    }
     if (await store.claimOnce('update-bonus-2026-11-17-goldrush')) {
       for (const name of ['Eule_Mit_Keule', 'Flöti']) {
         const u = await store.getUserByName(name);
