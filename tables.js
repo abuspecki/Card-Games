@@ -22,6 +22,8 @@ const GAMES = {
 const TABLES = [
   { id: 'HOLDEM-1', name: "Hold'em · Table 1", game: 'holdem', capacity: 8, buyIn: 1000, minBuyIn: 200, settings: { smallBlind: 5, bigBlind: 10 } },
   { id: 'HOLDEM-2', name: "Hold'em · High Roller", game: 'holdem', capacity: 8, highRoller: true, buyIn: 5000, minBuyIn: 2500, settings: { smallBlind: 25, bigBlind: 50 } },
+  // The big one: 500 / 1,000 blinds. Buy-in 20,000 (20 big blinds), at least 10,000.
+  { id: 'HOLDEM-3', name: "Hold'em · Diamond Room", game: 'holdem', capacity: 8, highRoller: true, buyIn: 20000, minBuyIn: 10000, settings: { smallBlind: 500, bigBlind: 1000 } },
   { id: 'BLACKJACK-1', name: 'Blackjack · Table 1', game: 'blackjack', capacity: 7, buyIn: 1000, minBuyIn: 100, settings: { bigBlind: 10 } },
   { id: 'BLACKJACK-2', name: 'Blackjack · High Roller', game: 'blackjack', capacity: 7, highRoller: true, buyIn: 5000, minBuyIn: 1000, settings: { bigBlind: 50 } },
   { id: 'DURAK-1', name: 'Durak · Table 1', game: 'durak', capacity: 6 },

@@ -27,7 +27,7 @@
     "Attack, defend — don't be the fool": 'Angreifen, verteidigen – sei nicht der Durak', 'Red, black or your lucky number': 'Rot, Schwarz oder deine Glückszahl',
     'Match colour or number · up to 6': 'Farbe oder Zahl bedienen · bis 6', 'Dig deeper — cash out before it caves in': 'Grab tiefer – zahl aus, bevor es einstürzt',
     'The Mine': 'Die Mine', 'Solo': 'Solo', 'Stakes 10 – 5,000 · members': 'Einsatz 10 – 5.000 · Mitglieder', 'Play': 'Spielen',
-    'Table 1': 'Tisch 1', 'High Roller': 'High Roller', 'Empty': 'Leer', 'Waiting': 'Wartet', '● In play': '● Im Spiel',
+    'Table 1': 'Tisch 1', 'High Roller': 'High Roller', 'Diamond Room': 'Diamant-Saal', 'Empty': 'Leer', 'Waiting': 'Wartet', '● In play': '● Im Spiel',
     'Take a Seat': 'Platz nehmen', 'Take a seat': 'Platz nehmen', 'Table full': 'Tisch voll', 'Members only': 'Nur Mitglieder', 'Not enough chips': 'Zu wenig Chips',
     '👁 Watch': '👁 Zuschauen', 'Watch this table without taking a seat': 'Diesem Tisch zuschauen, ohne Platz zu nehmen', 'Open seat': 'Freier Platz',
     '2–6 players': '2–6 Spieler', 'members only': 'nur Mitglieder',
