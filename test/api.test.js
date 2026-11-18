@@ -381,12 +381,14 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   assert.strictEqual(w.inPlay, 4900, 'high roller buy-in takes what you have');
   // bet in the middle of a hand, then the server restarts: the hand is called off, the bet comes back
   let lastBj = null;
+  let stackBefore = 4900;
   const betPlaced = new Promise((r) => s2.ws.on('message', (d) => {
     const m = JSON.parse(d);
     if (m.t === 'state') lastBj = { stage: m.state.stage, limits: m.state.limits, me: m.state.seats[m.state.mySeat], maint: m.maintenance };
     if (m.t === 'error') lastBj = { error: m.msg };
     if (m.t === 'state' && m.state.limits && m.state.limits.phase === 'bet') s2.ws.send(JSON.stringify({ t: 'action', action: 'bet', amount: 500 }));
-    if (m.t === 'state' && m.state.seats[m.state.mySeat] && m.state.seats[m.state.mySeat].chips === 4400) r(true);
+    // the bet is down (the stack depends on how earlier hands ended)
+    if (m.t === 'state' && m.state.seats[m.state.mySeat] && m.state.seats[m.state.mySeat].bet === 500) { stackBefore = m.state.seats[m.state.mySeat].chips + 500; r(true); }
   }));
   assert(await Promise.race([betPlaced, wait(12000).then(() => false)]), '500 bet placed: ' + JSON.stringify(lastBj));
   await stop('SIGTERM');
@@ -395,7 +397,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   // Either the hand is called off (bet back) or it finished while the server drained
   // (lost / push / won / blackjack). Nothing may stay "at the table". +1,000 update bonus.
   assert.strictEqual(w.inPlay, 0, 'nothing left at the table after the restart');
-  assert.ok([-500, 0, 500, 750].includes(w.chips - 1000 - 4900), 'chips back after restart, plus the 1,000 update bonus: ' + w.chips);
+  assert.ok([-500, 0, 500, 750].includes(w.chips - 1000 - stackBefore), `chips back after restart, plus the 1,000 update bonus: ${w.chips} (stack before the bet ${stackBefore})`);
   await call('POST', '/api/admin/players/' + (await call('GET', '/api/admin/players?search=' + B, to)).data.players[0].id + '/adjust', to, { chips: 4900 - w.chips });
   // crash (no graceful shutdown) is refunded at the next start
   const s3 = await sit('HOLDEM-1', tb2);

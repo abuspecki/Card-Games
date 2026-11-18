@@ -47,6 +47,15 @@ const CATALOG = [
   // ----- animated (everyone at the table sees them move) -----
   { id: 'back-aurora', slot: 'cardback', name: 'Aurora', price: 1200, preview: 'aurora', animated: true },
   { id: 'back-goldflux', slot: 'cardback', name: 'Liquid Gold', price: 1500, preview: 'goldflux', animated: true },
+  // anime collection (original designs)
+  { id: 'back-sakura', slot: 'cardback', name: 'Sakura Storm', price: 1600, preview: 'sakura', animated: true },
+  { id: 'back-kitsune', slot: 'cardback', name: 'Neon Kitsune', price: 2000, preview: 'kitsune', animated: true },
+  { id: 'back-burst', slot: 'cardback', name: 'Shonen Burst', price: 1800, preview: 'burst', animated: true },
+  { id: 'back-starry', slot: 'cardback', name: 'Starry Dream', price: 1600, preview: 'starry', animated: true },
+  { id: 'face-sakura', slot: 'cardface', name: 'Sakura Bloom', price: 1400, preview: 'sakura', animated: true },
+  { id: 'face-neon', slot: 'cardface', name: 'Neon Night', price: 1800, preview: 'neon', animated: true },
+  { id: 'face-manga', slot: 'cardface', name: 'Manga Ink', price: 1500, preview: 'manga', animated: true },
+  { id: 'face-starlight', slot: 'cardface', name: 'Starlight', price: 1400, preview: 'starlight', animated: true },
   { id: 'pf-neon', slot: 'avatar', name: 'Neon Pulse', price: 900, preview: 'pf:neon', animated: true },
   { id: 'pf-flame', slot: 'avatar', name: 'Eternal Flame', price: 1300, preview: 'pf:flame', animated: true },
   { id: 'pf-halo', slot: 'avatar', name: 'Golden Halo', price: 1800, preview: 'pf:halo', animated: true },

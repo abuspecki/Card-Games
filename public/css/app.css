@@ -984,3 +984,85 @@ body.holdem .seat.active[data-turn="lightning"] { box-shadow: 0 0 26px rgba(255,
   .card-back.cb-aurora .deco, .card-back.cb-goldflux .deco, .pf-neon, .pf-flame::before, .pf-halo::before, .title.anim, .chip.cs-holo,
   :is(.seat, .plate, .spot-label, .mini-turn)[data-turn="lightning"]::after { animation: none !important; }
 }
+
+/* =========================================================
+   Anime collection — original, animated card backs and faces.
+   ========================================================= */
+/* ---------- backs ---------- */
+/* Sakura Storm: night-pink sky, cherry petals drifting down, 桜 in the middle */
+.card-back.cb-sakura { --acc: #FFD3E6; --bg1: #7A2A5C; --bg2: #2A0E2E; }
+.card-back.cb-sakura .deco { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'%3E%3Cpath d='M14 8c6-5 13 0 10 7-2 5-9 6-10-7z' fill='%23FFC4DD'/%3E%3Cpath d='M44 34c7-2 11 5 6 9-4 3-10 1-6-9z' fill='%23FF9EC8'/%3E%3Cpath d='M28 48c4 3 1 9-3 8-3-1-3-6 3-8z' fill='%23FFE0EE'/%3E%3C/svg%3E") 0 0 / calc(var(--w) * .5) calc(var(--w) * .5);
+  animation: cg-petal-fall 7s linear infinite; opacity: .9; }
+.card-back.cb-sakura .deco::after { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 50% 120%, rgba(255,150,200,.45), transparent 60%); }
+.card-back.cb-sakura .mono { font-size: 0; }
+.card-back.cb-sakura .mono::after { content: '桜'; font-size: calc(var(--w) * .3); color: #FFE3EF; text-shadow: 0 0 8px #FF7AB6, 0 0 16px rgba(255,122,182,.6); font-family: 'Noto Serif JP', 'Hiragino Mincho ProN', serif; }
+@keyframes cg-petal-fall { from { background-position: 0 0; } to { background-position: calc(var(--w) * .5) calc(var(--w) * 1); } }
+
+/* Neon Kitsune: a glowing fox mask, scanlines drifting by */
+.card-back.cb-kitsune { --acc: #39F0FF; --bg1: #2A0F4A; --bg2: #0A0618; }
+.card-back.cb-kitsune .deco { background: repeating-linear-gradient(0deg, rgba(57,240,255,.08) 0 1px, transparent 1px 4px); animation: cg-scan 3s linear infinite; }
+.card-back.cb-kitsune .deco::after { content: ''; position: absolute; inset: 18% 14% 22%; background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M18 14 L38 40 L62 40 L82 14 L78 58 Q50 94 22 58 Z' fill='rgba(57,240,255,.08)' stroke='%2339F0FF' stroke-width='3' stroke-linejoin='round'/%3E%3Cpath d='M26 22 L36 38 M74 22 L64 38' stroke='%23FF4FD8' stroke-width='2.5'/%3E%3Cpath d='M33 54 l10 5 M67 54 l-10 5' stroke='%23FF4FD8' stroke-width='3.5' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='72' r='3.5' fill='%23FF4FD8'/%3E%3Cpath d='M42 64 Q50 70 58 64' fill='none' stroke='%2339F0FF' stroke-width='2'/%3E%3C/svg%3E");
+  filter: drop-shadow(0 0 4px #39F0FF) drop-shadow(0 0 10px rgba(255,79,216,.6)); animation: cg-neon-flicker 3.2s infinite; }
+.card-back.cb-kitsune .mono { align-self: end; margin-bottom: 12%; font-size: calc(var(--w) * .11); font-family: 'Montserrat', sans-serif; letter-spacing: .2em; color: #FF4FD8; text-shadow: 0 0 6px #FF4FD8; }
+@keyframes cg-scan { from { background-position: 0 0; } to { background-position: 0 calc(var(--w) * .4); } }
+@keyframes cg-neon-flicker { 0%, 18%, 22%, 62%, 66%, 100% { opacity: 1; } 20%, 64% { opacity: .45; } }
+
+/* Shonen Burst: manga speed lines turning around a pulsing energy core */
+.card-back.cb-burst { --acc: #FFFFFF; --bg1: #FF8A1F; --bg2: #C2281B; }
+.card-back.cb-burst .deco { inset: -45%; background: repeating-conic-gradient(from 0deg, rgba(255,255,255,.55) 0 2deg, transparent 2deg 11deg); animation: cg-spin 14s linear infinite; }
+.card-back.cb-burst .deco::after { content: ''; position: absolute; left: 50%; top: 50%; width: 30%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%;
+  background: radial-gradient(circle, #FFFBE0 0 30%, #FFE15A 45%, rgba(255,225,90,0) 70%); animation: cg-core 1.4s ease-in-out infinite; }
+.card-back.cb-burst .mono { font-family: 'Montserrat', sans-serif; font-weight: 900; font-style: italic; color: #1A0A00; text-shadow: 2px 2px 0 #FFE15A, -1px -1px 0 #fff; }
+@keyframes cg-core { 0%, 100% { transform: translate(-50%, -50%) scale(.85); opacity: .85; } 50% { transform: translate(-50%, -50%) scale(1.25); opacity: 1; } }
+
+/* Starry Dream: twinkling stars, a crescent moon and a shooting star */
+.card-back.cb-starry { --acc: #E8E4FF; --bg1: #2B2A7A; --bg2: #0B0B2E; }
+.card-back.cb-starry .deco { background:
+  radial-gradient(circle at 18% 22%, #fff 0 1px, transparent 1.6px), radial-gradient(circle at 72% 14%, #fff 0 1.2px, transparent 2px),
+  radial-gradient(circle at 84% 62%, #fff 0 1px, transparent 1.6px), radial-gradient(circle at 30% 78%, #fff 0 1.3px, transparent 2px),
+  radial-gradient(circle at 58% 88%, #fff 0 .8px, transparent 1.4px), radial-gradient(circle at 10% 55%, #fff 0 .9px, transparent 1.5px);
+  animation: cg-twinkle 2.4s ease-in-out infinite alternate; }
+.card-back.cb-starry .deco::before { content: ''; position: absolute; right: 16%; top: 12%; width: 22%; aspect-ratio: 1; border-radius: 50%; box-shadow: inset -5px 3px 0 0 #FFE9A8; transform: rotate(-20deg); filter: drop-shadow(0 0 6px rgba(255,233,168,.8)); }
+.card-back.cb-starry .deco::after { content: ''; position: absolute; left: -30%; top: 30%; width: 35%; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, #fff); transform: rotate(18deg); animation: cg-shoot 4.5s ease-in infinite; }
+.card-back.cb-starry .mono { color: #FFE9A8; text-shadow: 0 0 8px rgba(255,233,168,.7); }
+@keyframes cg-twinkle { from { opacity: .55; } to { opacity: 1; } }
+@keyframes cg-shoot { 0%, 70% { transform: translate(0, 0) rotate(18deg); opacity: 0; } 75% { opacity: 1; } 100% { transform: translate(calc(var(--w) * 1.6), calc(var(--w) * .5)) rotate(18deg); opacity: 0; } }
+
+/* ---------- faces (your own view) ---------- */
+/* Sakura Bloom */
+body[data-cardface="sakura"] .card:not(.shop-preview .card), .face-sakura .card {
+  --ink: #3B2350; border-color: #F3B8D0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'%3E%3Cpath d='M14 8c6-5 13 0 10 7-2 5-9 6-10-7z' fill='%23FFD6E8'/%3E%3Cpath d='M44 34c7-2 11 5 6 9-4 3-10 1-6-9z' fill='%23FFC4DD' opacity='.8'/%3E%3C/svg%3E") 0 0 / calc(var(--w) * .6) calc(var(--w) * .6), linear-gradient(170deg, #FFF8FB, #FFE6F0);
+  animation: cg-petal-face 10s linear infinite; }
+:is(body[data-cardface="sakura"] .card:not(.shop-preview .card), .face-sakura .card).red { --ink: #D6336C; }
+@keyframes cg-petal-face { from { background-position: 0 0, 0 0; } to { background-position: calc(var(--w) * .6) calc(var(--w) * 1.2), 0 0; } }
+
+/* Neon Night */
+body[data-cardface="neon"] .card:not(.shop-preview .card), .face-neon .card { --ink: #39F0FF; background: radial-gradient(circle at 50% 40%, #241B4A, #0E0A1E); border-color: #4B3A9A; }
+:is(body[data-cardface="neon"] .card:not(.shop-preview .card), .face-neon .card).red { --ink: #FF4FD8; }
+:is(body[data-cardface="neon"] .card:not(.shop-preview .card), .face-neon .card) :is(.pip, .corner) { filter: drop-shadow(0 0 3px currentColor); animation: cg-neon-glow 2.4s ease-in-out infinite; }
+:is(body[data-cardface="neon"] .card:not(.shop-preview .card), .face-neon .card)::before { opacity: .55; box-shadow: 0 0 6px currentColor; }
+@keyframes cg-neon-glow { 0%, 100% { filter: drop-shadow(0 0 2px currentColor); } 50% { filter: drop-shadow(0 0 7px currentColor); } }
+
+/* Manga Ink */
+body[data-cardface="manga"] .card:not(.shop-preview .card), .face-manga .card {
+  --ink: #111; border: 2px solid #111;
+  background: radial-gradient(rgba(0,0,0,.13) 1px, transparent 1.5px) 0 0 / calc(var(--w) * .07) calc(var(--w) * .07), #FFFFFF;
+  animation: cg-halftone 6s linear infinite; }
+:is(body[data-cardface="manga"] .card:not(.shop-preview .card), .face-manga .card).red { --ink: #E0182D; }
+:is(body[data-cardface="manga"] .card:not(.shop-preview .card), .face-manga .card) .corner { font-style: italic; font-weight: 900; text-shadow: 1.5px 1.5px 0 rgba(0,0,0,.15); }
+:is(body[data-cardface="manga"] .card:not(.shop-preview .card), .face-manga .card)[data-rank="A"] { background: repeating-conic-gradient(from 0deg at 50% 50%, rgba(0,0,0,.09) 0 2deg, transparent 2deg 10deg), #FFFFFF; }
+:is(body[data-cardface="manga"] .card:not(.shop-preview .card), .face-manga .card)::before { opacity: .9; border-width: 1.5px; }
+@keyframes cg-halftone { to { background-position: calc(var(--w) * .07) calc(var(--w) * .07), 0 0; } }
+
+/* Starlight */
+body[data-cardface="starlight"] .card:not(.shop-preview .card), .face-starlight .card { --ink: #3A2E7A; background: linear-gradient(165deg, #F7F3FF, #E6DCFF); border-color: #C9B8FF; }
+:is(body[data-cardface="starlight"] .card:not(.shop-preview .card), .face-starlight .card).red { --ink: #C2185B; }
+:is(body[data-cardface="starlight"] .card:not(.shop-preview .card), .face-starlight .card)::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 140'%3E%3Cg fill='%23B79CFF'%3E%3Cpath d='M78 18l2 6 6 2-6 2-2 6-2-6-6-2 6-2z'/%3E%3Cpath d='M22 108l1.5 4.5 4.5 1.5-4.5 1.5-1.5 4.5-1.5-4.5-4.5-1.5 4.5-1.5z'/%3E%3Cpath d='M84 96l1 3 3 1-3 1-1 3-1-3-3-1 3-1z'/%3E%3Cpath d='M16 40l1 3 3 1-3 1-1 3-1-3-3-1 3-1z'/%3E%3C/g%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  animation: cg-twinkle 1.8s ease-in-out infinite alternate; }
+
+@media (prefers-reduced-motion: reduce) {
+  .card-back:is(.cb-sakura, .cb-kitsune, .cb-burst, .cb-starry) .deco, .card-back:is(.cb-kitsune, .cb-burst, .cb-starry) .deco::after, .card-back.cb-burst .deco::after,
+  .card, .card::after, .card .pip, .card .corner { animation: none !important; }
+}
