@@ -50,7 +50,7 @@ class Flamingo extends BaseTable {
   }
 
   isPlaying() { return this.stage === 'playing'; }
-  canStart() { return !this.isPlaying() && this.seats.filter(Boolean).length >= 2; }
+  canStart() { return !this.isPlaying() && this.seats.filter((s) => s && !s.sitOut).length >= 2; }
   top() { return this.discard[this.discard.length - 1]; }
 
   shuffleIn(cards) {
@@ -90,12 +90,12 @@ class Flamingo extends BaseTable {
     this.discard = [];
     for (const s of this.seats) {
       if (!s) continue;
-      s.inHand = true;
+      s.inHand = !s.sitOut;
       s.hand = [];
       s.drewCard = null;
       s.lastAction = null;
     }
-    for (let k = 0; k < HAND; k++) this.seats.forEach((s, i) => { if (s) this.drawFor(i, 1); });
+    for (let k = 0; k < HAND; k++) this.seats.forEach((s, i) => { if (s && s.inHand) this.drawFor(i, 1); });
     // The first card is always a plain number card.
     let first = this.deck.findIndex((c) => !isWild(c) && /[0-9]/.test(rankOf(c)));
     this.discard.push(this.deck.splice(first, 1)[0]);

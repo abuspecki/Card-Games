@@ -36,7 +36,8 @@
     'Chips': 'Chips', 'Coins': 'Münzen', 'Friends online': 'Freunde online', 'Quick seat': 'Schnell spielen', 'Return': 'Zurück zum Tisch',
     'Leave the table': 'Tisch verlassen', 'Your seat is free again.': 'Dein Platz ist wieder frei.',
     // tab names, windows
-    'Wallet': 'Konto', 'The Shop': 'Shop', 'My Profile': 'Mein Profil', 'Profile': 'Profil', 'Signing out leaves the table — a hand is running, what you have bet is lost. Sign out anyway?': 'Beim Abmelden verlässt du den Tisch – es läuft eine Hand, dein Einsatz ist dann verloren. Trotzdem abmelden?', 'Sign out': 'Abmelden', 'Close': 'Schließen', 'Cancel': 'Abbrechen',
+    'Wallet': 'Konto', 'The Shop': 'Shop', 'My Profile': 'Mein Profil', 'This week': 'Diese Woche', "Last week's winners": 'Sieger der letzten Woche', 'Weekly ranking': 'Wochen-Rangliste', 'Could not load the ranking.': 'Die Rangliste konnte nicht geladen werden.',
+    'Nobody has played this week yet — the first hand takes the lead.': 'Diese Woche hat noch niemand gespielt – die erste Hand übernimmt die Führung.', 'Ends in': 'Endet in', 'You: place': 'Du: Platz', '☕ You are sitting out': '☕ Du setzt aus', 'Sitting out': 'Setzt aus', "I'm back": 'Bin wieder da', '☕ Sit out after this hand': '☕ Nach dieser Hand aussetzen', '☕ Sit out the next hand': '☕ Nächste Hand aussetzen', '☕ Sit out': '☕ Aussetzen', 'Sit out the next hand': 'Nächste Hand aussetzen', 'Sit out after this hand': 'Nach dieser Hand aussetzen', 'Profile': 'Profil', 'Signing out leaves the table — a hand is running, what you have bet is lost. Sign out anyway?': 'Beim Abmelden verlässt du den Tisch – es läuft eine Hand, dein Einsatz ist dann verloren. Trotzdem abmelden?', 'Sign out': 'Abmelden', 'Close': 'Schließen', 'Cancel': 'Abbrechen',
     'Got it': 'Verstanden', 'Loading…': 'Lädt…', 'Something went wrong': 'Etwas ist schiefgelaufen', 'Network problem — please try again': 'Verbindungsproblem – bitte nochmal versuchen',
     // sign in
     'Members': 'Mitglieder', 'Welcome back': 'Willkommen zurück', 'Become a member': 'Mitglied werden', 'Create my membership': 'Konto erstellen',
@@ -211,6 +212,11 @@
   const P = [
     [/^Today ([\d,.]+) \/ ([\d,.]+)$/, 'Heute $1 / $2'],
     [/^Day (\d+)$/, 'Tag $1'],
+    [/^Place (\d+)$/, 'Platz $1'],
+    [/^(\d+) d (\d+) h$/, '$1 T $2 Std'], [/^(\d+) h$/, '$1 Std'],
+    [/^Chips won this week in Hold'em against real people, Blackjack and Roulette\. Every Monday the best three receive coins \(at least (\d+) hands and more chips won than lost\)\.$/, 'Gewonnene Chips dieser Woche in Hold\'em gegen echte Mitspieler, Blackjack und Roulette. Jeden Montag bekommen die besten drei Münzen (mindestens $1 Hände und mehr Chips gewonnen als verloren).'],
+    [/^\((\d+) more for a prize\)$/, '(noch $1 für einen Preis)'],
+    [/^🏆 Winners of the week: (.+)$/, '🏆 Sieger der Woche: $1'],
     [/^The board would have been: (.+)$/, 'Das Board wäre gewesen: $1'],
     [/^You have won the most table coins for today \(([\d,.]+)\)\. Wins still count for your chips — more coins tomorrow\.$/, 'Du hast heute die meisten Tisch-Münzen gewonnen ($1). Gewinne zählen weiter für deine Chips – morgen gibt es wieder Münzen.'],
     [/^Your ([\d,.]+) chips are at a table right now\. Leave the table and they come back to your bankroll — then you can exchange them\.$/, 'Deine $1 Chips liegen gerade an einem Tisch. Verlass den Tisch, dann kommen sie zurück auf dein Konto – und du kannst sie tauschen.'],

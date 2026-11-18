@@ -83,7 +83,7 @@ class BaseTable {
 
   baseSeatView(s) {
     return {
-      name: s.name, chips: s.chips, isBot: s.isBot, connected: s.connected, inHand: s.inHand,
+      name: s.name, chips: s.chips, isBot: s.isBot, connected: s.connected, inHand: s.inHand, sitOut: !!s.sitOut,
       lastAction: s.lastAction, hasAccount: !!s.accountId, badge: s.badge || null, avatar: s.avatar || null, folded: false, allIn: false, bet: 0,
     };
   }

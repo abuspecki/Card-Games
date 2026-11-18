@@ -75,4 +75,21 @@ for (const variant of ['holdem', 'omaha', 'omaha5']) {
   }
 }
 
+// Sitting out: keeps the seat, is not dealt in; two others are needed to play.
+{
+  const t = new Table({ variant: 'holdem' });
+  for (let i = 0; i < 3; i++) t.sit({ id: 's' + i, name: 'S' + i });
+  t.seats[t.seatOf('s0')].sitOut = true;
+  assert(t.startHand());
+  assert.strictEqual(t.seats[t.seatOf('s0')].inHand, false, 'sitting out: not dealt in');
+  assert.strictEqual(t.seats[t.seatOf('s0')].hole.length, 0);
+  assert.strictEqual(t.view('s1').seats[t.seatOf('s0')].sitOut, true, 'others see it');
+  while (t.isPlaying()) t.act(t.seats[t.toAct].id, 'fold');
+  t.seats[t.seatOf('s1')].sitOut = true;
+  assert.strictEqual(t.canStart(), false, 'one player left who plays: no hand');
+  t.seats[t.seatOf('s0')].sitOut = false;
+  assert(t.startHand(), 'back in');
+  assert.strictEqual(t.seats[t.seatOf('s0')].inHand, true);
+}
+
 console.log('simulation ok');

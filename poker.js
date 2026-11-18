@@ -231,7 +231,7 @@ class Table {
     return -1;
   }
 
-  eligiblePlayers() { return this.seats.filter((s) => s && s.chips > 0); }
+  eligiblePlayers() { return this.seats.filter((s) => s && s.chips > 0 && !s.sitOut); }
 
   canStart() { return !this.isPlaying() && this.eligiblePlayers().length >= 2; }
 
@@ -249,7 +249,7 @@ class Table {
     for (const s of this.seats) {
       if (!s) continue;
       Object.assign(s, { hole: [], bet: 0, totalBet: 0, acted: false, allIn: false });
-      s.inHand = s.chips > 0;
+      s.inHand = s.chips > 0 && !s.sitOut;
       s.startChips = s.chips;
       s.folded = !s.inHand;
       s.lastAction = null;
@@ -498,7 +498,7 @@ class Table {
       chat: (this.chat || []).slice(-50),
       seats: this.seats.map((s, i) => s && {
         name: s.name, chips: s.chips, bet: s.bet, folded: s.folded, allIn: s.allIn,
-        inHand: s.inHand, connected: s.connected, lastAction: s.lastAction, isBot: s.isBot, hasAccount: !!s.accountId, badge: s.badge || null, avatar: s.avatar || null,
+        inHand: s.inHand, sitOut: !!s.sitOut, connected: s.connected, lastAction: s.lastAction, isBot: s.isBot, hasAccount: !!s.accountId, badge: s.badge || null, avatar: s.avatar || null,
         cardCount: s.hole.length,
         hole: i === me || (showAll && s.inHand && !s.folded) ? s.hole : null,
         handName: (i === me || showAll) && s.inHand && !s.folded && this.board.length >= 3

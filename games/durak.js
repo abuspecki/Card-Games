@@ -10,6 +10,7 @@ const { BaseTable, SUITS, shuffle } = require('./base');
 
 const D_RANKS = '6789TJQKA';
 const MAX_PLAYERS = 6;
+const STALL_ROUNDS = 40;   // rounds with an empty deck and nobody getting out before a game is called a draw
 const rankOf = (c) => D_RANKS.indexOf(c[0]);
 const RANK_NAMES = { 6: '6', 7: '7', 8: '8', 9: '9', T: '10', J: 'Jack', Q: 'Queen', K: 'King', A: 'Ace' };
 const SUIT_NAMES = { s: 'Spades', h: 'Hearts', d: 'Diamonds', c: 'Clubs' };
@@ -26,7 +27,7 @@ class Durak extends BaseTable {
 
   isPlaying() { return this.stage === 'playing'; }
 
-  canStart() { return !this.isPlaying() && this.seats.filter(Boolean).length >= 2; }
+  canStart() { return !this.isPlaying() && this.seats.filter((s) => s && !s.sitOut).length >= 2; }
 
   beats(def, att) {
     if (def[1] === att[1]) return rankOf(def) > rankOf(att);
@@ -42,6 +43,8 @@ class Durak extends BaseTable {
     if (!this.canStart()) return false;
     this.handNo++;
     this.results = null;
+    this.stall = 0;
+    this.stalled = false;
     this.deck = [];
     for (const r of D_RANKS) for (const s of SUITS) this.deck.push(r + s);
     shuffle(this.deck);
@@ -51,7 +54,7 @@ class Durak extends BaseTable {
     let count = 0;
     for (const s of this.seats) {
       if (!s) continue;
-      s.inHand = count < MAX_PLAYERS;
+      s.inHand = !s.sitOut && count < MAX_PLAYERS;
       if (s.inHand) count++;
       s.hand = [];
       s.out = false;
@@ -205,6 +208,7 @@ class Durak extends BaseTable {
       while (s.hand.length < 6 && this.deck.length) s.hand.push(this.deck.pop());
     }
     // Anyone without cards once the deck is empty is out — they escaped.
+    const outBefore = this.finished.length;
     if (!this.deck.length) {
       this.seats.forEach((s, i) => {
         if (this.active(s) && s.hand.length === 0) {
@@ -217,6 +221,12 @@ class Durak extends BaseTable {
     }
     const left = this.seats.map((s, i) => (this.active(s) ? i : -1)).filter((i) => i !== -1);
     if (left.length <= 1) return this.endGame(left.length ? left[0] : -1);
+    // Safety net: with the deck empty, the same cards can wander round forever.
+    // 40 rounds without anyone getting out: the game is called a draw.
+    if (!this.deck.length) {
+      this.stall = this.finished.length > outBefore ? 0 : (this.stall || 0) + 1;
+      if (this.stall >= STALL_ROUNDS) { this.stalled = true; return this.endGame(-1); }
+    }
 
     // Next attacker: after a successful defense the defender attacks;
     // after a take, the player after the defender attacks.
@@ -231,11 +241,14 @@ class Durak extends BaseTable {
     this.stage = 'showdown';
     this.toAct = -1;
     this.durak = loser;
-    const winners = this.seats.map((s, i) => (s && s.inHand && i !== loser ? { seat: i, amount: 0, hand: 'escaped' } : null)).filter(Boolean);
+    // after a stalled game only those who really got out have escaped
+    const winners = this.seats.map((s, i) => (s && s.inHand && i !== loser && (!this.stalled || s.out) ? { seat: i, amount: 0, hand: 'escaped' } : null)).filter(Boolean);
     this.results = { shown: true, winners, durak: loser };
     if (loser !== -1) {
       this.seats[loser].lastAction = '🃏 Durak!';
       this.addLog(`${this.seats[loser].name} is the durak!`);
+    } else if (this.stalled) {
+      this.addLog('No end in sight — the game is called a draw');
     } else {
       this.addLog('Draw — everyone got rid of their cards');
     }
@@ -289,7 +302,7 @@ class Durak extends BaseTable {
     if (!this.results) return [];
     return this.seats.filter((s) => s && s.inHand && s.accountId).map((s) => {
       const lost = this.seats.indexOf(s) === this.durak;
-      return { accountId: s.accountId, mode: 'durak', net: this.durak === -1 ? 0 : lost ? -1 : 1, won: !lost, pot: 0 };
+      return { accountId: s.accountId, mode: 'durak', net: this.durak === -1 ? 0 : lost ? -1 : 1, won: this.stalled ? !!s.out : !lost, pot: 0 };
     });
   }
 

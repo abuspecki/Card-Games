@@ -178,6 +178,10 @@ function createApi(ctx) {
     }
 
     // ===== public data =====
+    if (method === 'GET' && url === '/api/leaderboard/weekly') {
+      const user = await currentUser(req);
+      return json(res, 200, await ctx.weekly.view(user ? user.id : null));
+    }
     if (method === 'GET' && url === '/api/leaderboard') {
       const mode = new URL(req.url, 'http://x').searchParams.get('mode');
       // 'overall': chips won in poker against real people, blackjack and roulette together

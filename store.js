@@ -30,7 +30,7 @@ const WALLET_FIELDS = ['coins', 'chips', 'in_play', 'last_daily', 'streak', 'las
   'earned_day', 'earned_today', 'converted_day', 'converted_today'];
 // Restore order: parents before the tables that point at them.
 const BACKUP_TABLES = ['users', 'stats', 'wallets', 'user_items', 'equipped', 'friends', 'feedback', 'activity',
-  'tasks', 'task_notes', 'dev_keys', 'meta', 'hand_log', 'quests', 'admin_log', 'error_log', 'coin_log'];
+  'tasks', 'task_notes', 'dev_keys', 'meta', 'hand_log', 'quests', 'admin_log', 'error_log', 'coin_log', 'weekly'];
 const pair = (x, y) => (x < y ? [x, y] : [y, x]);
 
 // ---------- Postgres backend ----------
@@ -161,6 +161,10 @@ function postgresStore(url) {
         id BIGSERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         coins INTEGER NOT NULL, chips INTEGER NOT NULL, reason TEXT NOT NULL, at TIMESTAMPTZ NOT NULL DEFAULT now())`);
       await q('CREATE INDEX IF NOT EXISTS coin_log_user ON coin_log (user_id, id DESC)');
+      await q(`CREATE TABLE IF NOT EXISTS weekly (
+        week TEXT NOT NULL, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        net BIGINT NOT NULL DEFAULT 0, hands INTEGER NOT NULL DEFAULT 0, wins INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (week, user_id))`);
       await q(`CREATE TABLE IF NOT EXISTS backups (
         id BIGSERIAL PRIMARY KEY, kind TEXT NOT NULL, at TIMESTAMPTZ NOT NULL DEFAULT now(),
         size INTEGER NOT NULL, summary JSONB, data BYTEA NOT NULL)`);
@@ -272,6 +276,21 @@ function postgresStore(url) {
       await q('INSERT INTO hand_log (user_id, mode, net, won) VALUES ($1, $2, $3, $4)', [userId, mode, Math.round(net) || 0, !!won]);
       // keep the history short: the newest 200 per player
       if (Math.random() < 0.05) await q('DELETE FROM hand_log WHERE user_id = $1 AND id < (SELECT MIN(id) FROM (SELECT id FROM hand_log WHERE user_id = $1 ORDER BY id DESC LIMIT 200) t)', [userId]);
+    },
+    // ----- weekly ranking -----
+    async recordWeekly(week, userId, net, won) {
+      await q(`INSERT INTO weekly (week, user_id, net, hands, wins) VALUES ($1, $2, $3, 1, $4)
+        ON CONFLICT (week, user_id) DO UPDATE SET net = weekly.net + EXCLUDED.net, hands = weekly.hands + 1, wins = weekly.wins + EXCLUDED.wins`,
+      [week, userId, Math.round(net) || 0, won ? 1 : 0]);
+    },
+    async weeklyBoard(week, limit = 20) {
+      return (await q(`SELECT w.user_id, u.username, w.net::int AS net, w.hands, w.wins FROM weekly w JOIN users u ON u.id = w.user_id
+        WHERE w.week = $1 AND NOT u.banned ORDER BY w.net DESC, w.wins DESC, w.hands ASC LIMIT $2`, [week, limit])).rows;
+    },
+    async weeklyOf(week, userId) {
+      const r = await q(`SELECT net::int AS net, hands, wins, 1 + (SELECT COUNT(*)::int FROM weekly x JOIN users u ON u.id = x.user_id
+        WHERE x.week = $1 AND NOT u.banned AND x.net > w.net) AS place FROM weekly w WHERE w.week = $1 AND w.user_id = $2`, [week, userId]);
+      return r.rows[0] || null;
     },
     async coinLog(userId, limit = 60) {
       return (await q('SELECT coins, chips, reason, at FROM coin_log WHERE user_id = $1 ORDER BY id DESC LIMIT $2', [userId, limit])).rows;
@@ -598,6 +617,28 @@ function fileStore(file) {
       }
       save();
       return out.result;
+    },
+    async recordWeekly(week, userId, net, won) {
+      db.weekly = db.weekly || {};
+      const w = db.weekly[week] || (db.weekly[week] = {});
+      const e = w[userId] || (w[userId] = { net: 0, hands: 0, wins: 0 });
+      e.net += Math.round(net) || 0; e.hands++; if (won) e.wins++;
+      const weeks = Object.keys(db.weekly).sort();
+      while (weeks.length > 10) delete db.weekly[weeks.shift()];
+      save();
+    },
+    async weeklyBoard(week, limit = 20) {
+      const w = (db.weekly || {})[week] || {};
+      return Object.entries(w).map(([id, e]) => ({ user_id: Number(id), username: (userById(Number(id)) || {}).username, banned: (userById(Number(id)) || {}).banned, ...e }))
+        .filter((e) => e.username && !e.banned).sort((a, b) => b.net - a.net || b.wins - a.wins || a.hands - b.hands).slice(0, limit)
+        .map(({ banned, ...e }) => e);
+    },
+    async weeklyOf(week, userId) {
+      const all = await this.weeklyBoard(week, 1e6);
+      const i = all.findIndex((e) => e.user_id === userId);
+      if (i === -1) return null;
+      const better = all.filter((e) => e.net > all[i].net).length;
+      return { net: all[i].net, hands: all[i].hands, wins: all[i].wins, place: better + 1 };
     },
     async coinLog(userId, limit = 60) {
       return (db.coinLog || []).filter((e) => e.user_id === userId).slice(-limit).reverse().map(({ user_id, ...e }) => e);

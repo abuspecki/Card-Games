@@ -13,6 +13,7 @@ const { createGoldRush } = require('./goldrush');
 const { createErrorLog } = require('./errorlog');
 const { createQuests } = require('./quests');
 const { createBackups } = require('./backups');
+const { createWeekly } = require('./weekly');
 // Error monitoring first, so every console.error from here on is recorded.
 const errors = createErrorLog();
 errors.hookConsole();
@@ -45,6 +46,7 @@ ctx.reward = (userId, result) => { const n = rewardFor(result); return n ? coins
 ctx.goldrush = createGoldRush(ctx);
 ctx.quests = createQuests(ctx);
 ctx.backups = createBackups(ctx);
+ctx.weekly = createWeekly(ctx);
 const api = createApi(ctx);
 
 const SECURITY_HEADERS = {
@@ -181,12 +183,15 @@ openStore()
     store.recordHand = async (userId, mode, net, won, pot, extra = {}) => {
       await recordHand(userId, mode, net, won, pot);
       ctx.quests.onResult(userId, { mode, net, won, pot, depth: extra.depth });
+      ctx.weekly.onResult(userId, mode, net, won);
     };
     // Chips left at tables by a crash go back to their owners.
     const refunded = await store.refundInPlay();
     if (refunded) console.log(`Refunded table chips for ${refunded} player(s) after a restart`);
     // a full backup every day
     ctx.backups.start();
+    // the weekly ranking pays last week's prizes once the new week has begun
+    ctx.weekly.start();
     // One-time thank-you for the players interrupted by the Gold Rush update
     // (the old server could not pay the update bonus yet). Runs only once.
     if (await store.claimOnce('update-bonus-2026-11-17-goldrush')) {

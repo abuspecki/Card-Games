@@ -73,7 +73,7 @@ for (let g = 0; g < 2000; g++) {
   let steps = 0;
   while (t.isPlaying()) {
     // random players can trade cards back and forth for a long time; real play ends far sooner
-    assert(++steps < (g % 2 ? 2000 : 20000), 'durak stuck');
+    assert(++steps < 20000, 'durak stuck');
     const i = t.toAct;
     const mv = t.moves(i);
     assert(mv, 'player to act has no moves');

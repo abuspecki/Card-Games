@@ -793,6 +793,7 @@
     if (App.tableId) localStorage.removeItem('cg.seat.' + App.tableId);
     App.tableId = null; App.S = null; App.game = null; App.watching = false;
     if ($('tourneyBar')) $('tourneyBar').remove();
+    if ($('sitOut')) $('sitOut').remove();
     if (App.ws) { App.ws.onclose = null; App.ws.close(); App.ws = null; }
     $('tableScreen').classList.add('hidden');
     $('hub').classList.remove('hidden');
@@ -865,6 +866,7 @@
     renderTableInfo(S, st);
     renderPrivateCode(S);
     renderTourney(S);
+    renderSitOut(S, st);
     renderOdds(st);
     const title = document.querySelector('[data-tb-title]');
     if (title) title.textContent = S.tableName.replace(/^[^·]*·\s*/, '') + (st.game === 'holdem' ? ` · Blinds ${st.settings.smallBlind} / ${st.settings.bigBlind}` : st.game === 'blackjack' || st.game === 'roulette' ? ` · Bets from ${st.minBet}` : st.stage !== 'waiting' ? ` · Game ${st.handNo}` : '');
@@ -967,6 +969,25 @@
     setTimeout(() => document.addEventListener('click', function close(ev) {
       if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', close); }
     }), 0);
+  }
+
+  // Sit out: keep the seat, skip the next hands until you come back.
+  function renderSitOut(S, st) {
+    let box = $('sitOut');
+    const me = st.mySeat !== -1 ? st.seats[st.mySeat] : null;
+    const show = me && !S.watching && !S.tourney && st.game !== 'roulette';
+    if (!show) { if (box) box.remove(); return; }
+    if (!box) { box = h('div', 'sitout'); box.id = 'sitOut'; $('stageWrap').appendChild(box); }
+    const out = !!me.sitOut;
+    const key = out ? 'out' : me.inHand && st.stage !== 'waiting' && st.stage !== 'showdown' ? 'after' : 'next';
+    if (box.dataset.key === key) return;
+    box.dataset.key = key;
+    box.classList.toggle('on', out);
+    box.innerHTML = out
+      ? '<span>☕ You are sitting out</span><button class="btn btn-navy" data-back>I\'m back</button>'
+      : `<button class="sitout-pill" data-out title="${key === 'after' ? 'Sit out after this hand' : 'Sit out the next hand'}"><span class="long">☕ ${key === 'after' ? 'Sit out after this hand' : 'Sit out the next hand'}</span><span class="short">☕ Sit out</span></button>`;
+    const b = box.querySelector('button');
+    b.onclick = () => { send({ t: 'sitout', on: !out }); box.dataset.key = ''; };
   }
 
   // The table top bar shows your bankroll / coins (members only).
@@ -1291,6 +1312,7 @@
     if (kind === 'quest') return two('Quest:', detail);
     if (kind === 'achievement') return two('Achievement:', detail);
     if (kind === 'tourney') return '<span>Sit & Go prize</span>';
+    if (kind === 'weekly') return `<span>Weekly ranking</span> · <b>Place ${esc(detail)}</b>`;
     if (kind === 'gift') return '<span>Gift from the house</span>';
     if (kind === 'bonus') return '<span>Thank-you bonus for an update</span>';
     if (kind === 'owner') return '<span>Correction by the owner</span>';
@@ -1806,7 +1828,33 @@
   App.openProfile = openProfile;
 
   // ================= LEADERBOARD =================
-  async function openLeaderboard(mode = 'friends') {
+  // The weekly ranking: chips won this week, prizes for the top three.
+  async function paintWeekly(body, note) {
+    note.textContent = '';
+    body.innerHTML = '<p class="muted">Loading…</p>';
+    const r = await api('/api/leaderboard/weekly');
+    if (!r.ok) { body.textContent = 'Could not load the ranking.'; return; }
+    const d = r.data;
+    const medals = ['🥇', '🥈', '🥉'];
+    const left = Math.max(0, d.endsAt - Date.now());
+    const days = Math.floor(left / 86400000), hours = Math.floor((left % 86400000) / 3600000);
+    const mine = App.account && d.me;
+    body.innerHTML = `
+      <div class="wk-head">
+        <div class="wk-prizes">${d.prizes.map((p, i) => `<span><b>${medals[i]}</b><i class="ico-coin"></i>${fmt(p)}</span>`).join('')}</div>
+        <p class="wk-ends">Ends in <b>${days ? `${days} d ` : ''}${hours} h</b></p>
+      </div>
+      <p class="fine">Chips won this week in Hold'em against real people, Blackjack and Roulette. Every Monday the best three receive coins (at least ${d.minHands} hands and more chips won than lost).</p>
+      ${mine ? `<p class="wk-me">You: place <b>${d.me.place}</b> · <span class="${d.me.net >= 0 ? 'pos' : 'neg'}">${d.me.net > 0 ? '+' : ''}${fmt(d.me.net)}</span> · ${fmt(d.me.hands)} hands${d.me.hands < d.minHands ? ` <em>(${d.minHands - d.me.hands} more for a prize)</em>` : ''}</p>` : ''}
+      ${d.rows.length ? `<table class="stats lb"><thead><tr><th>#</th><th>Member</th><th>Chips won</th><th>Hands</th></tr></thead><tbody>
+        ${d.rows.map((x) => `<tr class="${App.account && x.username.toLowerCase() === App.account.username.toLowerCase() ? 'me' : ''}"><td>${medals[x.place - 1] || x.place}</td><td><button class="link" data-prof="${esc(x.username)}">${esc(x.username)}</button></td>
+          <td class="${x.net >= 0 ? 'pos' : 'neg'}">${x.net > 0 ? '+' : ''}${fmt(x.net)}</td><td>${fmt(x.hands)}</td></tr>`).join('')}</tbody></table>`
+    : '<p class="muted">Nobody has played this week yet — the first hand takes the lead.</p>'}
+      ${d.last.winners.length ? `<div class="wk-last"><h4>Last week's winners</h4>${d.last.winners.map((w) => `<span>${medals[w.place - 1]} <b>${esc(w.username)}</b> <em>+${fmt(w.prize)}</em><i class="ico-coin"></i></span>`).join('')}</div>` : ''}`;
+    body.querySelectorAll('[data-prof]').forEach((b) => { b.onclick = () => openProfile(b.dataset.prof); });
+  }
+
+  async function openLeaderboard(mode = 'week') {
     openModal((card) => {
       modalHead(card, 'The Club Ledger', 'Leaderboard');
       const note = h('p', 'fine', '');
@@ -1821,6 +1869,7 @@
         goldrush: 'Gold Rush digs. Ranked by chips won.',
       };
       const load = async (m) => {
+        if (m === 'week') return paintWeekly(body, note);
         note.textContent = NOTES[m];
         body.innerHTML = '<p class="muted">Loading…</p>';
         const r = await api('/api/leaderboard?mode=' + m);
@@ -1833,7 +1882,7 @@
         body.querySelectorAll('[data-prof]').forEach((b) => { b.onclick = () => openProfile(b.dataset.prof); });
         if (!r.data.persistent) body.appendChild(h('p', 'fine warn', 'Test mode: no database is connected, so results are temporary.'));
       };
-      tabs(card, [['friends', 'Hold\'em'], ['bots', 'vs Bots'], ['blackjack', 'Blackjack'], ['durak', 'Durak'], ['roulette', 'Roulette'], ['flamingo', 'Flamingo'], ['goldrush', 'Gold Rush']], load, mode);
+      tabs(card, [['week', 'This week'], ['friends', 'Hold\'em'], ['bots', 'vs Bots'], ['blackjack', 'Blackjack'], ['durak', 'Durak'], ['roulette', 'Roulette'], ['flamingo', 'Flamingo'], ['goldrush', 'Gold Rush']], load, mode);
       card.append(note, body);
       load(mode);
     }, { wide: true });

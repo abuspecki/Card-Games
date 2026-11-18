@@ -92,3 +92,19 @@ body.holdem .pre-btn.on::before { border-color: var(--m-accent); background: var
 /* blackjack: a disabled main button must not look active */
 body.blackjack .plaque.gold:disabled { background: rgba(255, 255, 255, .05) !important; color: var(--m-muted) !important; border: 1px solid var(--m-line) !important; }
 body.blackjack .plaque.gold:disabled :is(b, em) { color: var(--m-muted) !important; }
+
+/* sit out: a small pill at the table's edge; while sitting out, a clear banner */
+.sitout { position: absolute; left: 12px; bottom: 10px; z-index: 30; display: flex; align-items: center; gap: 10px; font-family: var(--m-font, 'Montserrat', sans-serif); }
+.sitout-pill { padding: 7px 12px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .14); background: rgba(9, 16, 13, .72); color: #C9D4CD; font: 600 12.5px var(--m-font, 'Montserrat', sans-serif); cursor: pointer; backdrop-filter: blur(4px); }
+.sitout-pill:hover { color: #fff; border-color: rgba(242, 193, 78, .6); }
+.sitout.on { left: 50%; bottom: 16px; transform: translateX(-50%); padding: 10px 12px 10px 18px; border-radius: 16px; background: rgba(9, 16, 13, .9); border: 1px solid rgba(242, 193, 78, .55);
+  color: #F1F4F0; font-weight: 700; font-size: 15px; box-shadow: 0 10px 30px rgba(0, 0, 0, .45); white-space: nowrap; }
+.sitout.on .btn { border-radius: 12px; padding: 9px 16px; min-height: 0; background: #F2C14E; color: #231A02; font-weight: 800; }
+body.portrait .sitout { left: 8px; bottom: 6px; }
+body.portrait .sitout.on { left: 50%; }
+.sitout-pill .short { display: none; }
+/* phones: a small button in the top-right corner, away from your cards and name */
+body.portrait .sitout:not(.on) { left: auto; right: 8px; top: 8px; bottom: auto; }
+body.portrait .sitout-pill { padding: 5px 10px; font-size: 12px; }
+body.portrait .sitout-pill .long { display: none; }
+body.portrait .sitout-pill .short { display: inline; }

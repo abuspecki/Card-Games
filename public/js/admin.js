@@ -142,7 +142,7 @@
     const [k, ...rest] = String(e.reason || '').split(':');
     const d = rest.join(':');
     return ({ win: `Gewinn: ${MODE[d] || d}`, daily: `Tagesbonus (Tag ${d})`, topup: 'Tägliches Auffüllen', bank: e.coins > 0 ? 'Bank: Chips → Münzen' : 'Bank: Münzen → Chips',
-      shop: `Shop: ${d}`, quest: `Aufgabe: ${d}`, achievement: `Erfolg: ${d}`, tourney: 'Sit-&-Go-Preis', gift: 'Geschenk an alle', bonus: 'Update-Bonus', owner: 'Korrektur (Owner)' })[k] || e.reason;
+      shop: `Shop: ${d}`, quest: `Aufgabe: ${d}`, achievement: `Erfolg: ${d}`, tourney: 'Sit-&-Go-Preis', weekly: `Wochen-Rangliste: Platz ${d}`, gift: 'Geschenk an alle', bonus: 'Update-Bonus', owner: 'Korrektur (Owner)' })[k] || e.reason;
   }
   async function openPlayer(id) {
     const r = await api(`/api/admin/players/${id}`);

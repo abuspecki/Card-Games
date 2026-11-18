@@ -38,6 +38,7 @@ const TURN_TIMEOUT = Number(process.env.TURN_TIMEOUT_MS) || 40000;            //
 const BOT_THINK_MS = [700, 1800];
 const AUTO_START_DELAY = 3000;          // deal this long after enough players sit down
 const AWAY_LIMIT = Number(process.env.AWAY_LIMIT_MS) || 90 * 1000; // disconnected players lose their seat after this (also mid-game)
+const SITOUT_LIMIT = 15 * 60 * 1000; // sitting out longer than this frees the seat (and returns the chips)
 
 function createLobby(ctx) {
   // ctx: { store(), coins(), log }
@@ -437,6 +438,9 @@ function createLobby(ctx) {
       if (s && !s.isBot && !s.connected && Date.now() - (s.awayAt || 0) > AWAY_LIMIT) {
         await removeSeat(room, s.id, `${s.name} left (disconnected)`);
         changed = true;
+      } else if (s && !s.isBot && s.sitOut && !t.isPlaying() && Date.now() - (s.sitOutAt || 0) > SITOUT_LIMIT) {
+        await removeSeat(room, s.id, `${s.name} left (sat out for 15 minutes)`);
+        changed = true;
       }
     }
     if (!t.isPlaying() && !t.seats.some((s) => s && !s.isBot)) {
@@ -452,7 +456,8 @@ function createLobby(ctx) {
     }
   }, 20000).unref();
 
-  function hasHuman(room) { return room.table.seats.some((s) => s && !s.isBot && s.connected); }
+  // Someone real who wants to play (sitting out doesn't count: bots don't play alone).
+  function hasHuman(room) { return room.table.seats.some((s) => s && !s.isBot && s.connected && !s.sitOut); }
 
   function rebuyBots(t) {
     if ([...rooms.values()].some((r) => r.table === t && r.tourney)) return;
@@ -658,6 +663,15 @@ function createLobby(ctx) {
           me.lastGesture = Date.now();
           broadcast(room, { t: 'gesture', seat: t.seatOf(pid), name: me.name, text: g.preview });
           return;
+        }
+        // Sit out from the next hand on (keep the seat), or come back in.
+        case 'sitout': {
+          const me = t.seats[t.seatOf(pid)];
+          if (!me || room.tourney) return;
+          me.sitOut = !!m.on;
+          me.sitOutAt = me.sitOut ? Date.now() : 0;
+          t.addLog(me.sitOut ? `${me.name} sits out` : `${me.name} is back`);
+          break;
         }
         case 'chat':
           // at most one message per second per player

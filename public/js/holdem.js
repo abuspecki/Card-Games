@@ -20,7 +20,8 @@
 
   let raiseTouched = false;
   let lastTurnKey = '';
-  let pre = null;   // a move chosen in advance: { kind: checkfold | call | callany, hand, amount }
+  let pre = null;
+  let prevView = null;  // last hand / street, its bets and seat positions (for the chip animations)   // a move chosen in advance: { kind: checkfold | call | callany, hand, amount }
 
   function build(ctx) {
     const G = L[ctx.layout];
@@ -30,7 +31,9 @@
     t.innerHTML = '<div class="rail"></div><div class="trim"></div><div class="felt"></div><div class="print"></div><div class="monogram">CardGames</div>';
     const layer = ctx.h('div', 'layer');
     layer.id = 'hLayer';
-    ctx.stage.append(t, layer);
+    const fly = ctx.h('div', 'layer fly-layer');   // chips in flight; not cleared by each redraw
+    fly.id = 'hFly';
+    ctx.stage.append(t, layer, fly);
 
     // Controls (design: action panel)
     ctx.controls.innerHTML = `
@@ -133,6 +136,8 @@
     const showdown = st.stage === 'showdown' && st.results;
     const winCards = new Set();
     const winSeats = new Set();
+    const betsNow = new Map();
+    const platesNow = new Map();
     if (showdown) for (const w of st.results.winners) { winSeats.add(w.seat); (w.cards || []).forEach((c) => winCards.add(c)); }
 
     // Pot
@@ -175,6 +180,7 @@
         return;
       }
       ctx.plates[i] = [px, py - (port ? 30 : 40)];
+      platesNow.set(i, [px, py]);
       const inPlay = s.inHand && st.stage !== 'waiting';
 
       // opponents' hole cards (face down, or face up at showdown)
@@ -195,6 +201,7 @@
         const [bx, by] = k === 0 ? [G.cx, G.board.y + G.board.size * 1.4 + (port ? 14 : 22)] : P.bet;
         place(b, bx, by).style.transform = 'translate(-50%,-50%)';
         layer.appendChild(b);
+        betsNow.set(i, { amount: s.bet, at: [bx, by] });
       }
       // dealer button
       if (i === st.button && st.stage !== 'waiting') {
@@ -204,7 +211,7 @@
         layer.appendChild(d);
       }
       // nameplate
-      const status = !inPlay ? (s.chips === 0 ? 'Out of chips' : fmt(s.chips)) : s.folded ? 'Folded' : s.allIn ? `All-in` : fmt(s.chips);
+      const status = !inPlay ? (s.sitOut ? 'Sitting out' : s.chips === 0 ? 'Out of chips' : fmt(s.chips)) : s.folded ? 'Folded' : s.allIn ? `All-in` : fmt(s.chips);
       const cls = ['seat', k === 0 && 'me', s.folded && inPlay && 'folded', st.toAct === i && 'active', winSeats.has(i) && 'winner', !s.connected && 'away'].filter(Boolean).join(' ');
       const p = el('div', cls,
         `<span class="avatar">${ctx.avatarHtml(s)}</span><span class="col"><span class="name">${ctx.nameHtml(s)}</span><span class="chips">${status}</span></span>`);
@@ -245,7 +252,45 @@
       layer.appendChild(m);
     }
 
+    animateChips(st, G, port, betsNow, platesNow);
     renderControls(st, ctx);
+  }
+
+  // Chips move like at a real table: the bets slide into the pot when a street
+  // ends, and the pot slides to the winner. Display only.
+  function animateChips(st, G, port, betsNow, platesNow) {
+    const flyLayer = document.getElementById('hFly');
+    const prev = prevView;
+    prevView = { hand: st.handNo, stage: st.stage, bets: betsNow, plates: platesNow };
+    if (!flyLayer || !prev || prev.hand !== st.handNo || prev.stage === st.stage) return;
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const potAt = [G.W / 2 - (port ? 22 : 36), G.potY + (port ? 16 : 26)];
+    const flyTo = (amount, from, to, delay, size) => {
+      const f = document.createElement('div');
+      f.className = 'chip-fly';
+      f.append(stack(amount, { size, maxPer: 5, maxCols: 2 }));
+      place(f, from[0], from[1]).style.transform = 'translate(-50%,-50%)';
+      flyLayer.appendChild(f);
+      const dx = to[0] - from[0], dy = to[1] - from[1];
+      const a = f.animate([
+        { transform: 'translate(-50%,-50%)', opacity: 1 },
+        { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`, opacity: 1, offset: 0.85 },
+        { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(.8)`, opacity: 0 },
+      ], { duration: 650, delay, easing: 'cubic-bezier(.3,.7,.3,1)', fill: 'both' });
+      a.onfinish = () => f.remove();
+    };
+    // 1. the street is over: its bets into the pot
+    let delay = 0;
+    for (const [, b] of prev.bets) { flyTo(b.amount, b.at, potAt, delay, port ? 22 : 34); delay += 40; }
+    // 2. showdown: the pot to the winner(s)
+    if (st.stage === 'showdown' && st.results && prev.stage !== 'showdown') {
+      const start = prev.bets.size ? 600 : 150;
+      st.results.winners.forEach((w, n) => {
+        const to = platesNow.get(w.seat);
+        if (to && w.amount > 0) flyTo(w.amount, potAt, to, start + n * 150, port ? 26 : 40);
+      });
+      if (window.Sound) setTimeout(() => Sound.play('chips'), start + 200);
+    }
   }
 
   function message(st) {

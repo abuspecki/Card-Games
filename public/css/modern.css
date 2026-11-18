@@ -379,3 +379,21 @@ body.is-app .tbar { padding-top: max(6px, env(safe-area-inset-top, 0px)); }
 html[data-theme="light"] .toast { background: #14231B !important; }
 /* phone lobby: notices sit above the tab bar, not on top of it */
 @media (max-width: 760px) { body.hub .toasts { bottom: calc(74px + env(safe-area-inset-bottom, 0px)); } }
+
+/* ----- weekly ranking ----- */
+.modal-card .wk-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; }
+.modal-card .wk-prizes { display: flex; gap: 8px; flex-wrap: wrap; }
+.modal-card .wk-prizes span { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 12px; background: var(--a-surface2); border: 1px solid var(--a-line); font-weight: 800; }
+.modal-card .wk-prizes b { font-size: 18px; }
+.modal-card .wk-ends { margin: 0; color: var(--a-muted); }
+.modal-card .wk-ends b { color: var(--a-text); }
+.modal-card .wk-me { margin: 0; padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(242, 193, 78, .45); background: rgba(242, 193, 78, .08); }
+.modal-card .wk-me em { color: var(--a-muted); font-style: normal; }
+.modal-card .wk-last { padding: 12px 14px; border-radius: 14px; background: var(--a-surface2); border: 1px solid var(--a-line); display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.modal-card .wk-last h4 { width: 100%; margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--a-muted); }
+.modal-card .wk-last em { font-style: normal; color: #3FB27F; font-weight: 700; }
+/* more than five tabs (leaderboard): one scrollable row instead of a grid */
+@media (max-width: 560px) {
+  .modal-card .mtabs:has(> button:nth-child(6)) { display: flex; overflow-x: auto; scrollbar-width: none; }
+  .modal-card .mtabs:has(> button:nth-child(6)) button { flex: none; padding: 10px 12px; }
+}

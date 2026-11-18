@@ -162,7 +162,8 @@
         const size = rows.length > 1 ? H.size * 0.86 : H.size;
         const y = H.y + (rows.length > 1 ? (ri ? size * 0.62 : -size * 0.32) : 0);
         const step = nH > 1 ? Math.min(port ? 7 : 5, H.spread / (nH - 1)) : 0;
-        const spreadX = Math.min(port ? 330 : 760, nH * size * 0.55);
+        // phones: use the whole width, so every card's number stays visible
+        const spreadX = Math.min(port ? G.W - size - 48 : 760, nH * size * (port ? 0.8 : 0.55));
         row.forEach((c, k) => {
           const e = fcard(c, size);
           const off = k - (nH - 1) / 2;

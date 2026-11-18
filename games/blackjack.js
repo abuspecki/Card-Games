@@ -37,7 +37,7 @@ class Blackjack extends BaseTable {
   isPlaying() { return this.stage === 'betting' || this.stage === 'playing'; }
 
   canStart() {
-    return !this.isPlaying() && this.seats.some((s) => s && s.chips >= this.minBet());
+    return !this.isPlaying() && this.seats.some((s) => s && !s.sitOut && s.chips >= this.minBet());
   }
 
   draw() {
@@ -57,7 +57,7 @@ class Blackjack extends BaseTable {
     this.dealer = [];
     for (const s of this.seats) {
       if (!s) continue;
-      s.inHand = s.chips >= this.minBet();
+      s.inHand = !s.sitOut && s.chips >= this.minBet();
       s.startChips = s.chips;
       s.hands = [];
       s.handIdx = 0;
