@@ -47,4 +47,32 @@ for (const variant of ['holdem', 'omaha', 'omaha5']) {
     }
   }
 }
+// Everyone folds before the river: the rest of the board is shown (display only).
+{
+  for (const foldAt of ['preflop', 'flop', 'turn']) {
+    const t = new Table({ variant: 'holdem' });
+    for (let i = 0; i < 3; i++) t.sit({ id: 'r' + i, name: 'R' + i });
+    assert(t.startHand());
+    const actor = () => t.seats[t.toAct];
+    // everyone just calls/checks until the street we want
+    let guard = 0;
+    while (t.stage !== foldAt && guard++ < 50) { const p = actor(); const lim = t.limits(t.toAct); t.act(p.id, lim.toCall > 0 ? 'call' : 'check'); }
+    assert.strictEqual(t.stage, foldAt);
+    assert.deepStrictEqual(t.view('r0').runout, [], 'nothing shown while the hand runs');
+    const boardBefore = t.board.slice();
+    const total = () => t.seats.filter(Boolean).reduce((a, x) => a + x.chips, 0);
+    const before = total() + t.pot();
+    while (t.stage !== 'showdown') t.act(actor().id, 'fold');
+    const v = t.view('r0');
+    assert.deepStrictEqual(t.board, boardBefore, 'the real board is unchanged');
+    assert.strictEqual(v.board.length + v.runout.length, 5, `${foldAt}: board filled up to the river`);
+    const all = [...v.board, ...v.runout, ...t.seats.filter(Boolean).flatMap((x) => x.hole)];
+    assert.strictEqual(new Set(all).size, all.length, 'no card twice');
+    assert.strictEqual(total(), before, 'all chips accounted for');
+    assert(t.log.some((l) => /would have been/.test(typeof l === 'string' ? l : l.text || '')), 'log line');
+    assert(t.startHand());
+    assert.deepStrictEqual(t.view('r0').runout, [], 'cleared for the next hand');
+  }
+}
+
 console.log('simulation ok');

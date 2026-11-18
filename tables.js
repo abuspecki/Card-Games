@@ -183,7 +183,7 @@ function createLobby(ctx) {
       const prize = prizes.get(e.accountId) || 0;
       await settleEntrant(room, e, prize);
       ctx.store().recordHand(e.accountId, 'tourney', prize - e.entry, prize > e.entry, prize).catch((err) => console.error('record', err));
-      if (prize > e.entry) ctx.coins().adjust(e.accountId, prize === Math.max(...prizes.values()) ? 100 : 50, 0).catch(() => {});
+      if (prize > e.entry) ctx.coins().adjust(e.accountId, prize === Math.max(...prizes.values()) ? 100 : 50, 0, 'tourney').catch(() => {});
     }
     T.result = { order: order.map((o, i) => ({ place: i + 1, name: o.name, bot: o.isBot, prize: o.accountId ? prizes.get(o.accountId) || 0 : 0 })) };
     T.state = 'done';
@@ -373,10 +373,10 @@ function createLobby(ctx) {
       store.recordHand(r.accountId, r.mode, r.net, r.won, r.pot).catch((e) => console.error('record error', e));
       const amount = rewardFor(r);
       if (!amount) continue;
-      coins.earn(r.accountId, amount).then((res) => {
+      coins.earn(r.accountId, amount, Date.now(), `win:${r.mode}`).then((res) => {
         const seat = room.table.seats.find((s) => s && s.accountId === r.accountId);
         const ws = seat && room.clients.get(seat.id);
-        if (ws) send(ws, { t: 'coins', amount: res.amount, coins: res.coins, capped: !!res.capped });
+        if (ws) send(ws, { t: 'coins', amount: res.amount, coins: res.coins, capped: !!res.capped, today: res.today, cap: res.cap });
       }).catch((e) => console.error('coin error', e));
     }
   }

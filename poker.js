@@ -142,6 +142,7 @@ class Table {
   resetHand() {
     this.stage = 'waiting'; // waiting | preflop | flop | turn | river | showdown
     this.board = [];
+    this.runout = [];       // the cards that would have come after an early fold-out (shown only)
     this.deck = [];
     this.currentBet = 0;
     this.minRaise = 0;
@@ -365,6 +366,19 @@ class Table {
       w.chips += total;
       this.addLog(`${w.name} wins ${total}`);
       this.results = { winners: [{ seat: this.seats.indexOf(w), amount: total, hand: null }], shown: false };
+      // Everyone folded before the river: still show what the board would have been.
+      // Display only — it changes nothing about the result. Dealt as usual (burn card before each street).
+      if (this.board.length < 5 && this.deck.length) {
+        const d = this.deck.slice();
+        const run = [];
+        let n = this.board.length;
+        while (n < 5 && d.length > 1) {
+          d.pop(); // burn
+          if (n === 0) { run.push(d.pop(), d.pop(), d.pop()); n = 3; } else { run.push(d.pop()); n++; }
+        }
+        this.runout = run;
+        this.addLog(`The board would have been: ${[...this.board, ...run].join(' ')}`);
+      }
       this.endHand();
       return true;
     }
@@ -471,6 +485,7 @@ class Table {
       settings: this.settings,
       variants: Object.fromEntries(Object.entries(VARIANTS).map(([k, v]) => [k, v.name])),
       board: this.board,
+      runout: this.stage === 'showdown' ? this.runout : [],
       pot: this.pot(),
       button: this.button,
       toAct: this.toAct,

@@ -132,13 +132,19 @@
     const board = el('div', 'board');
     const bw = 5 * G.board.size + 4 * G.board.gap;
     place(board, (G.W - bw) / 2, G.board.y);
+    // After everyone folded, the rest of the board (up to the river) is laid out
+    // dimmed: what would have come. It changes nothing about the result.
+    const runout = st.runout || [];
     for (let i = 0; i < 5; i++) {
       const c = st.board[i];
-      const e = c ? fromCode(c, { size: G.board.size }) : el('div', 'slot');
-      if (!c) { e.style.width = G.board.size + 'px'; e.style.height = G.board.size * 1.4 + 'px'; }
+      const r = !c ? runout[i - st.board.length] : null;
+      const e = c || r ? fromCode(c || r, { size: G.board.size }) : el('div', 'slot');
+      if (!c && !r) { e.style.width = G.board.size + 'px'; e.style.height = G.board.size * 1.4 + 'px'; }
       if (c && winCards.has(c)) e.classList.add('win');
+      if (r) { e.classList.add('runout'); e.style.animationDelay = `${(i - st.board.length) * 0.25}s`; }
       board.appendChild(e);
     }
+    if (runout.length) board.appendChild(el('div', 'runout-note', 'What would have come'));
     layer.appendChild(board);
 
     // Seats

@@ -242,6 +242,7 @@ function createApi(ctx) {
     // ----- wallet -----
     if (url.startsWith('/api/wallet') || url.startsWith('/api/shop/')) {
       if (method === 'GET' && url === '/api/wallet') return json(res, 200, await coins.getStatus(user.id));
+      if (method === 'GET' && url === '/api/wallet/history') return json(res, 200, { entries: await coins.history(user.id, 60) });
       if (method !== 'POST') return json(res, 404, { error: 'Not found' });
       if (limited(`wallet:${user.id}`, 60, 60 * 1000)) return json(res, 429, { error: 'Slow down a little' });
       const body = await readBody(req);
@@ -404,7 +405,7 @@ function createApi(ctx) {
         const chips = Math.floor(Number(body.chips) || 0), cns = Math.floor(Number(body.coins) || 0);
         if ((!chips && !cns) || chips < 0 || cns < 0 || chips > 100000 || cns > 10000) return json(res, 400, { error: 'Choose a gift of up to 100,000 chips and 10,000 coins' });
         const ids = await store.allUserIds();
-        for (const id of ids) await coins.adjust(id, cns, chips);
+        for (const id of ids) await coins.adjust(id, cns, chips, 'gift');
         const what = [chips && `${chips.toLocaleString('en-US')} chips`, cns && `${cns.toLocaleString('en-US')} coins`].filter(Boolean).join(' and ');
         await store.logAdmin(user.username, `gift to all ${ids.length} members: ${what}`);
         if (body.announce !== false) ctx.lobby.announce(`🎁 A gift from the house: ${what} for every member!`, 30);
@@ -498,6 +499,7 @@ function createApi(ctx) {
             wallet: await coins.getStatus(id),
             stats: await store.userStats(id),
             history: await store.handHistory(id, 50),
+            coinLog: await coins.history(id, 40),
             seat: ctx.lobby.locate(id),
             friends: await store.countFriends(id),
           });

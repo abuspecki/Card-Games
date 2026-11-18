@@ -9,7 +9,7 @@
   const fmt = (n) => Number(n || 0).toLocaleString('en-US');
   const session = localStorage.getItem('cg.session') || localStorage.getItem('poker.session');
   const GAME = { holdem: "Hold'em", blackjack: 'Blackjack', durak: 'Durak' };
-  const MODE = { friends: "Hold'em (friends)", bots: "Hold'em (bots)", blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette', flamingo: 'Flamingo', goldrush: 'Gold Rush' };
+  const MODE = { friends: "Hold'em (friends)", bots: "Hold'em (bots)", blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette', flamingo: 'Flamingo', goldrush: 'Gold Rush', tourney: 'Sit & Go' };
   const CAT = { bug: 'Bug report', suggestion: 'Suggestion', feature: 'Feature request', general: 'General' };
 
   async function api(path, body) {
@@ -138,10 +138,16 @@
   $('prev').onclick = () => { offset = Math.max(0, offset - 50); loadPlayers(); };
   $('next').onclick = () => { offset += 50; loadPlayers(); };
 
+  function reasonText(e) {
+    const [k, ...rest] = String(e.reason || '').split(':');
+    const d = rest.join(':');
+    return ({ win: `Gewinn: ${MODE[d] || d}`, daily: `Tagesbonus (Tag ${d})`, topup: 'Tägliches Auffüllen', bank: e.coins > 0 ? 'Bank: Chips → Münzen' : 'Bank: Münzen → Chips',
+      shop: `Shop: ${d}`, quest: `Aufgabe: ${d}`, achievement: `Erfolg: ${d}`, tourney: 'Sit-&-Go-Preis', gift: 'Geschenk an alle', bonus: 'Update-Bonus', owner: 'Korrektur (Owner)' })[k] || e.reason;
+  }
   async function openPlayer(id) {
     const r = await api(`/api/admin/players/${id}`);
     if (!r.ok) return toast(r.data.error || 'Could not load', true);
-    const { player: p, wallet: w, stats, friends, history = [], seat } = r.data;
+    const { player: p, wallet: w, stats, friends, history = [], seat, coinLog = [] } = r.data;
     const d = $('detail');
     d.classList.remove('hidden');
     d.innerHTML = `
@@ -160,6 +166,10 @@
       <h3>Recent games</h3>
       ${history.length ? `<table class="grid small"><thead><tr><th>When</th><th>Game</th><th class="num">Result</th></tr></thead><tbody>
         ${history.slice(0, 25).map((x) => `<tr><td>${ago(x.at)}</td><td>${MODE[x.mode] || esc(x.mode)}</td><td class="num ${x.net >= 0 ? 'pos' : 'neg'}">${x.mode === 'durak' || x.mode === 'flamingo' ? (x.won ? 'won' : 'lost') : `${x.net > 0 ? '+' : ''}${fmt(x.net)}`}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">No games recorded yet.</p>'}
+      <h3>Kontoauszug</h3>
+      ${coinLog.length ? `<table class="grid small"><thead><tr><th>Wann</th><th>Grund</th><th class="num">Münzen</th><th class="num">Chips</th></tr></thead><tbody>
+        ${coinLog.slice(0, 40).map((e) => `<tr><td>${ago(e.at)}</td><td>${esc(reasonText(e))}</td><td class="num ${e.coins >= 0 ? 'pos' : 'neg'}">${e.coins ? (e.coins > 0 ? '+' : '') + fmt(e.coins) : ''}</td><td class="num ${e.chips >= 0 ? 'pos' : 'neg'}">${e.chips ? (e.chips > 0 ? '+' : '') + fmt(e.chips) : ''}</td></tr>`).join('')}</tbody></table>`
+    : '<p class="muted">Noch keine Buchungen seit diesem Update.</p>'}
       <h3>Adjust balances</h3>
       <form class="adjust" id="adjForm">
         <label>Coins<input type="number" name="coins" value="0" step="1"></label>

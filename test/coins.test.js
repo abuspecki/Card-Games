@@ -139,6 +139,32 @@ const C = require('../coins');
   assert((await coins.buy(s, 'nope')).error);
   assert(C.SLOTS.every((slot) => C.CATALOG.some((i) => i.slot === slot)), 'every slot has items');
 
+  // ----- statement: every booking with its reason, table buy-ins are not listed -----
+  const sid = await newUser('stmt');
+  await coins.claimDaily(sid, t0);
+  await coins.convert(sid, 2);
+  await coins.buyChips(sid, 1);
+  await coins.earn(sid, 7, t0, 'win:blackjack');
+  await coins.buy(sid, 'title-hon');
+  await coins.adjust(sid, 5, 0, 'quest:Win 3 hands');
+  const bi = await coins.buyIn(sid, 500, 100);
+  await coins.cashOut(sid, 700, bi.amount);
+  await coins.earn(sid, 999, t0, 'win:roulette');               // capped at the daily limit
+  const capped = await coins.earn(sid, 5, t0, 'win:roulette');
+  assert.deepStrictEqual([capped.amount, capped.capped, capped.today, capped.cap], [0, true, C.TABLE_DAILY_CAP, C.TABLE_DAILY_CAP]);
+  const log = await coins.history(sid);
+  assert.deepStrictEqual(log.map((e) => [e.reason, e.coins, e.chips]), [
+    ['win:roulette', C.TABLE_DAILY_CAP - 7, 0],
+    ['quest:Win 3 hands', 5, 0],
+    ['shop:title-hon', -150, 0],
+    ['win:blackjack', 7, 0],
+    ['bank', -1, C.COIN_TO_CHIPS],
+    ['bank', 2, -2 * C.CONVERT_RATE],
+    ['daily:1', 100, 0],
+  ], JSON.stringify(log));
+  const sum = log.reduce((a, e) => a + e.coins, C.WELCOME_COINS);
+  assert.strictEqual(sum, (await coins.getStatus(sid)).coins, 'the statement adds up to the balance');
+
   // ----- rewards -----
   assert.strictEqual(C.rewardFor({ mode: 'friends', won: true, net: 1250, pot: 1500 }), 13);
   assert.strictEqual(C.rewardFor({ mode: 'durak', won: false }), 0);

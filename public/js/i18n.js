@@ -65,7 +65,12 @@
     'Coins to trade': 'Münzen tauschen', 'You pay': 'Du zahlst', 'You receive': 'Du bekommst', 'chips': 'Chips', 'Exchange chips for coins': 'Chips in Münzen tauschen',
     'Exchange coins for chips': 'Münzen in Chips tauschen', 'You have no coins to trade yet — collect the daily bonus or win at the tables.': 'Du hast noch keine Münzen – hol dir den Tagesbonus oder gewinn an den Tischen.',
     'Play money only — nothing here can be bought with or exchanged for real money.': 'Nur Spielgeld – nichts hier kann mit echtem Geld gekauft oder dagegen getauscht werden.',
-    'Daily bonus': 'Tagesbonus', 'Your daily top-up': 'Dein tägliches Auffüllen', 'Your coins:': 'Deine Münzen:',
+    'Daily bonus': 'Tagesbonus', 'What would have come': 'Das wäre noch gekommen', 'Your statement': 'Dein Kontoauszug', 'Win at': 'Gewinn bei', 'Daily top-up': 'Tägliches Auffüllen',
+    'Bank: chips → coins': 'Bank: Chips → Münzen', 'Bank: coins → chips': 'Bank: Münzen → Chips', 'Shop:': 'Shop:', 'Quest:': 'Aufgabe:', 'Achievement:': 'Erfolg:',
+    'Sit & Go prize': 'Sit-&-Go-Preis', 'Gift from the house': 'Geschenk vom Haus', 'Thank-you bonus for an update': 'Dankeschön-Bonus für ein Update',
+    'Correction by the owner': 'Korrektur durch den Owner', 'The statement could not be loaded.': 'Der Kontoauszug konnte nicht geladen werden.',
+    'No bookings yet — collect the daily bonus or win a hand.': 'Noch keine Buchungen – hol dir den Tagesbonus oder gewinn eine Hand.',
+    'Every coin and chip booking with its reason — the newest first. Chips you take to a table and back are not listed.': 'Jede Buchung von Münzen und Chips mit Grund – die neueste zuerst. Chips, die du an einen Tisch mitnimmst und zurückbekommst, stehen hier nicht.', 'Your daily top-up': 'Dein tägliches Auffüllen', 'Your coins:': 'Deine Münzen:',
     'The Bank is for members — sign in to exchange chips and coins.': 'Die Bank ist für Mitglieder – melde dich an, um Chips und Münzen zu tauschen.',
     // shop
     'Card backs': 'Kartenrücken', 'Card faces': 'Kartenseiten', 'Table felt': 'Tischfilz', 'Chip sets': 'Chip-Sets', 'Backgrounds': 'Hintergründe', 'Portraits': 'Porträts',
@@ -204,6 +209,11 @@
 
   // ---------- patterns for texts with numbers or names ----------
   const P = [
+    [/^Today ([\d,.]+) \/ ([\d,.]+)$/, 'Heute $1 / $2'],
+    [/^Day (\d+)$/, 'Tag $1'],
+    [/^The board would have been: (.+)$/, 'Das Board wäre gewesen: $1'],
+    [/^You have won the most table coins for today \(([\d,.]+)\)\. Wins still count for your chips — more coins tomorrow\.$/, 'Du hast heute die meisten Tisch-Münzen gewonnen ($1). Gewinne zählen weiter für deine Chips – morgen gibt es wieder Münzen.'],
+    [/^Your ([\d,.]+) chips are at a table right now\. Leave the table and they come back to your bankroll — then you can exchange them\.$/, 'Deine $1 Chips liegen gerade an einem Tisch. Verlass den Tisch, dann kommen sie zurück auf dein Konto – und du kannst sie tauschen.'],
     [/^You bet with them at the tables\. Below ([\d,.]+)\? Once a day the house tops you up to ([\d,.]+)\.$/, 'Damit setzt du an den Tischen. Unter $1? Einmal am Tag füllt das Haus auf $2 auf.'],
     [/^You earn 1 coin for every ([\d,.]+) chips you win \(up to ([\d,.]+) a day\) plus the daily bonus — and spend them in the Shop\.$/, 'Du bekommst 1 Münze pro $1 gewonnenen Chips (bis $2 am Tag) plus den Tagesbonus – und gibst sie im Shop aus.'],
     [/^at ([\d,.]+) chips = 1 coin and keeps (\d+) % of each exchange\.$/, 'zu $1 Chips = 1 Münze und behält $2 % jedes Tauschs.'],

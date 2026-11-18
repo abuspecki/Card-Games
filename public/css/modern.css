@@ -346,3 +346,17 @@ body.is-app .tbar { padding-top: max(6px, env(safe-area-inset-top, 0px)); }
 .ach em { margin-top: auto; color: var(--a-accent); font: 700 12px var(--a-font) !important; }
 .mb-quests { padding: 10px 14px; border-radius: 12px; background: var(--a-surface2); border: 1px solid var(--a-line); color: var(--a-text); font: 700 14px var(--a-font) !important; white-space: nowrap; }
 @media (max-width: 760px) { #hub .member-bar .mb-quests { grid-column: span 1; } }
+
+/* ----- wallet statement ----- */
+.modal-card .wstatement { margin-top: 14px; padding: 16px 18px; border-radius: 14px; border: 1px solid var(--a-line); background: var(--a-surface2); }
+.modal-card .wstatement h4 { font-size: 16px; margin: 0 0 4px; }
+.statement { list-style: none; margin: 10px 0 0; padding: 0; max-height: 320px; overflow-y: auto; }
+.statement li { display: grid; grid-template-columns: 92px 1fr auto; gap: 10px; align-items: center; padding: 8px 2px; border-top: 1px solid var(--a-line); font-size: 14px; }
+.statement li:first-child { border-top: 0; }
+.statement .st-when { opacity: .65; font-size: 12px; font-variant-numeric: tabular-nums; }
+.statement .st-what b { font-weight: 600; }
+.statement .st-amt { display: flex; gap: 10px; justify-content: flex-end; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.statement .st-amt em { font-style: normal; display: inline-flex; align-items: center; gap: 4px; }
+.statement .pos { color: #3FB27F; }
+.statement .neg { color: #E0715F; }
+@media (max-width: 560px) { .statement li { grid-template-columns: 1fr auto; } .statement .st-when { grid-column: 1 / -1; } }

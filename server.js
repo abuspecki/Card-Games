@@ -41,7 +41,7 @@ const ctx = { store: () => store, coins: () => coins, databaseError: () => datab
 ctx.errors = errors;
 ctx.lobby = createLobby(ctx);
 // Coins for a win outside the tables (Gold Rush), with the same daily cap.
-ctx.reward = (userId, result) => { const n = rewardFor(result); return n ? coins.earn(userId, n) : null; };
+ctx.reward = (userId, result) => { const n = rewardFor(result); return n ? coins.earn(userId, n, Date.now(), `win:${result.mode}`) : null; };
 ctx.goldrush = createGoldRush(ctx);
 ctx.quests = createQuests(ctx);
 ctx.backups = createBackups(ctx);
@@ -157,7 +157,7 @@ async function shutdown(signal) {
       // Everyone playing right now gets a thank-you for the interruption.
       const playing = new Set([...ctx.lobby.seatedAccounts(), ...ctx.goldrush._rounds.keys()]);
       const work = Promise.all([ctx.lobby.cashOutAll(), ctx.goldrush.cashOutAll()])
-        .then(() => Promise.all([...playing].map((id) => coins.adjust(id, 0, UPDATE_BONUS).catch((e) => console.error('update bonus', e)))))
+        .then(() => Promise.all([...playing].map((id) => coins.adjust(id, 0, UPDATE_BONUS, 'bonus').catch((e) => console.error('update bonus', e)))))
         .then(() => console.log(`Update bonus: ${UPDATE_BONUS} chips for ${playing.size} player(s)`));
       await Promise.race([work, new Promise((r) => setTimeout(r, 8000))]);
     }
@@ -192,7 +192,7 @@ openStore()
     if (await store.claimOnce('update-bonus-2026-11-17-goldrush')) {
       for (const name of ['Eule_Mit_Keule', 'Flöti']) {
         const u = await store.getUserByName(name);
-        if (u) { await coins.adjust(u.id, 0, UPDATE_BONUS); console.log(`Update bonus: ${UPDATE_BONUS} chips for ${u.username}`); }
+        if (u) { await coins.adjust(u.id, 0, UPDATE_BONUS, 'bonus'); console.log(`Update bonus: ${UPDATE_BONUS} chips for ${u.username}`); }
       }
     }
   })

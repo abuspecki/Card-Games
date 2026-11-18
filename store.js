@@ -30,7 +30,7 @@ const WALLET_FIELDS = ['coins', 'chips', 'in_play', 'last_daily', 'streak', 'las
   'earned_day', 'earned_today', 'converted_day', 'converted_today'];
 // Restore order: parents before the tables that point at them.
 const BACKUP_TABLES = ['users', 'stats', 'wallets', 'user_items', 'equipped', 'friends', 'feedback', 'activity',
-  'tasks', 'task_notes', 'dev_keys', 'meta', 'hand_log', 'quests', 'admin_log', 'error_log'];
+  'tasks', 'task_notes', 'dev_keys', 'meta', 'hand_log', 'quests', 'admin_log', 'error_log', 'coin_log'];
 const pair = (x, y) => (x < y ? [x, y] : [y, x]);
 
 // ---------- Postgres backend ----------
@@ -157,6 +157,10 @@ function postgresStore(url) {
         key TEXT PRIMARY KEY, source TEXT NOT NULL, message TEXT NOT NULL, stack TEXT, context TEXT,
         count INTEGER NOT NULL DEFAULT 1, first_at BIGINT NOT NULL, last_at BIGINT NOT NULL)`);
       await q('ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change BOOLEAN NOT NULL DEFAULT false');
+      await q(`CREATE TABLE IF NOT EXISTS coin_log (
+        id BIGSERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        coins INTEGER NOT NULL, chips INTEGER NOT NULL, reason TEXT NOT NULL, at TIMESTAMPTZ NOT NULL DEFAULT now())`);
+      await q('CREATE INDEX IF NOT EXISTS coin_log_user ON coin_log (user_id, id DESC)');
       await q(`CREATE TABLE IF NOT EXISTS backups (
         id BIGSERIAL PRIMARY KEY, kind TEXT NOT NULL, at TIMESTAMPTZ NOT NULL DEFAULT now(),
         size INTEGER NOT NULL, summary JSONB, data BYTEA NOT NULL)`);
@@ -269,6 +273,9 @@ function postgresStore(url) {
       // keep the history short: the newest 200 per player
       if (Math.random() < 0.05) await q('DELETE FROM hand_log WHERE user_id = $1 AND id < (SELECT MIN(id) FROM (SELECT id FROM hand_log WHERE user_id = $1 ORDER BY id DESC LIMIT 200) t)', [userId]);
     },
+    async coinLog(userId, limit = 60) {
+      return (await q('SELECT coins, chips, reason, at FROM coin_log WHERE user_id = $1 ORDER BY id DESC LIMIT $2', [userId, limit])).rows;
+    },
     async handHistory(userId, limit = 50) {
       const r = await q('SELECT mode, net, won, at FROM hand_log WHERE user_id = $1 ORDER BY id DESC LIMIT $2', [userId, limit]);
       return r.rows;
@@ -316,6 +323,11 @@ function postgresStore(url) {
           }
         }
         if (out.addItem) await c.query('INSERT INTO user_items (user_id, item_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userId, out.addItem]);
+        if (out.log) {
+          await c.query('INSERT INTO coin_log (user_id, coins, chips, reason) VALUES ($1, $2, $3, $4)', [userId, out.log.coins, out.log.chips, String(out.log.reason).slice(0, 80)]);
+          // keep the statement short: the newest 150 per player
+          if (Math.random() < 0.05) await c.query('DELETE FROM coin_log WHERE user_id = $1 AND id < (SELECT MIN(id) FROM (SELECT id FROM coin_log WHERE user_id = $1 ORDER BY id DESC LIMIT 150) t)', [userId]);
+        }
         await c.query('COMMIT');
         return out.result;
       } catch (e) {
@@ -579,8 +591,16 @@ function fileStore(file) {
         const list = db.items[userId] || (db.items[userId] = []);
         if (!list.includes(out.addItem)) list.push(out.addItem);
       }
+      if (out.log) {
+        db.coinLog = db.coinLog || [];
+        db.coinLog.push({ user_id: userId, coins: out.log.coins, chips: out.log.chips, reason: String(out.log.reason).slice(0, 80), at: new Date().toISOString() });
+        if (db.coinLog.length > 20000) db.coinLog = db.coinLog.slice(-15000);
+      }
       save();
       return out.result;
+    },
+    async coinLog(userId, limit = 60) {
+      return (db.coinLog || []).filter((e) => e.user_id === userId).slice(-limit).reverse().map(({ user_id, ...e }) => e);
     },
     async saveError(g) { db.errors = db.errors || {}; db.errors[g.key] = { ...g }; save(); },
     async loadErrors() { return Object.values(db.errors || {}); },

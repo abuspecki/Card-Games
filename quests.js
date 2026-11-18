@@ -74,7 +74,7 @@ function createQuests(ctx) {
   }
 
   async function pay(id, d, coins, text, kind) {
-    try { await ctx.coins().adjust(id, coins, 0); } catch (e) { console.error('quest reward', e); }
+    try { await ctx.coins().adjust(id, coins, 0, `${kind === 'achievement' ? 'achievement' : 'quest'}:${text}`); } catch (e) { console.error('quest reward', e); }
     d.news.push({ kind, text, coins, at: Date.now() });
     if (d.news.length > 10) d.news = d.news.slice(-10);
   }

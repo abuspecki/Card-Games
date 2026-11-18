@@ -719,8 +719,19 @@
       return;
     }
     if (m.t === 'coins') {
-      if (App.wallet) { App.wallet.coins = m.coins; renderAccount(); }
-      if (m.amount > 0) { coinPop(m.amount, m.capped ? 'Daily table limit reached' : 'For your win'); Sound.play('chips'); }
+      if (App.wallet) { App.wallet.coins = m.coins; if (m.today != null) App.wallet.earnedToday = m.today; renderAccount(); }
+      if (m.amount > 0) {
+        coinPop(m.amount, m.capped ? 'Daily table limit reached' : (m.cap ? `Today ${fmt(m.today)} / ${fmt(m.cap)}` : 'For your win'));
+        Sound.play('chips');
+      }
+      // Limit reached: say so once a day, so nobody thinks the coins got lost.
+      if (m.capped) {
+        const day = new Date().toISOString().slice(0, 10);
+        if (localStorage.getItem('cg.capNote') !== day) {
+          localStorage.setItem('cg.capNote', day);
+          toast(`You have won the most table coins for today (${fmt(m.cap || 500)}). Wins still count for your chips — more coins tomorrow.`, { timeout: 9000 });
+        }
+      }
       return;
     }
     if (m.t === 'notice') { toast(m.msg, { kind: 'good', timeout: 7000 }); return; }
@@ -1242,12 +1253,58 @@
           <h4 class="mt">Coins from the tables</h4>
           <p>1 coin for every 100 chips you win (at least 1 per win); escaping a game of Durak earns 10. Today: ${fmt(w.earnedToday)} / ${fmt(w.tableCap)}.</p>
         </section>
-      </div>`;
+      </div>
+      <section class="wstatement">
+        <h4>Your statement</h4>
+        <p class="fine">Every coin and chip booking with its reason — the newest first. Chips you take to a table and back are not listed.</p>
+        <div data-statement><p class="muted">Loading…</p></div>
+      </section>`;
+    paintStatement(body.querySelector('[data-statement]'));
     body.querySelector('[data-bank]').onclick = () => openBank();
     const daily = body.querySelector('[data-daily]');
     if (daily) daily.onclick = async () => { const r = await walletAction('/api/wallet/daily'); if (r) { coinPop(r.amount, r.streak > 1 ? `Day ${r.streak} in a row` : 'Daily bonus'); Sound.play('win'); paintLounge(body); } };
     const bk = body.querySelector('[data-bankrupt]');
     if (bk) bk.onclick = async () => { const r = await walletAction('/api/wallet/bankrupt'); if (r) { coinPop(r.amount, 'Your daily top-up', 'chip'); Sound.play('chips'); paintLounge(body); } };
+  }
+
+  // ----- the statement: where coins and chips came from and went -----
+  const GAME_NAME = { friends: "Hold'em", bots: "Hold'em", blackjack: 'Blackjack', roulette: 'Roulette', durak: 'Durak', flamingo: 'Flamingo', goldrush: 'Gold Rush', tourney: 'Sit & Go' };
+  function bookingLabel(e) {
+    const [kind, ...rest] = String(e.reason || '').split(':');
+    const detail = rest.join(':');
+    const two = (a, b) => `<span>${esc(a)}</span> <b>${esc(b)}</b>`;
+    if (kind === 'win') return two('Win at', GAME_NAME[detail] || detail);
+    if (kind === 'daily') return `<span>Daily bonus</span> · <b>Day ${esc(detail)}</b>`;
+    if (kind === 'topup') return '<span>Daily top-up</span>';
+    if (kind === 'bank') return e.coins > 0 ? '<span>Bank: chips → coins</span>' : '<span>Bank: coins → chips</span>';
+    if (kind === 'shop') { const it = App.shop && App.shop.items.find((i) => i.id === detail); return two('Shop:', it ? it.name : detail); }
+    if (kind === 'quest') return two('Quest:', detail);
+    if (kind === 'achievement') return two('Achievement:', detail);
+    if (kind === 'tourney') return '<span>Sit & Go prize</span>';
+    if (kind === 'gift') return '<span>Gift from the house</span>';
+    if (kind === 'bonus') return '<span>Thank-you bonus for an update</span>';
+    if (kind === 'owner') return '<span>Correction by the owner</span>';
+    return `<span>${esc(e.reason)}</span>`;
+  }
+  function bookingWhen(at) {
+    const d = new Date(at);
+    const loc = document.documentElement.lang === 'de' ? 'de-DE' : undefined;
+    return d.toDateString() === new Date().toDateString()
+      ? d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' })
+      : d.toLocaleDateString(loc, { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });
+  }
+  const signed = (n) => (n > 0 ? '+' : n < 0 ? '−' : '') + fmt(Math.abs(n));
+  async function paintStatement(box) {
+    if (!box) return;
+    const r = await api('/api/wallet/history');
+    if (!r.ok) { box.innerHTML = '<p class="muted">The statement could not be loaded.</p>'; return; }
+    const list = r.data.entries || [];
+    if (!list.length) { box.innerHTML = '<p class="muted">No bookings yet — collect the daily bonus or win a hand.</p>'; return; }
+    box.innerHTML = `<ul class="statement">${list.map((e) => `<li>
+      <span class="st-when">${bookingWhen(e.at)}</span>
+      <span class="st-what">${bookingLabel(e)}</span>
+      <span class="st-amt">${e.coins ? `<em class="${e.coins > 0 ? 'pos' : 'neg'}"><i class="ico-coin"></i>${signed(e.coins)}</em>` : ''}${e.chips ? `<em class="${e.chips > 0 ? 'pos' : 'neg'}"><i class="ico-chip"></i>${signed(e.chips)}</em>` : ''}</span>
+    </li>`).join('')}</ul>`;
   }
 
   // ================= GOLD RUSH =================
@@ -1382,7 +1439,9 @@
             <input type="range" min="1" max="${c.maxCoins}" value="${Math.min(c.maxCoins, 10)}" data-sell-range aria-label="Coins to receive">
             <p class="quote">You pay <b data-sell-cost></b> chips</p>
             <button class="btn btn-navy wide" data-sell-go>Exchange chips for coins</button>`
-    : `<p class="muted">You need at least ${fmt(c.rate)} chips in your bankroll for one coin.</p>`}
+    : w.inPlay > 0
+      ? `<p class="muted">Your ${fmt(w.inPlay)} chips are at a table right now. Leave the table and they come back to your bankroll — then you can exchange them.</p>`
+      : `<p class="muted">You need at least ${fmt(c.rate)} chips in your bankroll for one coin.</p>`}
           <p class="fine">Up to ${fmt(b.max)} coins per exchange.</p>
         </section>
         <section class="desk">

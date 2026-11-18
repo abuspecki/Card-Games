@@ -175,7 +175,17 @@ function status(w, now = Date.now()) {
 }
 
 function makeCoins(store) {
-  const wallet = (userId, fn) => store.updateWallet(userId, INIT, fn);
+  // A locked wallet update. With a `reason`, every change of coins or chips
+  // is written to the player's statement in the same step.
+  const wallet = (userId, fn, reason) => store.updateWallet(userId, INIT, (w, owned) => {
+    const out = fn(w, owned) || {};
+    if (reason && out.update) {
+      const dc = 'coins' in out.update ? out.update.coins - w.coins : 0;
+      const dh = 'chips' in out.update ? out.update.chips - w.chips : 0;
+      if (dc || dh) out.log = { coins: dc, chips: dh, reason: typeof reason === 'function' ? reason(out) : reason };
+    }
+    return out;
+  });
 
   const api = {
     CATALOG, SLOTS,
@@ -195,7 +205,7 @@ function makeCoins(store) {
         const amount = dailyAmount(streak);
         const coins = w.coins + amount;
         return { update: { coins, last_daily: dayString(now), streak }, result: { amount, streak, coins } };
-      });
+      }, (out) => `daily:${out.result.streak}`);
     },
 
     // The daily top-up: below 1,000 chips (bankroll + at tables), once a day, back to 1,000.
@@ -207,7 +217,7 @@ function makeCoins(store) {
         const amount = TOPUP_TO - total;
         const chips = w.chips + amount;
         return { update: { chips, last_bankrupt: now }, result: { amount, chips } };
-      });
+      }, 'topup');
     },
 
     // The Bank, chips -> coins: 110 chips per coin (100 + 10 % fee).
@@ -221,7 +231,7 @@ function makeCoins(store) {
         const chips = w.chips - cost;
         const coins = w.coins + want;
         return { update: { chips, coins }, result: { coins, chips, converted: want, spentChips: cost } };
-      });
+      }, 'bank');
     },
 
     // The Bank, coins -> chips: 90 chips per coin (100 − 10 % fee).
@@ -234,7 +244,7 @@ function makeCoins(store) {
         const coins = w.coins - n;
         const chips = w.chips + n * COIN_TO_CHIPS;
         return { update: { coins, chips }, result: { coins, chips, traded: n, gotChips: n * COIN_TO_CHIPS } };
-      });
+      }, 'bank');
     },
 
     // Move chips from the bankroll to a table. Takes up to `amount`, at least `min`.
@@ -255,16 +265,18 @@ function makeCoins(store) {
     },
 
     // Coins won at the tables, limited to TABLE_DAILY_CAP per day.
-    async earn(userId, amount, now = Date.now()) {
+    // `reason` says where they were won (e.g. "win:blackjack").
+    async earn(userId, amount, now = Date.now(), reason = 'win') {
       if (amount <= 0) return { amount: 0 };
       return wallet(userId, (w) => {
         const today = dayString(now);
         const already = w.earned_day === today ? w.earned_today : 0;
         const granted = Math.max(0, Math.min(amount, TABLE_DAILY_CAP - already));
-        if (!granted) return { result: { amount: 0, capped: true, coins: w.coins } };
+        if (!granted) return { result: { amount: 0, capped: true, coins: w.coins, today: already, cap: TABLE_DAILY_CAP } };
         const coins = w.coins + granted;
-        return { update: { coins, earned_day: today, earned_today: already + granted }, result: { amount: granted, capped: granted < amount, coins } };
-      });
+        return { update: { coins, earned_day: today, earned_today: already + granted },
+          result: { amount: granted, capped: granted < amount, coins, today: already + granted, cap: TABLE_DAILY_CAP } };
+      }, reason);
     },
 
     async buy(userId, itemId) {
@@ -278,7 +290,7 @@ function makeCoins(store) {
         if (w.coins < item.price) return { result: { error: `You need ${item.price - w.coins} more coins` } };
         const coins = w.coins - item.price;
         return { update: { coins }, addItem: itemId, result: { coins, item: itemId } };
-      });
+      }, `shop:${itemId}`);
     },
 
     async equip(userId, slot, itemId) {
@@ -309,14 +321,20 @@ function makeCoins(store) {
     },
 
     // Owner tool: add or remove coins/chips (never below zero).
-    async adjust(userId, dCoins, dChips) {
+    // `reason`: owner, gift, quest:…, tourney, bonus …
+    async adjust(userId, dCoins, dChips, reason = 'owner') {
       const c = int(dCoins) || 0;
       const h = int(dChips) || 0;
       if (Math.abs(c) > 1e6 || Math.abs(h) > 1e8) return { error: 'That amount is too large' };
       return wallet(userId, (w) => ({
         update: { coins: Math.max(0, w.coins + c), chips: Math.max(0, w.chips + h) },
         result: { coins: Math.max(0, w.coins + c), chips: Math.max(0, w.chips + h) },
-      }));
+      }), reason);
+    },
+
+    // The player's statement: the newest coin and chip bookings (not table buy-ins).
+    async history(userId, limit = 60) {
+      return store.coinLog ? store.coinLog(userId, limit) : [];
     },
   };
   return api;
