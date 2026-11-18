@@ -188,7 +188,7 @@
         const [hx, hy] = P.hole;
         const cards = s.hole || [null, null];
         cards.slice(0, 2).forEach((c, j) => {
-          const e = c ? fromCode(c, { size: G.hole }) : back('holdem', { size: G.hole });
+          const e = c ? fromCode(c, { size: G.hole }) : back('holdem', { size: G.hole, skin: (s.skin && s.skin.back) || '' });
           if (c && winCards.has(c)) e.classList.add('win');
           place(e, hx - G.hole * 0.75 + j * G.hole * 0.5, hy - G.hole * 0.7 + j * 2, j ? 6 : -10);
           layer.appendChild(e);
@@ -197,11 +197,11 @@
       // bet in front of the seat
       if (s.bet > 0) {
         const b = el('div', 'bet');
-        b.append(stack(s.bet, { size: port ? 22 : 36, maxPer: 6, maxCols: 3 }));
+        b.append(stack(s.bet, { size: port ? 22 : 36, maxPer: 6, maxCols: 3, set: (s.skin && s.skin.chips) || '' }));
         const [bx, by] = k === 0 ? [G.cx, G.board.y + G.board.size * 1.4 + (port ? 14 : 22)] : P.bet;
         place(b, bx, by).style.transform = 'translate(-50%,-50%)';
         layer.appendChild(b);
-        betsNow.set(i, { amount: s.bet, at: [bx, by] });
+        betsNow.set(i, { amount: s.bet, at: [bx, by], set: (s.skin && s.skin.chips) || '' });
       }
       // dealer button
       if (i === st.button && st.stage !== 'waiting') {
@@ -265,10 +265,10 @@
     if (!flyLayer || !prev || prev.hand !== st.handNo || prev.stage === st.stage) return;
     if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const potAt = [G.W / 2 - (port ? 22 : 36), G.potY + (port ? 16 : 26)];
-    const flyTo = (amount, from, to, delay, size) => {
+    const flyTo = (amount, from, to, delay, size, set) => {
       const f = document.createElement('div');
       f.className = 'chip-fly';
-      f.append(stack(amount, { size, maxPer: 5, maxCols: 2 }));
+      f.append(stack(amount, { size, maxPer: 5, maxCols: 2, set }));
       place(f, from[0], from[1]).style.transform = 'translate(-50%,-50%)';
       flyLayer.appendChild(f);
       const dx = to[0] - from[0], dy = to[1] - from[1];
@@ -281,7 +281,7 @@
     };
     // 1. the street is over: its bets into the pot
     let delay = 0;
-    for (const [, b] of prev.bets) { flyTo(b.amount, b.at, potAt, delay, port ? 22 : 34); delay += 40; }
+    for (const [, b] of prev.bets) { flyTo(b.amount, b.at, potAt, delay, port ? 22 : 34, b.set); delay += 40; }
     // 2. showdown: the pot to the winner(s)
     if (st.stage === 'showdown' && st.results && prev.stage !== 'showdown') {
       const start = prev.bets.size ? 600 : 150;

@@ -597,6 +597,7 @@ function createLobby(ctx) {
           if (entry) seat.tEntry = entry;
           seat.avatar = look.avatar || null;
           seat.badge = look.badge || null;
+          seat.skin = look.skin || null;
           room = target;
           pid = newPid;
           table.addLog(`${name} joined`);
@@ -749,7 +750,7 @@ function createLobby(ctx) {
     ctx.coins().lookOf(userId).then((look) => {
       for (const room of rooms.values()) {
         const seat = room.table.seats.find((s) => s && s.accountId === userId);
-        if (seat) { seat.avatar = look.avatar; seat.badge = look.badge; pushState(room); }
+        if (seat) { seat.avatar = look.avatar; seat.badge = look.badge; seat.skin = look.skin || null; pushState(room); }
       }
     }).catch(() => {});
   }

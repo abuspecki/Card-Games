@@ -44,6 +44,15 @@ const CATALOG = [
   { id: 'back-tartan', slot: 'cardback', name: 'Hunting Lodge', price: 450, preview: 'tartan' },
   { id: 'back-faberge', slot: 'cardback', name: 'Fabergé', price: 750, preview: 'faberge' },
   { id: 'back-flames', slot: 'cardback', name: 'Flames', price: 500, preview: 'flames', retired: true },
+  // ----- animated (everyone at the table sees them move) -----
+  { id: 'back-aurora', slot: 'cardback', name: 'Aurora', price: 1200, preview: 'aurora', animated: true },
+  { id: 'back-goldflux', slot: 'cardback', name: 'Liquid Gold', price: 1500, preview: 'goldflux', animated: true },
+  { id: 'pf-neon', slot: 'avatar', name: 'Neon Pulse', price: 900, preview: 'pf:neon', animated: true },
+  { id: 'pf-flame', slot: 'avatar', name: 'Eternal Flame', price: 1300, preview: 'pf:flame', animated: true },
+  { id: 'pf-halo', slot: 'avatar', name: 'Golden Halo', price: 1800, preview: 'pf:halo', animated: true },
+  { id: 'title-legend', slot: 'badge', name: 'Legend', price: 2500, preview: 'ta:Legend', animated: true },
+  { id: 'chips-holo', slot: 'chips', name: 'Holographic', price: 1400, preview: 'holo', animated: true },
+  { id: 'turn-lightning', slot: 'turn', name: 'Lightning', price: 1000, preview: 'lightning', animated: true },
   // ----- decks (card faces) -----
   { id: 'face-bridge', slot: 'cardface', name: 'Bridge Club', price: 200, preview: 'bridge' },
   { id: 'face-fourcolor', slot: 'cardface', name: 'Four-Colour Deck', price: 250, preview: 'fourcolor' },
@@ -313,11 +322,12 @@ function makeCoins(store) {
       return owned.includes(itemId) ? item : null;
     },
 
-    // Avatar + badge, shown to other players.
+    // What other players see of you: portrait, title and your table skins.
     async lookOf(userId) {
       const { equipped } = await store.getItems(userId);
       const pick = (slot) => (equipped[slot] && ITEMS[equipped[slot]] ? ITEMS[equipped[slot]].preview : null);
-      return { avatar: pick('avatar'), badge: pick('badge') };
+      // seen by everyone at the table: portrait, title, card back, chip set, turn marker
+      return { avatar: pick('avatar'), badge: pick('badge'), skin: { back: pick('cardback'), chips: pick('chips'), turn: pick('turn') } };
     },
 
     // Owner tool: add or remove coins/chips (never below zero).

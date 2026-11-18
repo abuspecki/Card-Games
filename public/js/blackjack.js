@@ -160,7 +160,7 @@
       Object.assign(circ.style, { width: CR + 'px', height: CR + 'px' });
       const building = isMe && st.limits && st.limits.phase === 'bet';
       const bet = building ? pending : (s.hands && s.hands.length ? s.hands.reduce((a, x) => a + x.bet, 0) : s.bet) || 0;
-      if (bet) circ.appendChild(stack(bet, { size: CR * 0.5, maxPer: 6, maxCols: 3 }));
+      if (bet) circ.appendChild(stack(bet, { size: CR * 0.5, maxPer: 6, maxCols: 3, set: isMe ? undefined : (s.skin && s.skin.chips) || '' }));
       else circ.appendChild(el('span', 'bet-word', 'BET'));
       place(circ, cx, cy).style.transform = 'translate(-50%,-50%)';
       layer.appendChild(circ);

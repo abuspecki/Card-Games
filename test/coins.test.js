@@ -119,7 +119,15 @@ const C = require('../coins');
   assert.ok((await coins.equip(s, 'avatar', 'pf-crest')).ok);
   assert.ok((await coins.buy(s, 'title-baron')).item);
   assert.ok((await coins.equip(s, 'badge', 'title-baron')).ok);
-  assert.deepStrictEqual(await coins.lookOf(s), { avatar: 'pf:crest', badge: 't:Baron' });
+  assert.deepStrictEqual(await coins.lookOf(s), { avatar: 'pf:crest', badge: 't:Baron', skin: { back: null, chips: null, turn: null } });
+  // what others see also includes the card back, chip set and turn marker
+  await coins.adjust(s, 5000, 0, 'owner');
+  for (const id of ['back-aurora', 'chips-holo', 'turn-lightning']) assert.ok((await coins.buy(s, id)).item, id);
+  assert.ok((await coins.equip(s, 'cardback', 'back-aurora')).ok);
+  assert.ok((await coins.equip(s, 'chips', 'chips-holo')).ok);
+  assert.ok((await coins.equip(s, 'turn', 'turn-lightning')).ok);
+  assert.deepStrictEqual((await coins.lookOf(s)).skin, { back: 'aurora', chips: 'holo', turn: 'lightning' });
+  assert(C.CATALOG.filter((i) => i.animated).length >= 8, 'animated skins for sale');
   // retired items can't be bought any more…
   assert((await coins.buy(s, 'avatar-lion')).error, 'retired items are not sold');
   // …but players who own one keep it and can still use it

@@ -103,7 +103,7 @@
       const shown = Math.min(n, port ? 6 : 10);
       for (let k = 0; k < shown; k++) {
         const off = k - (shown - 1) / 2;
-        layer.appendChild(place(back('durak', { size: G.fan }), fx - G.fan / 2 + off * G.fan * 0.26, fy - G.fan * 0.7 + Math.abs(off) * 2, off * 7));
+        layer.appendChild(place(back('durak', { size: G.fan, skin: (s.skin && s.skin.back) || '' }), fx - G.fan / 2 + off * G.fan * 0.26, fy - G.fan * 0.7 + Math.abs(off) * 2, off * 7));
       }
       if (n) { const c = el('span', 'count', String(n)); place(c, fx, fy + G.fan * 0.85); layer.appendChild(c); }
       const p = plate(ctx, st, s, i, s.out ? 'out' : '');

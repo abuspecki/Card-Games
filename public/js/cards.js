@@ -43,7 +43,10 @@
   function back(theme = 'holdem', opts = {}) {
     const el = document.createElement('div');
     // A card back bought in the shop replaces the room's default back.
-    el.className = 'card-back ' + (window.CardUI.backOverride && !opts.noOverride ? window.CardUI.backOverride : theme);
+    // A player's own card back (everyone sees it on that player's cards) — else the
+    // back you bought for your screen, else the room's default back.
+    const own = opts.skin !== undefined ? (opts.skin ? 'cb-' + opts.skin : theme) : null;
+    el.className = 'card-back ' + (own || (window.CardUI.backOverride && !opts.noOverride ? window.CardUI.backOverride : theme));
     if (opts.size) el.style.setProperty('--w', opts.size + 'px');
     el.setAttribute('role', 'img');
     el.setAttribute('aria-label', 'Face-down card');
@@ -100,7 +103,7 @@
     shown.forEach((c, ci) => {
       const n = Math.min(maxPer, c.n);
       for (let k = 0; k < n; k++) {
-        const ch = chip(c.v, { size });
+        const ch = chip(c.v, { size, set: opts.set });
         ch.style.left = (ci * size * 0.86) + 'px';
         ch.style.bottom = (k * step) + 'px';
         pile.appendChild(ch);

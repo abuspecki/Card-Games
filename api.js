@@ -279,7 +279,7 @@ function createApi(ctx) {
       else if (url === '/api/shop/buy') r = await coins.buy(user.id, String(body.item || ''));
       else if (url === '/api/shop/equip') {
         r = await coins.equip(user.id, String(body.slot || ''), body.item ? String(body.item) : null);
-        if (r.ok && (body.slot === 'badge' || body.slot === 'avatar')) ctx.lobby.refreshLook(user.id);
+        if (r.ok && ['badge', 'avatar', 'cardback', 'chips', 'turn'].includes(body.slot)) ctx.lobby.refreshLook(user.id);
       } else return json(res, 404, { error: 'Not found' });
       if (r.error) return json(res, 400, r);
       return json(res, 200, { ...r, wallet: await coins.getStatus(user.id) });

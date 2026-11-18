@@ -492,15 +492,15 @@ body.game[data-bg="riviera"] .stage, body.game[data-bg="tweed"] .stage, body.gam
 .mini-badge .title, .profile-head .title { color: #B08D57; }
 
 /* Turn markers: an emblem on the player whose turn it is */
-:is(body[data-turn="candle"], body[data-turn="hourglass"], body[data-turn="watch"]) :is(.seat.active, .plate.active, .spot-label.active)::after,
+:is(.seat, .plate, .spot-label).active:is([data-turn="candle"], [data-turn="hourglass"], [data-turn="watch"])::after,
 .mini-turn[data-turn="candle"]::after, .mini-turn[data-turn="hourglass"]::after, .mini-turn[data-turn="watch"]::after {
   content: ''; position: absolute; top: -22px; right: -16px; width: 42px; height: 42px; z-index: 3;
   background: center / contain no-repeat; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); pointer-events: none;
 }
-:is(body[data-turn="candle"] :is(.seat.active, .plate.active, .spot-label.active), .mini-turn[data-turn="candle"])::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='9' y='11' width='6' height='11' rx='1' fill='%23F4EFE3' stroke='%23B08D57'/%3E%3Cpath d='M12 2c2 3 3 4.5 3 6.2a3 3 0 0 1-6 0C9 6.5 10 5 12 2z' fill='%23F2B33D'/%3E%3Cpath d='M12 5.5c.9 1.4 1.3 2.2 1.3 3a1.3 1.3 0 0 1-2.6 0c0-.8.4-1.6 1.3-3z' fill='%23FFF3C4'/%3E%3C/svg%3E"); animation: flicker 1.6s ease-in-out infinite; transform-origin: 50% 100%; }
-:is(body[data-turn="hourglass"] :is(.seat.active, .plate.active, .spot-label.active), .mini-turn[data-turn="hourglass"])::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 4h8c0 4-4 5.5-4 8s4 4 4 8H8c0-4 4-5.5 4-8S8 8 8 4z' fill='%23FBF7EC' stroke='%23C9A45C' stroke-width='1.4'/%3E%3Cpath d='M9.6 6.5h4.8c-.6 1.6-2.4 2.4-2.4 3.6 0-1.2-1.8-2-2.4-3.6zM9 19.5c.4-2 3-2.6 3-4 0 1.4 2.6 2 3 4z' fill='%23D9A441'/%3E%3Cpath d='M6 3h12M6 21h12' stroke='%238A6A2E' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); animation: hourglass 3s ease-in-out infinite; }
-:is(body[data-turn="watch"] :is(.seat.active, .plate.active, .spot-label.active), .mini-turn[data-turn="watch"])::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='10.5' y='1.5' width='3' height='3' rx='1' fill='%238A6A2E'/%3E%3Ccircle cx='12' cy='14' r='8.5' fill='%23E6CC8F' stroke='%238A6A2E' stroke-width='1.5'/%3E%3Ccircle cx='12' cy='14' r='6.3' fill='%23FBF7EC'/%3E%3Cpath d='M12 14V9.5M12 14l3 1.8' stroke='%2314213D' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E"); animation: swing 2s ease-in-out infinite; transform-origin: 50% 0; }
-body[data-turn="candle"].holdem .seat.active { box-shadow: 0 0 26px rgba(242,179,61,.55); }
+:is(:is(.seat, .plate, .spot-label).active[data-turn="candle"], .mini-turn[data-turn="candle"])::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='9' y='11' width='6' height='11' rx='1' fill='%23F4EFE3' stroke='%23B08D57'/%3E%3Cpath d='M12 2c2 3 3 4.5 3 6.2a3 3 0 0 1-6 0C9 6.5 10 5 12 2z' fill='%23F2B33D'/%3E%3Cpath d='M12 5.5c.9 1.4 1.3 2.2 1.3 3a1.3 1.3 0 0 1-2.6 0c0-.8.4-1.6 1.3-3z' fill='%23FFF3C4'/%3E%3C/svg%3E"); animation: flicker 1.6s ease-in-out infinite; transform-origin: 50% 100%; }
+:is(:is(.seat, .plate, .spot-label).active[data-turn="hourglass"], .mini-turn[data-turn="hourglass"])::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 4h8c0 4-4 5.5-4 8s4 4 4 8H8c0-4 4-5.5 4-8S8 8 8 4z' fill='%23FBF7EC' stroke='%23C9A45C' stroke-width='1.4'/%3E%3Cpath d='M9.6 6.5h4.8c-.6 1.6-2.4 2.4-2.4 3.6 0-1.2-1.8-2-2.4-3.6zM9 19.5c.4-2 3-2.6 3-4 0 1.4 2.6 2 3 4z' fill='%23D9A441'/%3E%3Cpath d='M6 3h12M6 21h12' stroke='%238A6A2E' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); animation: hourglass 3s ease-in-out infinite; }
+:is(:is(.seat, .plate, .spot-label).active[data-turn="watch"], .mini-turn[data-turn="watch"])::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='10.5' y='1.5' width='3' height='3' rx='1' fill='%238A6A2E'/%3E%3Ccircle cx='12' cy='14' r='8.5' fill='%23E6CC8F' stroke='%238A6A2E' stroke-width='1.5'/%3E%3Ccircle cx='12' cy='14' r='6.3' fill='%23FBF7EC'/%3E%3Cpath d='M12 14V9.5M12 14l3 1.8' stroke='%2314213D' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E"); animation: swing 2s ease-in-out infinite; transform-origin: 50% 0; }
+body.holdem .seat.active[data-turn="candle"] { box-shadow: 0 0 26px rgba(242,179,61,.55); }
 @keyframes flicker { 0%, 100% { transform: scale(1) rotate(0); } 30% { transform: scale(1.06, .96) rotate(-3deg); } 60% { transform: scale(.96, 1.05) rotate(2deg); } }
 @keyframes hourglass { 0%, 70% { transform: rotate(0); } 85%, 100% { transform: rotate(180deg); } }
 @keyframes swing { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
@@ -924,3 +924,63 @@ html[lang="de"] .bottom-bar .info small { letter-spacing: .12em; }
 .tourney-bar .btn-gold { padding: 10px 16px !important; border-radius: 12px; background: #F2C14E !important; color: #231A02 !important; font: 700 14px 'Montserrat', sans-serif; white-space: nowrap; }
 .tourney-bar .btn-gold:disabled { opacity: .5; }
 @media (max-width: 760px) { .tourney-bar { padding: 6px 10px; font-size: 12px; } .tourney-bar small { display: none; } }
+
+/* =========================================================
+   Animated skins — everyone at the table sees them move.
+   ========================================================= */
+/* card back: Aurora — northern lights drifting across the back */
+.card-back.cb-aurora { --acc: #E8FFF6; --bg1: #0F4A5A; --bg2: #061826; overflow: hidden; }
+.card-back.cb-aurora .deco { background: linear-gradient(120deg, rgba(64,255,190,0) 10%, rgba(64,255,190,.6) 30%, rgba(124,112,255,.55) 50%, rgba(255,92,200,.4) 70%, rgba(64,255,190,0) 90%); background-size: 300% 300%; animation: cg-aurora 6s ease-in-out infinite; mix-blend-mode: screen; }
+@keyframes cg-aurora { 0%, 100% { background-position: 0% 40%; } 50% { background-position: 100% 60%; } }
+/* card back: Liquid Gold — a beam of light sweeps across gold */
+.card-back.cb-goldflux { --acc: #3A2A08; --bg1: #F4D27A; --bg2: #A87A22; overflow: hidden; }
+.card-back.cb-goldflux .deco { background: linear-gradient(105deg, transparent 38%, rgba(255,255,255,.85) 50%, transparent 62%), repeating-linear-gradient(45deg, rgba(90,60,10,.2) 0 2px, transparent 2px 9px); background-size: 260% 100%, auto; animation: cg-shine 3.2s linear infinite; }
+@keyframes cg-shine { 0% { background-position: 160% 0, 0 0; } 100% { background-position: -60% 0, 0 0; } }
+
+/* portraits: ring drawn by ::before, inner disc by ::after, initials on top */
+.pf-neon, .pf-flame, .pf-halo { isolation: isolate; }
+.pf-neon::after, .pf-flame::after, .pf-halo::after { content: ''; position: absolute; inset: 9%; border-radius: 50%; z-index: 0; }
+.pf-neon::before, .pf-flame::before, .pf-halo::before { content: ''; position: absolute; inset: -4%; border-radius: 50%; z-index: -1; }
+/* Neon Pulse */
+.pf-neon { color: #C9FBFF; text-shadow: 0 0 6px #3FE6FF; animation: cg-neon 1.8s ease-in-out infinite; }
+.pf-neon::before { background: conic-gradient(#3FE6FF, #B36BFF, #3FE6FF); }
+.pf-neon::after { background: #0B1424; }
+@keyframes cg-neon { 0%, 100% { box-shadow: 0 0 4px #3FE6FF, 0 0 10px rgba(63,230,255,.5); } 50% { box-shadow: 0 0 10px #B36BFF, 0 0 22px rgba(179,107,255,.7); } }
+/* Eternal Flame */
+.pf-flame { color: #FFE3A3; text-shadow: 0 0 6px #FF7A1C; }
+.pf-flame::before { background: conic-gradient(#FF3D1C, #FFB23D, #FF2E2E, #FFD86B, #FF5A1C, #FF3D1C); animation: cg-spin 2.2s linear infinite; filter: blur(.6px) drop-shadow(0 0 5px rgba(255,120,30,.8)); }
+.pf-flame::after { background: radial-gradient(circle at 50% 70%, #5A1606, #250703); }
+/* Golden Halo */
+.pf-halo { color: #3A2A10; text-shadow: 0 1px 0 rgba(255,255,255,.5); }
+.pf-halo::before { background: conic-gradient(from 0deg, #8A6A2E, #FFF1B8, #C9A45C, #8A6A2E 50%, #FFF1B8, #C9A45C, #8A6A2E); animation: cg-spin 3.5s linear infinite; box-shadow: 0 0 12px rgba(255,220,120,.6); }
+.pf-halo::after { background: radial-gradient(circle at 35% 30%, #F8E3A6, #D9B25E 60%, #A97F34); }
+@keyframes cg-spin { to { transform: rotate(360deg); } }
+
+/* title: Legend — shimmering gold lettering */
+.title.anim { background: linear-gradient(90deg, #B8892E 20%, #FFF4C8 45%, #E7C46A 55%, #B8892E 80%) 0 0 / 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent !important; font-weight: 700; animation: cg-title 2.6s linear infinite; }
+@keyframes cg-title { from { background-position: 120% 0; } to { background-position: -100% 0; } }
+
+/* chips: Holographic — colours keep shifting */
+.chip.cs-holo { background: repeating-conic-gradient(#FF8AD8 0 15deg, #8AE6FF 15deg 30deg, #C2FF8A 30deg 45deg, #FFE48A 45deg 60deg); animation: cg-hue 4s linear infinite; }
+.chip.cs-holo.v5, .chip.cs-holo.v25, .chip.cs-holo.v100, .chip.cs-holo.v500 { --acc: #FFFFFF; }
+.chip.cs-holo.v5 { --bg: #3A2A55; } .chip.cs-holo.v25 { --bg: #1F3F5A; } .chip.cs-holo.v100 { --bg: #23452E; } .chip.cs-holo.v500 { --bg: #4A1F45; }
+@keyframes cg-hue { to { filter: hue-rotate(360deg); } }
+
+/* turn marker: Lightning */
+:is(:is(.seat, .plate, .spot-label).active[data-turn="lightning"], .mini-turn[data-turn="lightning"])::after {
+  content: ''; position: absolute; top: -22px; right: -16px; width: 42px; height: 42px; z-index: 3; pointer-events: none;
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13.5 1.5 4 13.5h6.5L9 22.5l11-13h-6.8z' fill='%23FFE15A' stroke='%23B8860B' stroke-width='1.2' stroke-linejoin='round'/%3E%3C/svg%3E");
+  filter: drop-shadow(0 0 6px rgba(255,220,80,.95)); animation: cg-zap 1.3s ease-in-out infinite;
+}
+body.holdem .seat.active[data-turn="lightning"] { box-shadow: 0 0 26px rgba(255,225,90,.55); }
+@keyframes cg-zap { 0%, 40%, 100% { opacity: 1; transform: scale(1); } 45% { opacity: .25; transform: scale(.9); } 52% { opacity: 1; transform: scale(1.12); } 60% { opacity: .5; } 66% { opacity: 1; transform: scale(1); } }
+
+/* shop: mark the animated items */
+.shop-item.animated { position: relative; }
+.shop-item .anim-tag { position: absolute; top: 8px; right: 8px; padding: 2px 8px; border-radius: 999px; font: 700 10.5px 'Montserrat', system-ui, sans-serif; letter-spacing: .02em;
+  background: linear-gradient(90deg, #F2C14E, #FF8AD8, #8AE6FF); color: #1A1208; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+
+@media (prefers-reduced-motion: reduce) {
+  .card-back.cb-aurora .deco, .card-back.cb-goldflux .deco, .pf-neon, .pf-flame::before, .pf-halo::before, .title.anim, .chip.cs-holo,
+  :is(.seat, .plate, .spot-label, .mini-turn)[data-turn="lightning"]::after { animation: none !important; }
+}

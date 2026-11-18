@@ -325,6 +325,7 @@
   // Titles: 't:<word>' is written before the name; older emoji badges stay as marks.
   function titleMarkup(b) {
     if (!b) return '';
+    if (b.startsWith('ta:')) return `<span class="title anim">${esc(b.slice(3))}</span> `;   // animated title
     return b.startsWith('t:') ? `<span class="title">${esc(b.slice(2))}</span> ` : `<span class="badge">${esc(b)}</span>`;
   }
   App.avatarMarkup = avatarMarkup;
@@ -861,6 +862,7 @@
     ctx.plates = {};
     fit();
     ui.render(st, S, ctx);
+    markTurn(st);
     renderChat(st);
     renderBubbles(st);
     renderLog(st);
@@ -984,6 +986,15 @@
     setTimeout(() => document.addEventListener('click', function close(ev) {
       if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', close); }
     }), 0);
+  }
+
+  // The player whose turn it is shows *their* turn marker (everyone sees it).
+  function markTurn(st) {
+    const s = st.toAct >= 0 ? st.seats[st.toAct] : null;
+    const turn = s && s.skin && s.skin.turn;
+    document.querySelectorAll('#stage :is(.seat, .plate, .spot-label, .r-plate).active').forEach((e) => {
+      if (turn) e.dataset.turn = turn; else delete e.dataset.turn;
+    });
   }
 
   // Sit out: keep the seat, skip the next hands until you come back.
@@ -1588,14 +1599,14 @@
 
   // ----- shop -----
   const SLOT_INFO = {
-    cardback: ['Card backs', 'The back of every face-down card — on your screen.'],
+    cardback: ['Card backs', 'The back of your face-down cards — everyone at your table sees it.'],
     cardface: ['Card faces', 'How the faces of the cards are printed — on your screen.'],
     felt: ['Table felt', 'The cloth of every table you sit at — on your screen.'],
     background: ['Backgrounds', 'The wallpaper of the club and the rooms — on your screen.'],
-    chips: ['Chip sets', 'The chips on every table — on your screen.'],
+    chips: ['Chip sets', 'Your chips when you bet — everyone at your table sees them.'],
     avatar: ['Portraits', 'A frame around your initials on your nameplate — everyone at your table sees it.'],
     badge: ['Titles', 'A title written before your name — everyone at your table and on your profile sees it.'],
-    turn: ['Turn markers', 'How the player whose turn it is gets marked — on your screen.'],
+    turn: ['Turn markers', 'Your emblem when it is your turn — everyone at your table sees it.'],
     gesture: ['Gestures', 'Little courtesies for the table. Every gesture you own is yours to use — open the hat button at any table.'],
   };
   let shopSlot = 'cardback';
@@ -1655,8 +1666,9 @@
     for (const item of App.shop.items.filter((i) => i.slot === shopSlot && (!i.retired || w.owned.includes(i.id)))) {
       const owned = w.owned.includes(item.id);
       const on = equipped === item.id;
-      const el = h('div', 'shop-item' + (on ? ' on' : '') + (owned ? ' owned' : ''));
+      const el = h('div', 'shop-item' + (on ? ' on' : '') + (owned ? ' owned' : '') + (item.animated ? ' animated' : ''));
       el.appendChild(shopPreview(item));
+      if (item.animated) el.appendChild(h('span', 'anim-tag', '✨ Animated'));
       el.appendChild(h('b', '', esc(item.name)));
       el.appendChild(h('em', '', owned ? (item.retired ? 'Retired · still yours' : 'In your collection') : `<i class="ico-coin"></i>${fmt(item.price)}`));
       const b = h('button', 'pill');
