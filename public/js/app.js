@@ -810,7 +810,8 @@
     $('hub').classList.add('hidden');
     $('tableScreen').classList.remove('hidden');
     window.scrollTo(0, 0);
-    setDrawer(window.innerWidth >= 1280 && localStorage.getItem('cg.drawer') !== '0');
+    // The side panel starts closed so the table gets the room; it stays open if you open it.
+    setDrawer(window.innerWidth >= 1280 && localStorage.getItem('cg.panel') === '1');
   }
 
   function computeLayout() {
@@ -868,8 +869,22 @@
     renderTourney(S);
     renderSitOut(S, st);
     renderOdds(st);
+    // Title: long on a computer; on a phone two short lines ("Hold'em · 5/10" over "Table 1").
     const title = document.querySelector('[data-tb-title]');
-    if (title) title.textContent = S.tableName.replace(/^[^·]*·\s*/, '') + (st.game === 'holdem' ? ` · Blinds ${st.settings.smallBlind} / ${st.settings.bigBlind}` : st.game === 'blackjack' || st.game === 'roulette' ? ` · Bets from ${st.minBet}` : st.stage !== 'waiting' ? ` · Game ${st.handNo}` : '');
+    const sub = document.querySelector('[data-tb-sub]');
+    if (title) {
+      const name = S.tableName.replace(/^[^·]*·\s*/, '');
+      const game = st.game;
+      if (layout === 'port') {
+        const SHORT = { holdem: "Hold'em", blackjack: 'Blackjack', roulette: 'Roulette', durak: 'Durak', flamingo: 'Flamingo' };
+        const stake = game === 'holdem' ? `${st.settings.smallBlind}/${st.settings.bigBlind}` : game === 'blackjack' || game === 'roulette' ? `from ${st.minBet}` : st.stage !== 'waiting' ? `Game ${st.handNo}` : '';
+        title.textContent = name;
+        if (sub) sub.textContent = SHORT[game] + (stake ? ` · ${stake}` : '');
+      } else {
+        title.textContent = name + (game === 'holdem' ? ` · Blinds ${st.settings.smallBlind} / ${st.settings.bigBlind}` : game === 'blackjack' || game === 'roulette' ? ` · Bets from ${st.minBet}` : st.stage !== 'waiting' ? ` · Game ${st.handNo}` : '');
+        if (sub) sub.textContent = sub.dataset.full;
+      }
+    }
     renderTopbarWallet();
     myTurnSound(st);
   }
@@ -918,7 +933,7 @@
     const [title, room] = ROOM_TITLES[game];
     tb.innerHTML = `
       <button class="lobby-link" data-act="lobby"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg><span>Lobby</span></button>
-      <div class="tb-center"><small>${esc(game === 'durak' ? 'Durak' : title)} · ${esc(room)}</small><strong data-tb-title></strong></div>
+      <div class="tb-center"><small data-tb-sub data-full="${esc(game === 'durak' ? 'Durak' : title)} · ${esc(room)}">${esc(game === 'durak' ? 'Durak' : title)} · ${esc(room)}</small><strong data-tb-title></strong></div>
       <div class="tb-right"><span class="turn-clock hidden" data-turn-clock aria-live="polite"></span><span data-topbar-wallet></span>
         <button class="tb-btn tb-react" data-act="gesture" title="Quick chat & gestures" aria-label="Quick chat and gestures">💬</button>
         <button class="tb-btn" data-act="rules" title="How to play" aria-label="How to play">?</button>
@@ -1004,7 +1019,7 @@
   function setDrawer(open) {
     $('drawer').classList.toggle('open', open);
     document.body.classList.toggle('drawer-open', open);
-    if (window.innerWidth >= 1280) localStorage.setItem('cg.drawer', open ? '1' : '0');
+    if (window.innerWidth >= 1280 && App.tableId) localStorage.setItem('cg.panel', open ? '1' : '0');
     if (open && currentTab === 'chat') $('chatDot').classList.add('hidden');
     document.querySelectorAll('[data-chat-dot]').forEach((d) => d.classList.toggle('hidden', open || !unread));
     if (open) unread = false;
@@ -1803,7 +1818,27 @@
     return `<div class="profile-head"><span class="big-avatar">${avatarMarkup(p.avatar, p.username)}</span>
       <div><h3>${titleMarkup(p.badge)}${esc(p.username)}</h3>
       <p class="muted"><i class="presence ${p.online ? 'on' : ''}"></i>${p.online ? (p.where ? `Playing at ${esc(p.where.tableName)}` : 'Online') : 'Offline'} · Member since ${new Date(p.memberSince).toLocaleDateString([], { month: 'long', year: 'numeric' })} · ${p.friends} friend${p.friends === 1 ? '' : 's'}</p></div></div>
+      ${highlightsHtml(p)}
       ${statsTable(p.stats)}`;
+  }
+  // The profile's highlights: favourite game, win rate, biggest pot, this week, achievements, recent form.
+  function highlightsHtml(p) {
+    const x = p.highlights;
+    if (!x || !x.hands) return '';
+    const NAME = { friends: "Hold'em", bots: "Hold'em (bots)", blackjack: 'Blackjack', roulette: 'Roulette', durak: 'Durak', flamingo: 'Flamingo', goldrush: 'Gold Rush', tourney: 'Sit & Go' };
+    const tile = (label, value, sub) => `<div class="hl"><small>${label}</small><b>${value}</b>${sub ? `<em>${sub}</em>` : ''}</div>`;
+    const tiles = [
+      tile('Favourite game', esc(NAME[x.favorite] || x.favorite || '–')),
+      tile('Rounds played', fmt(x.hands), `${x.winRate}% won`),
+      tile('Biggest pot', x.biggestPot ? `<i class="ico-chip"></i>${fmt(x.biggestPot)}` : '–'),
+      tile('Best game', x.best ? esc(NAME[x.best.mode] || x.best.mode) : '–', x.best ? `+${fmt(x.best.net)} chips` : ''),
+      tile('This week', x.week ? `<span>Place ${x.week.place}</span>` : '–', x.week ? `${x.week.net > 0 ? '+' : ''}${fmt(x.week.net)} chips` : ''),
+      tile('Achievements', `${x.achievements.length} / ${x.achievementsTotal}`),
+    ];
+    const form = p.form && p.form.length ? `<div class="hl-form"><small>Recent games</small><div>${p.form.slice().reverse().map((f) =>
+      `<i class="${f.won ? 'w' : f.net < 0 ? 'l' : 'n'}" title="${esc(NAME[f.mode] || f.mode)}${['durak', 'flamingo'].includes(f.mode) ? '' : ` ${f.net > 0 ? '+' : ''}${f.net}`}">${f.won ? 'W' : f.net < 0 ? 'L' : '–'}</i>`).join('')}</div></div>` : '';
+    const ach = x.achievements.length ? `<div class="hl-ach">${x.achievements.map((t) => `<span>🏅 ${esc(t)}</span>`).join('')}</div>` : '';
+    return `<div class="hl-grid">${tiles.join('')}</div>${form}${ach}`;
   }
   async function openProfile(username) {
     const r = await api(`/api/players/${encodeURIComponent(username)}`);

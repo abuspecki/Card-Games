@@ -108,3 +108,7 @@ body.portrait .sitout:not(.on) { left: auto; right: 8px; top: 8px; bottom: auto;
 body.portrait .sitout-pill { padding: 5px 10px; font-size: 12px; }
 body.portrait .sitout-pill .long { display: none; }
 body.portrait .sitout-pill .short { display: inline; }
+
+/* phones: the short two-line title is always shown in full */
+body.game.portrait .tbar .tb-center small { display: block !important; font-size: 10.5px !important; letter-spacing: .06em !important; max-width: none !important; }
+body.game.portrait .tbar .tb-center strong { font-size: 16px !important; max-width: none !important; }

@@ -397,3 +397,18 @@ html[data-theme="light"] .toast { background: #14231B !important; }
   .modal-card .mtabs:has(> button:nth-child(6)) { display: flex; overflow-x: auto; scrollbar-width: none; }
   .modal-card .mtabs:has(> button:nth-child(6)) button { flex: none; padding: 10px 12px; }
 }
+
+/* ----- profile highlights ----- */
+.modal-card .hl-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 6px 0 4px; }
+.modal-card .hl { padding: 10px 12px; border-radius: 14px; background: var(--a-surface2); border: 1px solid var(--a-line); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.modal-card .hl small { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--a-muted); }
+.modal-card .hl b { font-size: 17px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 2px; }
+.modal-card .hl em { font-style: normal; font-size: 12px; color: var(--a-muted); }
+.modal-card .hl-form { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0; }
+.modal-card .hl-form small { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--a-muted); }
+.modal-card .hl-form div { display: flex; gap: 4px; flex-wrap: wrap; }
+.modal-card .hl-form i { width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; font: 800 11px var(--a-font); font-style: normal; color: #fff; background: #4A5A52; }
+.modal-card .hl-form i.w { background: #2F9A6A; } .modal-card .hl-form i.l { background: #B4473A; }
+.modal-card .hl-ach { display: flex; gap: 6px; flex-wrap: wrap; margin: 2px 0 6px; }
+.modal-card .hl-ach span { padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: rgba(242, 193, 78, .12); border: 1px solid rgba(242, 193, 78, .35); }
+@media (max-width: 560px) { .modal-card .hl-grid { grid-template-columns: repeat(2, 1fr); } }

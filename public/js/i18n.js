@@ -36,7 +36,7 @@
     'Chips': 'Chips', 'Coins': 'Münzen', 'Friends online': 'Freunde online', 'Quick seat': 'Schnell spielen', 'Return': 'Zurück zum Tisch',
     'Leave the table': 'Tisch verlassen', 'Your seat is free again.': 'Dein Platz ist wieder frei.',
     // tab names, windows
-    'Wallet': 'Konto', 'The Shop': 'Shop', 'My Profile': 'Mein Profil', 'This week': 'Diese Woche', "Last week's winners": 'Sieger der letzten Woche', 'Weekly ranking': 'Wochen-Rangliste', 'Could not load the ranking.': 'Die Rangliste konnte nicht geladen werden.',
+    'Wallet': 'Konto', 'The Shop': 'Shop', 'My Profile': 'Mein Profil', 'Favourite game': 'Lieblingsspiel', 'Rounds played': 'Gespielte Runden', 'Biggest pot': 'Größter Pot', 'Best game': 'Bestes Spiel', 'Achievements': 'Erfolge', 'Recent games': 'Letzte Spiele', 'This week': 'Diese Woche', "Last week's winners": 'Sieger der letzten Woche', 'Weekly ranking': 'Wochen-Rangliste', 'Could not load the ranking.': 'Die Rangliste konnte nicht geladen werden.',
     'Nobody has played this week yet — the first hand takes the lead.': 'Diese Woche hat noch niemand gespielt – die erste Hand übernimmt die Führung.', 'Ends in': 'Endet in', 'You: place': 'Du: Platz', '☕ You are sitting out': '☕ Du setzt aus', 'Sitting out': 'Setzt aus', "I'm back": 'Bin wieder da', '☕ Sit out after this hand': '☕ Nach dieser Hand aussetzen', '☕ Sit out the next hand': '☕ Nächste Hand aussetzen', '☕ Sit out': '☕ Aussetzen', 'Sit out the next hand': 'Nächste Hand aussetzen', 'Sit out after this hand': 'Nach dieser Hand aussetzen', 'Profile': 'Profil', 'Signing out leaves the table — a hand is running, what you have bet is lost. Sign out anyway?': 'Beim Abmelden verlässt du den Tisch – es läuft eine Hand, dein Einsatz ist dann verloren. Trotzdem abmelden?', 'Sign out': 'Abmelden', 'Close': 'Schließen', 'Cancel': 'Abbrechen',
     'Got it': 'Verstanden', 'Loading…': 'Lädt…', 'Something went wrong': 'Etwas ist schiefgelaufen', 'Network problem — please try again': 'Verbindungsproblem – bitte nochmal versuchen',
     // sign in
@@ -213,6 +213,8 @@
     [/^Today ([\d,.]+) \/ ([\d,.]+)$/, 'Heute $1 / $2'],
     [/^Day (\d+)$/, 'Tag $1'],
     [/^Place (\d+)$/, 'Platz $1'],
+    [/^(Hold'em|Blackjack|Roulette|Durak|Flamingo) · from ([\d,.]+)$/, '$1 · ab $2'], [/^(Durak|Flamingo) · Game (\d+)$/, '$1 · Spiel $2'],
+    [/^(\d+)% won$/, '$1 % gewonnen'], [/^\+([\d,.]+) chips$/, '+$1 Chips'], [/^(-?[\d,.]+) chips$/, '$1 Chips'],
     [/^(\d+) d (\d+) h$/, '$1 T $2 Std'], [/^(\d+) h$/, '$1 Std'],
     [/^Chips won this week in Hold'em against real people, Blackjack and Roulette\. Every Monday the best three receive coins \(at least (\d+) hands and more chips won than lost\)\.$/, 'Gewonnene Chips dieser Woche in Hold\'em gegen echte Mitspieler, Blackjack und Roulette. Jeden Montag bekommen die besten drei Münzen (mindestens $1 Hände und mehr Chips gewonnen als verloren).'],
     [/^\((\d+) more for a prize\)$/, '(noch $1 für einen Preis)'],

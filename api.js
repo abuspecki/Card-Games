@@ -214,11 +214,32 @@ function createApi(ctx) {
         const f = await store.getFriendship(viewer.id, u.id);
         friendship = f ? (f.status === 'accepted' ? 'friends' : f.requested_by === viewer.id ? 'sent' : 'received') : 'none';
       }
+      const stats = await store.userStats(u.id);
+      const isMe = !!viewer && viewer.id === u.id;
+      // Highlights for everyone; the recent form only for friends and the player.
+      const sum = (k) => stats.reduce((x, r) => x + Number(r[k] || 0), 0);
+      const hands = sum('hands'), wins = sum('wins');
+      const byHands = stats.slice().sort((a, b) => b.hands - a.hands)[0];
+      const chipModes = stats.filter((r) => !['durak', 'flamingo'].includes(r.mode) && Number(r.net) > 0).sort((a, b) => b.net - a.net);
+      let achievements = [];
+      try { achievements = (await ctx.quests.view(u.id)).achievements.filter((x) => x.done).map((x) => x.text); } catch { /* ignore */ }
+      let week = null;
+      try { week = await store.weeklyOf(require('./weekly').weekKey(), u.id); } catch { /* ignore */ }
+      const showForm = isMe || friendship === 'friends';
       return json(res, 200, {
         username: u.username, memberSince: full.created_at, ...look,
         ...presence(u.id, full.last_seen),
-        stats: await store.userStats(u.id), friends: await store.countFriends(u.id),
-        isMe: !!viewer && viewer.id === u.id, friendship,
+        stats, friends: await store.countFriends(u.id),
+        isMe, friendship,
+        highlights: {
+          hands, wins, winRate: hands ? Math.round((wins / hands) * 100) : 0,
+          favorite: byHands ? byHands.mode : null,
+          best: chipModes[0] ? { mode: chipModes[0].mode, net: Number(chipModes[0].net) } : null,
+          biggestPot: Math.max(0, ...stats.map((r) => Number(r.biggest_pot) || 0)),
+          achievements, achievementsTotal: require('./quests').ACHIEVEMENTS.length,
+          week: week ? { place: week.place, net: week.net } : null,
+        },
+        form: showForm ? (await store.handHistory(u.id, 12)).map((h) => ({ mode: h.mode, won: !!h.won, net: h.net })) : null,
       });
     }
 
