@@ -20,7 +20,7 @@
 
   const L = {
     land: { W: 1440, H: 780, wheel: { cx: 300, cy: 400, r: 230 }, board: { x: 600, y: 170, cw: 58, ch: 74 } },
-    port: { W: 440, H: 860, wheel: { cx: 220, cy: 122, r: 104 }, board: { x: 16, y: 252, cw: 92, ch: 38 } },
+    port: { W: 440, H: 920, wheel: { cx: 220, cy: 114, r: 96 }, board: { x: 16, y: 252, cw: 92, ch: 38 } },
   };
 
   let chipValue = 5;
@@ -117,6 +117,7 @@
     } else {
       place(hist, 16, 8);
       place(status, 220, 232).style.transform = 'translate(-50%,-50%)';
+      hist.classList.add('port');
     }
     ctx.stage.append(felt, wheel, board, layer, hist, status);
     // keep the wheel where it was if the layout is rebuilt
@@ -237,7 +238,8 @@
       c.classList.toggle('has-mine', !!mine[s]);
     });
     for (const c of cells(ctx.layout)) {
-      const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
+      const lowSpot = ctx.layout === 'port' && c.cls.includes('vert');
+      const cx = c.x + c.w / 2, cy = lowSpot ? c.y + c.h - 14 : c.y + c.h / 2;
       if (others[c.spot]) {
         const o = chip(others[c.spot] >= 100 ? 100 : others[c.spot] >= 25 ? 25 : 5, { size: ctx.layout === 'port' ? 16 : 22 });
         o.classList.add('r-other');
@@ -326,5 +328,5 @@
     paintChips(ctx);
   }
 
-  window.TableUI.roulette = { size: { land: [1440, 780], port: [440, 860] }, build, render };
+  window.TableUI.roulette = { size: { land: [1440, 780], port: [440, 920] }, build, render };
 })();

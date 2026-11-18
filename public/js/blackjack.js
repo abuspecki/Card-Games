@@ -97,7 +97,11 @@
     $('bRebuy').onclick = () => ctx.send({ t: 'rebuy' });
   }
 
+  // Phone (portrait): three seats down each side, you large in the middle at the bottom,
+  // spaced so that cards and names never overlap.
+  const PORT_SPOTS = { 0: [80, 282], 1: [80, 448], 2: [80, 614], 3: [220, 640], 4: [360, 614], 5: [360, 448], 6: [360, 282] };
   function spotPos(G, k) {
+    if (G === L.port) return PORT_SPOTS[k];
     const [cx, cy, rx, ry] = G.arc;
     const a = ARC_STEPS[k] * Math.PI / 180;
     return [G.table[0] + cx + Math.cos(a) * rx, G.table[1] + cy + Math.sin(a) * ry];
@@ -133,7 +137,7 @@
       place(shows, midX, G.showsY).style.transform = 'translateX(-50%)';
       layer.appendChild(shows);
     }
-    const print = el('div', 'print', `<p class="pays">Blackjack pays 3 to 2</p><p class="rule">Dealer must draw to 16 and stand on all 17s</p>${port ? '' : '<p class="insurance"><span></span>Bets from ' + fmt(st.minBet) + '<span></span></p>'}`);
+    const print = el('div', 'print', `<p class="pays">Blackjack pays 3 to 2</p>${port ? '' : '<p class="rule">Dealer must draw to 16 and stand on all 17s</p>'}${port ? '' : '<p class="insurance"><span></span>Bets from ' + fmt(st.minBet) + '<span></span></p>'}`);
     place(print, G.table[0], G.printY).style.width = G.table[2] + 'px';
     layer.appendChild(print);
 
@@ -148,13 +152,15 @@
       const k = ks[n];
       const [cx, cy] = spotPos(G, k);
       const isMe = i === st.mySeat;
-      ctx.plates[i] = [cx, cy - G.cards * 2.3];
+      const CS = port && isMe ? 56 : G.cards;    // your own cards are bigger on the phone
+      const CR = port && isMe ? 60 : G.circle;
+      ctx.plates[i] = [cx, cy - CS * 2.3];
       const active = st.toAct === i;
       const circ = el('div', 'spot-circle' + (active ? ' spot-active' : ''));
-      Object.assign(circ.style, { width: G.circle + 'px', height: G.circle + 'px' });
+      Object.assign(circ.style, { width: CR + 'px', height: CR + 'px' });
       const building = isMe && st.limits && st.limits.phase === 'bet';
       const bet = building ? pending : (s.hands && s.hands.length ? s.hands.reduce((a, x) => a + x.bet, 0) : s.bet) || 0;
-      if (bet) circ.appendChild(stack(bet, { size: G.circle * 0.5, maxPer: 6, maxCols: 3 }));
+      if (bet) circ.appendChild(stack(bet, { size: CR * 0.5, maxPer: 6, maxCols: 3 }));
       else circ.appendChild(el('span', 'bet-word', 'BET'));
       place(circ, cx, cy).style.transform = 'translate(-50%,-50%)';
       layer.appendChild(circ);
@@ -162,30 +168,32 @@
       // hands (one or two after a split)
       (s.hands || []).forEach((hand, hi) => {
         const n2 = s.hands.length;
-        const hx = cx - G.cards * 0.6 + (n2 > 1 ? (hi - 0.5) * G.cards * 1.5 : 0);
-        const hy = cy - G.circle * 0.5 - G.cards * 1.75;
+        let hx = cx - CS * 0.6 + (n2 > 1 ? (hi - 0.5) * CS * 1.5 : 0);
+        // phone: keep split hands inside the table
+        if (port) hx = Math.max(6, Math.min(G.W - CS * 1.9 - (hand.cards.length - 1) * CS * 0.33 - (n2 > 1 && hi === 0 ? CS * 1.5 : 0), hx));
+        const hy = cy - CR * 0.5 - CS * 1.75;
         hand.cards.forEach((c, j) => {
-          const e = fromCode(c, { size: G.cards });
-          place(e, hx + j * G.cards * 0.33, hy - j * G.cards * 0.12, j % 2 ? 4 : -3);
+          const e = fromCode(c, { size: CS });
+          place(e, hx + j * CS * 0.33, hy - j * CS * 0.12, j % 2 ? 4 : -3);
           if (hand.result === 'lose') e.classList.add('dim');
           layer.appendChild(e);
         });
         const nC = hand.cards.length - 1;
         const badge = el('div', 'score' + (hand.bust ? ' bust' : hand.blackjack ? ' bj' : '') + (n2 > 1 && s.handIdx === hi && active ? ' cur' : ''), hand.blackjack ? 'BJ' : String(hand.total));
-        place(badge, hx + nC * G.cards * 0.33 + G.cards * 0.9, hy - nC * G.cards * 0.12 - 14);
+        place(badge, hx + nC * CS * 0.33 + CS * 0.9, hy - nC * CS * 0.12 - 14);
         layer.appendChild(badge);
         if (hand.result) {
           const r = el('span', 'result-tag ' + hand.result, { win: 'Win', lose: 'Lose', push: 'Push', blackjack: 'Blackjack!' }[hand.result]);
-          place(r, hx + G.cards * 0.5, hy + G.cards * 1.45).style.transform = 'translateX(-50%)';
+          place(r, hx + CS * 0.5, hy + CS * 1.45).style.transform = 'translateX(-50%)';
           layer.appendChild(r);
         }
       });
 
       // name under the spot
       const lab = el('button', 'spot-label' + (isMe ? ' me' : '') + (active ? ' active' : ''),
-        `<span class="mini-av">${ctx.avatarHtml(s)}</span>${ctx.nameHtml(s)}${s.lastAction && st.stage !== 'waiting' ? ` · <i>${ctx.esc(s.lastAction)}</i>` : ''}${!isMe && !port ? ` · ${fmt(s.chips)}` : ''}`);
+        `<span class="mini-av">${ctx.avatarHtml(s)}</span>${ctx.nameHtml(s)}${s.lastAction && st.stage !== 'waiting' && !port ? ` · <i>${ctx.esc(s.lastAction)}</i>` : ''}${!isMe && !port ? ` · ${fmt(s.chips)}` : ''}`);
       if (s.hasAccount && !s.isBot) lab.onclick = () => App.openProfile(s.name);
-      place(lab, cx, cy + G.circle * 0.58).style.transform = 'translateX(-50%)';
+      place(lab, cx, cy + CR * 0.58).style.transform = 'translateX(-50%)';
       layer.appendChild(lab);
     });
 

@@ -20,6 +20,7 @@
 
   let raiseTouched = false;
   let lastTurnKey = '';
+  let pre = null;   // a move chosen in advance: { kind: checkfold | call | callany, hand, amount }
 
   function build(ctx) {
     const G = L[ctx.layout];
@@ -45,6 +46,11 @@
         <div class="row chip-row" id="hChipRow">
           <span class="chip-adds" id="hAdds"></span>
           <input type="range" id="hSlider" aria-label="Raise amount">
+        </div>
+        <div class="row pre hidden" id="hPre" role="group" aria-label="Choose your move in advance">
+          <button class="pre-btn" data-pre="checkfold">Check / Fold</button>
+          <button class="pre-btn" data-pre="call">Check</button>
+          <button class="pre-btn" data-pre="callany">Call any</button>
         </div>
         <div class="row buttons">
           <button class="act act-fold" id="hFold">Fold</button>
@@ -84,6 +90,15 @@
     $('hCall').onclick = () => { const lim = ctx.st.limits; if (lim) ctx.send({ t: 'action', action: lim.toCall > 0 ? 'call' : 'check' }); };
     $('hRaise').onclick = () => ctx.send({ t: 'action', action: 'raise', amount: +slider.value });
     $('hRebuy').onclick = () => ctx.send({ t: 'rebuy' });
+    // Pre-select: tap again to cancel.
+    ctx.controls.querySelectorAll('.pre-btn').forEach((b) => b.addEventListener('click', () => {
+      const st = ctx.st;
+      const me = st && st.mySeat !== -1 ? st.seats[st.mySeat] : null;
+      if (!me) return;
+      const kind = b.dataset.pre;
+      pre = pre && pre.kind === kind ? null : { kind, hand: st.handNo, amount: Math.max(0, st.currentBet - (me.bet || 0)) };
+      renderControls(st, ctx);
+    }));
   }
 
   function setRaise(ctx, v) {
@@ -259,6 +274,28 @@
     $('hSizing').classList.toggle('hidden', !!canRebuy);
     $('hChipRow').classList.toggle('hidden', !!canRebuy);
     $('hPanel').classList.toggle('my-turn', myTurn);
+    // Not your turn yet, but still in the hand: offer a move in advance.
+    const waiting = !!(me && me.inHand && !me.folded && !me.allIn && PLAYING.includes(st.stage) && !myTurn && !canRebuy);
+    if (pre && pre.hand !== st.handNo) pre = null;
+    const toCallNow = me ? Math.max(0, st.currentBet - (me.bet || 0)) : 0;
+    if (pre && pre.kind === 'call' && waiting && pre.amount !== toCallNow) pre = null;   // the bet changed: ask again
+    $('hPanel').classList.toggle('waiting', waiting);
+    $('hPre').classList.toggle('hidden', !waiting);
+    if (waiting) {
+      const callBtn = $('hPre').querySelector('[data-pre=call]');
+      callBtn.textContent = toCallNow ? `Call ${fmt(Math.min(toCallNow, me.chips))}` : 'Check';
+      $('hPre').querySelector('[data-pre=checkfold]').textContent = toCallNow ? 'Fold' : 'Check / Fold';
+      $('hPre').querySelectorAll('.pre-btn').forEach((b) => b.classList.toggle('on', !!pre && pre.kind === b.dataset.pre));
+    }
+    // Your turn and a move was chosen in advance: play it.
+    if (myTurn && pre && pre.hand === st.handNo) {
+      const p = pre;
+      pre = null;
+      const move = p.kind === 'checkfold' ? (lim.toCall > 0 ? 'fold' : 'check')
+        : p.kind === 'callany' ? (lim.toCall > 0 ? 'call' : 'check')
+          : lim.toCall === p.amount ? (lim.toCall > 0 ? 'call' : 'check') : null;
+      if (move) setTimeout(() => { if (ctx.st && ctx.st.limits && ctx.st.handNo === p.hand) ctx.send({ t: 'action', action: move }); }, 250);
+    }
     $('hPanel').querySelectorAll('#hSizing button, #hChipRow button, #hChipRow input, #hFold, #hCall, #hRaise').forEach((b) => { b.disabled = !myTurn; });
     let note = '';
     if (canRebuy) note = App.account ? 'You are out of chips at this table. Rebuy from your bankroll.' : 'You are out of chips. Rebuy for a fresh stack.';

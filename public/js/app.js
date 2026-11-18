@@ -207,7 +207,7 @@
   }
 
   // Change the password. "forced" after the owner set a temporary one.
-  function passwordModal(forced) {
+  function passwordModal(forced, back) {
     openModal((card) => {
       modalHead(card, 'Your account', forced ? 'Choose a new password' : 'Change your password');
       if (forced) card.appendChild(h('p', 'modal-note', 'You signed in with a temporary password. Please choose your own now — only you will know it.'));
@@ -228,14 +228,13 @@
         const r = await api('/api/me/password', { current: form.c ? form.c.value : '', password: form.p.value });
         if (!r.ok) { err.textContent = r.data.error || 'Something went wrong'; return; }
         if (App.account) App.account.mustChange = false;
-        modalOnClose = null;
         closeModal();
         toast('Your new password is saved.', { kind: 'good' });
       };
     }, forced ? {
       // a temporary password must be replaced: re-open if closed early
       onClose: () => { if (App.account && App.account.mustChange) setTimeout(() => passwordModal(true), 300); },
-    } : {});
+    } : { onClose: () => { if (back && App.account) setTimeout(back, 50); } });
   }
   App.passwordModal = passwordModal;
 
@@ -283,6 +282,17 @@
   }
 
   async function logout() {
+    // Seated at a table? Leave it first, so the seat and the chips are settled.
+    if (App.tableId && !App.watching) {
+      const st = App.S && App.S.state;
+      const me = st && st.mySeat !== -1 ? st.seats[st.mySeat] : null;
+      const playing = st && me && me.inHand && ['preflop', 'flop', 'turn', 'river', 'betting', 'playing', 'spinning'].includes(st.stage);
+      if (playing && !confirm('Signing out leaves the table — a hand is running, what you have bet is lost. Sign out anyway?')) return;
+      const id = App.tableId;
+      send({ t: 'leave' });
+      await apiLeave(id, localStorage.getItem('cg.seat.' + id));
+      backToHub();
+    } else if (App.tableId) { send({ t: 'leave' }); backToHub(); }
     await api('/api/logout', {});
     signedOut();
     closeModal();
@@ -1180,12 +1190,12 @@
     openModal((card) => {
       modalHead(card, `The Members' Lounge`, `Good evening, <em>${esc(App.account.username)}</em>`);
       const body = h('div', 'lounge-body');
-      tabs(card, [['wallet', 'Wallet'], ['quests', 'Quests'], ['shop', 'The Shop'], ['friends', 'Friends'], ['profile', 'My Profile']], (k) => { loungeTab = k; paintLounge(body); }, loungeTab);
+      tabs(card, [['wallet', 'Wallet'], ['quests', 'Quests'], ['shop', 'The Shop'], ['friends', 'Friends'], ['profile', 'Profile']], (k) => { loungeTab = k; paintLounge(body); }, loungeTab);
       card.appendChild(body);
       const foot = h('div', 'lounge-foot');
       if (App.account.isOwner) foot.appendChild(h('a', 'btn btn-outline', 'Owner dashboard')).setAttribute('href', '/admin');
       const pw = h('button', 'btn btn-outline', 'Change password');
-      pw.onclick = () => passwordModal(false);
+      pw.onclick = () => passwordModal(false, () => openLounge());
       foot.appendChild(pw);
       const out = h('button', 'btn btn-outline', 'Sign out');
       out.onclick = logout;

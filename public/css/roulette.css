@@ -104,3 +104,11 @@ body.portrait.roulette .r-players { max-width: 410px; }
   .roulette .r-buttons .pill { padding: 6px 10px; font-size: 13px; }
   .roulette .r-spin { padding: 10px 18px; }
 }
+
+/* phone: history stays left of the wheel, labels of the narrow side bets sit above the chips */
+body.portrait.roulette .r-history.port { flex-wrap: wrap; align-content: flex-start; width: 104px; height: auto; gap: 4px; }
+body.portrait.roulette .r-history.port em { font-size: 11px; white-space: normal; line-height: 1.25; }
+body.portrait.roulette .r-cell.vert { place-items: start center; padding-top: 4px; }
+body.portrait.roulette .r-cell.vert span:not(.diamond) { height: auto; width: auto; }
+body.portrait.roulette .r-cell.vert .diamond { margin-top: 8px; }
+body.portrait.roulette .r-cell.vert span { font-size: 12px; }

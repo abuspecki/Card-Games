@@ -360,3 +360,22 @@ body.is-app .tbar { padding-top: max(6px, env(safe-area-inset-top, 0px)); }
 .statement .pos { color: #3FB27F; }
 .statement .neg { color: #E0715F; }
 @media (max-width: 560px) { .statement li { grid-template-columns: 1fr auto; } .statement .st-when { grid-column: 1 / -1; } }
+
+/* ----- dialogs: content never squeezed under the buttons ----- */
+.modal-card > * { flex-shrink: 0; }
+/* the lounge's buttons stay at the bottom of the dialog while you scroll */
+.modal-card .lounge-foot { position: sticky; bottom: calc(-18px - env(safe-area-inset-bottom, 0px)); z-index: 2; margin: 0 -4px; padding: 12px 4px calc(12px + env(safe-area-inset-bottom, 0px)); background: var(--a-surface, #13201A); }
+@media (min-width: 701px) { .modal-card .lounge-foot { bottom: -30px; padding-bottom: 14px; } }
+/* the five lounge tabs fit side by side on a phone */
+@media (max-width: 560px) {
+  .modal-card .mtabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; overflow: visible; }
+  .modal-card .mtabs button { padding: 10px 2px; font-size: 12.5px; letter-spacing: 0; text-transform: none; white-space: nowrap; }
+}
+/* notices: always readable */
+.toast { background: #1C2A23 !important; color: #F1F4F0 !important; border: 1px solid rgba(255, 255, 255, .1); border-left: 3px solid var(--gold, #F2C14E) !important; }
+.toast.good { border-left-color: #3FB27F !important; }
+.toast.bad { border-left-color: #E0715F !important; }
+.toast .toast-x { color: #F1F4F0; }
+html[data-theme="light"] .toast { background: #14231B !important; }
+/* phone lobby: notices sit above the tab bar, not on top of it */
+@media (max-width: 760px) { body.hub .toasts { bottom: calc(74px + env(safe-area-inset-bottom, 0px)); } }

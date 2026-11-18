@@ -33,7 +33,7 @@ const TABLES = [
 ];
 
 const NEXT_HAND_DELAY = 6000;
-const DISCONNECTED_TURN_TIMEOUT = 8000;
+const DISCONNECTED_TURN_TIMEOUT = 4000;
 const TURN_TIMEOUT = Number(process.env.TURN_TIMEOUT_MS) || 40000;            // a seated player who does nothing this long gets a safe default move
 const BOT_THINK_MS = [700, 1800];
 const AUTO_START_DELAY = 3000;          // deal this long after enough players sit down

@@ -36,7 +36,7 @@
     'Chips': 'Chips', 'Coins': 'Münzen', 'Friends online': 'Freunde online', 'Quick seat': 'Schnell spielen', 'Return': 'Zurück zum Tisch',
     'Leave the table': 'Tisch verlassen', 'Your seat is free again.': 'Dein Platz ist wieder frei.',
     // tab names, windows
-    'Wallet': 'Konto', 'The Shop': 'Shop', 'My Profile': 'Mein Profil', 'Sign out': 'Abmelden', 'Close': 'Schließen', 'Cancel': 'Abbrechen',
+    'Wallet': 'Konto', 'The Shop': 'Shop', 'My Profile': 'Mein Profil', 'Profile': 'Profil', 'Signing out leaves the table — a hand is running, what you have bet is lost. Sign out anyway?': 'Beim Abmelden verlässt du den Tisch – es läuft eine Hand, dein Einsatz ist dann verloren. Trotzdem abmelden?', 'Sign out': 'Abmelden', 'Close': 'Schließen', 'Cancel': 'Abbrechen',
     'Got it': 'Verstanden', 'Loading…': 'Lädt…', 'Something went wrong': 'Etwas ist schiefgelaufen', 'Network problem — please try again': 'Verbindungsproblem – bitte nochmal versuchen',
     // sign in
     'Members': 'Mitglieder', 'Welcome back': 'Willkommen zurück', 'Become a member': 'Mitglied werden', 'Create my membership': 'Konto erstellen',
@@ -65,7 +65,7 @@
     'Coins to trade': 'Münzen tauschen', 'You pay': 'Du zahlst', 'You receive': 'Du bekommst', 'chips': 'Chips', 'Exchange chips for coins': 'Chips in Münzen tauschen',
     'Exchange coins for chips': 'Münzen in Chips tauschen', 'You have no coins to trade yet — collect the daily bonus or win at the tables.': 'Du hast noch keine Münzen – hol dir den Tagesbonus oder gewinn an den Tischen.',
     'Play money only — nothing here can be bought with or exchanged for real money.': 'Nur Spielgeld – nichts hier kann mit echtem Geld gekauft oder dagegen getauscht werden.',
-    'Daily bonus': 'Tagesbonus', 'What would have come': 'Das wäre noch gekommen', 'Your statement': 'Dein Kontoauszug', 'Win at': 'Gewinn bei', 'Daily top-up': 'Tägliches Auffüllen',
+    'Daily bonus': 'Tagesbonus', 'Check / Fold': 'Schieben / Passen', 'Call any': 'Alles mitgehen', 'What would have come': 'Das wäre noch gekommen', 'Your statement': 'Dein Kontoauszug', 'Win at': 'Gewinn bei', 'Daily top-up': 'Tägliches Auffüllen',
     'Bank: chips → coins': 'Bank: Chips → Münzen', 'Bank: coins → chips': 'Bank: Münzen → Chips', 'Shop:': 'Shop:', 'Quest:': 'Aufgabe:', 'Achievement:': 'Erfolg:',
     'Sit & Go prize': 'Sit-&-Go-Preis', 'Gift from the house': 'Geschenk vom Haus', 'Thank-you bonus for an update': 'Dankeschön-Bonus für ein Update',
     'Correction by the owner': 'Korrektur durch den Owner', 'The statement could not be loaded.': 'Der Kontoauszug konnte nicht geladen werden.',
