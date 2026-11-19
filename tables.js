@@ -33,7 +33,6 @@ const TABLES = [
   { id: 'ROULETTE-1', name: 'Roulette · Table 1', game: 'roulette', capacity: 8, buyIn: 5000, minBuyIn: 100, settings: { bigBlind: 5 } },
   { id: 'TOURNEY-1', name: "Hold'em · Sit & Go", game: 'holdem', capacity: 6, accountsOnly: true, tourney: { entry: 500, stack: 1500, handsPerLevel: 6 }, settings: { smallBlind: 10, bigBlind: 20 }, buyIn: 1500 },
   { id: 'FLAMINGO-1', name: 'Flamingo · Table 1', game: 'flamingo', capacity: 6 },
-  { id: 'DRAW-1', name: 'Five Card Draw · Table 1', game: 'draw', capacity: 6, buyIn: 1000, minBuyIn: 200, settings: { smallBlind: 5, bigBlind: 10 } },
   { id: 'ROULETTE-2', name: 'Roulette · High Roller', game: 'roulette', capacity: 8, highRoller: true, buyIn: 50000, minBuyIn: 1000, settings: { bigBlind: 25 } },
 ];
 
@@ -67,7 +66,6 @@ function createLobby(ctx) {
     roulette: { capacity: 8, buyIn: 1000, minBuyIn: 100, settings: { bigBlind: 5 }, label: 'Roulette' },
     durak: { capacity: 6, label: 'Durak' },
     flamingo: { capacity: 6, label: 'Flamingo' },
-    draw: { capacity: 6, buyIn: 1000, minBuyIn: 200, settings: { smallBlind: 5, bigBlind: 10 }, label: 'Five Card Draw' },
   };
   // Stakes the owner of a private table may choose (blind / minimum bet), and the
   // buy-in as a multiple of it. Validated here, whatever the browser sends.

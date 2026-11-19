@@ -398,7 +398,7 @@
   function buildRooms() {
     const grid = $('roomGrid');
     grid.replaceChildren();
-    for (const game of ['holdem', 'draw', 'blackjack', 'durak', 'roulette', 'flamingo']) {
+    for (const game of ['holdem', 'blackjack', 'durak', 'roulette', 'flamingo']) {   // Five Card Draw ('draw') is built but not offered yet
       const info = ROOM_INFO[game];
       const art = h('article', `room room-${game}`);
       const vis = h('div', 'visual');
@@ -546,7 +546,7 @@
   App.openQuests = () => { loungeTab = 'quests'; openLounge('quests'); };
 
   // ================= PRIVATE TABLES =================
-  const PRIV_GAMES = [['holdem', "Hold'em", '♠'], ['draw', 'Five Card Draw', '🃏'], ['blackjack', 'Blackjack', '🂡'], ['roulette', 'Roulette', '◉'], ['durak', 'Durak', '♦'], ['flamingo', 'Flamingo', '🦩']];
+  const PRIV_GAMES = [['holdem', "Hold'em", '♠'], ['blackjack', 'Blackjack', '🂡'], ['roulette', 'Roulette', '◉'], ['durak', 'Durak', '♦'], ['flamingo', 'Flamingo', '🦩']];
   function openPrivate() {
     openModal((card) => {
       modalHead(card, 'Friends only', 'Private table');
@@ -2453,7 +2453,7 @@
           });
         }
       };
-      tabs(card, [['holdem', "Hold'em"], ['draw', 'Five Card Draw'], ['blackjack', 'Blackjack'], ['durak', 'Durak'], ['roulette', 'Roulette'], ['flamingo', 'Flamingo'], ['goldrush', 'Gold Rush']], paint, game);
+      tabs(card, [['holdem', "Hold'em"], ['blackjack', 'Blackjack'], ['durak', 'Durak'], ['roulette', 'Roulette'], ['flamingo', 'Flamingo'], ['goldrush', 'Gold Rush']], paint, game);
       card.appendChild(body);
       paint(game);
     }, { wide: true });

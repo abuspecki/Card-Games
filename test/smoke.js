@@ -49,7 +49,7 @@ async function checkScreen(page, where) {
   await post(`/api/admin/players/${id}/adjust`, { coins: 20000, chips: 600000 }, owner);
   // wear a few skins, so their markup is drawn everywhere
   // skins come only from boxes: draw one per category and wear it
-  for (const slot of ['avatar', 'badge', 'cardback', 'chips', 'victory']) {
+  for (const slot of ['avatar', 'badge', 'cardback', 'chips', 'victory', 'tag']) {
     const r = await post('/api/shop/box', { box: slot, pay: 'coins' }, me);
     if (!r.item) fail('box ' + slot, JSON.stringify(r));
     else await post('/api/shop/equip', { slot, item: r.item }, me);
@@ -67,22 +67,28 @@ async function checkScreen(page, where) {
       page.on('dialog', (d) => d.accept());
       await page.goto(B);
       await page.evaluate(([t, l]) => { localStorage.setItem('cg.session', t); localStorage.setItem('cg.lang', l); }, [me, lang]);
-      await page.reload(); await page.waitForTimeout(1200);
+      await page.reload(); await page.waitForTimeout(1800);
+      // the daily bonus pops up once a day after signing in
+      if (dev === 'phone' && lang === 'de' && !(await page.$('.daily-pop .streak.week'))) fail(where('lobby'), 'no daily bonus pop-up');
       await checkScreen(page, where('lobby'));
+      await page.evaluate(() => App.closeModal());
 
       // lounge: every tab, every shop tab, the boxes
-      for (const tab of ['wallet', 'quests', 'shop', 'friends', 'profile']) {
+      for (const tab of ['wallet', 'quests', 'shop', 'collection', 'friends', 'profile']) {
         await page.evaluate((t) => App.openLounge(t), tab); await page.waitForTimeout(500);
         await checkScreen(page, where('lounge ' + tab));
       }
-      await page.evaluate(() => App.openLounge('shop')); await page.waitForTimeout(400);
+      // the collection: every category
+      await page.evaluate(() => App.openLounge('collection')); await page.waitForTimeout(700);
       const subtabs = await page.$$('.subtabs button');
+      if (subtabs.length < 10) fail(where('collection'), `only ${subtabs.length} categories`);
       for (let i = 0; i < subtabs.length; i++) {
         await (await page.$$('.subtabs button'))[i].click(); await page.waitForTimeout(250);
-        await checkScreen(page, where('shop tab ' + i));
+        await checkScreen(page, where('collection tab ' + i));
       }
-      // a box preview
-      await page.click('.subtabs .box-tab'); await page.waitForTimeout(300);
+      // the shop: only boxes, and a box preview
+      await page.evaluate(() => App.openLounge('shop')); await page.waitForTimeout(500);
+      if (await page.$('.lounge-body .subtabs')) fail(where('shop'), 'the shop still has category tabs');
       await page.click('.box-card .box-preview-btn'); await page.waitForTimeout(500);
       if (!(await page.$('.box-preview .bp-item'))) fail(where('box preview'), 'empty');
       await checkScreen(page, where('box preview'));
@@ -107,6 +113,15 @@ async function checkScreen(page, where) {
           await page.waitForTimeout(3500);
           const drawn = await page.evaluate(() => document.querySelectorAll('#stage *').length);
           if (drawn < 20) fail(where(t), `the table looks empty (${drawn} elements)`);
+          if (!(await page.$('#tDealer'))) fail(where(t), 'no dealer at the table');
+          // the tip menu (any amount)
+          if (!(await page.$('#tTip:not([hidden])'))) fail(where(t), 'no tip button');
+          else {
+            await page.evaluate(() => document.getElementById('tTip').click()); await page.waitForTimeout(200);
+            if (!(await page.$('.tip-menu input'))) fail(where(t), 'no amount field in the tip menu');
+            await checkScreen(page, where(t + ' tip menu'));
+            await page.evaluate(() => document.querySelectorAll('.tip-menu').forEach((x) => x.remove()));
+          }
           await checkScreen(page, where(t));
           await page.evaluate(() => App.leaveTable()); await page.waitForTimeout(800);
         }
