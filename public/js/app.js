@@ -1616,7 +1616,7 @@
     const w = App.wallet;
     const p = App.presence || {};
     bar.innerHTML = `
-      <div class="mb-hello"><span class="mb-av">${esc(myAvatar())}</span><div><small>${greeting()}</small><b>${esc(a.username)}</b></div></div>
+      <div class="mb-hello"><span class="mb-av">${myAvatar()}</span><div><small>${greeting()}</small><b>${esc(a.username)}</b></div></div>
       <button class="mb-stat" data-open="bank" title="The Bank"><small>Chips</small><b><i class="ico-chip"></i>${w ? fmt(w.chips) : '…'}</b></button>
       <button class="mb-stat" data-open="shop" title="The Shop"><small>Coins</small><b><i class="ico-coin"></i>${w ? fmt(w.coins) : '…'}</b></button>
       <button class="mb-stat" data-open="friends" title="Friends"><small>Friends online</small><b>${p.onlineFriends ?? '–'}${p.requests ? ` <em>· ${p.requests} new request${p.requests === 1 ? '' : 's'}</em>` : ''}</b></button>
