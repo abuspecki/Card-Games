@@ -191,7 +191,7 @@ function createApi(ctx) {
       const limit = Math.max(1, Math.min(50, Number(new URL(req.url, 'http://x').searchParams.get('limit')) || 50));
       return json(res, 200, { mode: m, persistent: store.kind === 'postgres', databaseError: ctx.databaseError(), rows: await store.leaderboard(m === 'overall' ? OVERALL : m, limit) });
     }
-    if (method === 'GET' && url === '/api/tables') return json(res, 200, { tables: [...ctx.lobby.rooms.values()].filter((r) => !r.private).map(ctx.lobby.tableSummary), maintenance: ctx.lobby.maintenanceInfo(), announcement: ctx.lobby.currentAnnouncement() });
+    if (method === 'GET' && url === '/api/tables') return json(res, 200, { tables: [...ctx.lobby.rooms.values()].filter((r) => !r.private).map(ctx.lobby.tableSummary), maintenance: ctx.lobby.maintenanceInfo(), announcement: ctx.lobby.currentAnnouncement(), piggy: await ctx.piggy.info() });
     if (method === 'GET' && url === '/api/status') {
       return json(res, 200, {
         database: store.kind === 'postgres' ? 'connected' : (process.env.DATABASE_URL ? 'failed' : 'not configured'),
@@ -201,7 +201,7 @@ function createApi(ctx) {
       });
     }
     if (method === 'GET' && url === '/api/shop') {
-      return json(res, 200, { items: CATALOG.map((i) => ({ ...i, rarity: rarityOf(i) })), slots: SHOP_TABS, boxes: BOXES, rules: { chipsPerCoin: CHIPS_PER_COIN, fee: EXCHANGE_FEE, convertRate: CONVERT_RATE, coinToChips: COIN_TO_CHIPS, topUpTo: TOPUP_TO } });
+      return json(res, 200, { items: CATALOG.map((i) => ({ ...i, rarity: rarityOf(i) })), slots: SHOP_TABS, boxes: BOXES, onlyBoxes: true, rules: { chipsPerCoin: CHIPS_PER_COIN, fee: EXCHANGE_FEE, convertRate: CONVERT_RATE, coinToChips: COIN_TO_CHIPS, topUpTo: TOPUP_TO } });
     }
     const profileMatch = url.match(/^\/api\/players\/([^/]{1,64})$/);
     if (method === 'GET' && profileMatch) {
@@ -268,6 +268,8 @@ function createApi(ctx) {
     // ----- wallet -----
     if (url.startsWith('/api/wallet') || url.startsWith('/api/shop/')) {
       if (method === 'GET' && url === '/api/wallet') return json(res, 200, await coins.getStatus(user.id));
+      const prev = url.match(/^\/api\/shop\/box\/([a-z]+)$/);
+      if (method === 'GET' && prev) { const r = await coins.boxPreview(user.id, prev[1]); return json(res, r.error ? 400 : 200, r); }
       if (method === 'GET' && url === '/api/wallet/history') return json(res, 200, { entries: await coins.history(user.id, 60) });
       if (method !== 'POST') return json(res, 404, { error: 'Not found' });
       if (limited(`wallet:${user.id}`, 60, 60 * 1000)) return json(res, 429, { error: 'Slow down a little' });
@@ -277,7 +279,7 @@ function createApi(ctx) {
       else if (url === '/api/wallet/bankrupt') r = await coins.claimBankrupt(user.id);
       else if (url === '/api/wallet/convert') r = await coins.convert(user.id, body.coins);
       else if (url === '/api/wallet/buychips') r = await coins.buyChips(user.id, body.coins);
-      else if (url === '/api/shop/buy') r = await coins.buy(user.id, String(body.item || ''));
+      else if (url === '/api/shop/buy') r = { error: 'Skins now come only from boxes — open one in the shop' };
       else if (url === '/api/shop/box') r = await coins.openBox(user.id, String(body.box || ''), String(body.pay || 'coins'));
       else if (url === '/api/shop/equip') {
         r = await coins.equip(user.id, String(body.slot || ''), body.item ? String(body.item) : null);
@@ -518,7 +520,7 @@ function createApi(ctx) {
           totals: await store.totals(now),
           live: ctx.lobby.liveStats(),
           activity: await store.activity(since),
-          economy: { ...(await store.economy(7)), tipsSinceRestart: ctx.lobby.tipsTotal() },
+          economy: { ...(await store.economy(7)), piggy: await ctx.piggy.info() },
           database: store.kind,
         });
       }

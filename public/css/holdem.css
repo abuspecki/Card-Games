@@ -204,3 +204,4 @@ body.portrait.holdem .tip-btn { width: 30px; height: 30px; font-size: 15px; }
 @media (prefers-reduced-motion: reduce) {
   .holdem .dealer-figure :is(.d-body, .d-head, .d-eyes, .d-arm), .holdem .tip-btn { animation: none !important; }
 }
+.tip-menu small { font-weight: 600; font-size: 11px; color: #F7B6C9; margin-right: 4px; }

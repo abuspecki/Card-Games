@@ -469,3 +469,44 @@ html[data-theme="light"] .toast { background: #14231B !important; }
 .box-reveal .reveal .btn { border-radius: 12px; padding: 12px 18px; min-height: 0; font: 800 15px 'Montserrat', system-ui, sans-serif; letter-spacing: 0; text-transform: none; }
 .box-reveal .reveal .btn-navy { background: #F2C14E; color: #231A02; border: 0; }
 .box-reveal .reveal .btn-outline { background: rgba(255,255,255,.06); color: #F1F4F0; border: 1px solid rgba(255,255,255,.18); }
+
+/* ----- the piggy bank on the home page ----- */
+#hub .piggy { display: flex; align-items: center; gap: 16px; margin: 0 0 16px; padding: 14px 18px; border-radius: 18px; background: linear-gradient(120deg, rgba(247,182,201,.14), rgba(242,193,78,.12)); border: 1px solid rgba(247,182,201,.35); }
+#hub .piggy.hidden { display: none; }
+#hub .piggy .pig-art { width: 86px; flex: none; animation: pig-wobble 3.5s ease-in-out infinite; }
+#hub .piggy .pig-art svg { width: 100%; height: auto; display: block; }
+#hub .piggy .pig-fill { transition: y 1.2s ease; }
+#hub .piggy .pig-text { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+#hub .piggy .pig-text > b { font-size: 17px; }
+#hub .piggy .pig-line b { font-size: 18px; color: #F2C14E; }
+#hub .piggy .pig-bar { height: 10px; border-radius: 999px; background: rgba(255,255,255,.1); overflow: hidden; }
+#hub .piggy .pig-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #F7B6C9, #F2C14E); transition: width 1.2s ease; }
+#hub .piggy small { color: var(--a-muted); font-size: 12.5px; }
+@keyframes pig-wobble { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-4deg) translateY(-2px); } }
+@media (prefers-reduced-motion: reduce) { #hub .piggy .pig-art { animation: none; } }
+
+/* ----- boxes per category ----- */
+.box-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)) !important; }
+.box-card { position: relative; }
+.box-card .chest { --c1: #D89A5B; --c2: #8A4F22; --band: #5A3214; }
+.box-card.box-mystery { border-color: rgba(179,107,255,.6); box-shadow: 0 0 22px rgba(179,107,255,.18); }
+.box-card.box-mystery .chest, .box-reveal.box-mystery .chest { --c1: #D3B4FF; --c2: #6A3FB5; --band: #3A1F70; }
+.box-card.box-victory .chest, .box-reveal.box-victory .chest { --c1: #FFE29A; --c2: #C08A22; --band: #7A5410; }
+.box-card:is(.box-cardback, .box-cardface) .chest, .box-reveal:is(.box-cardback, .box-cardface) .chest { --c1: #9CC8FF; --c2: #2E5DA8; --band: #1A3566; }
+.box-card:is(.box-avatar, .box-badge) .chest, .box-reveal:is(.box-avatar, .box-badge) .chest { --c1: #FFB0C8; --c2: #B23A62; --band: #6A1A36; }
+.box-card .chest-icon { position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%); z-index: 3; font-size: 22px; filter: drop-shadow(0 2px 2px rgba(0,0,0,.4)); }
+.box-card .box-count { color: var(--a-muted); font-size: 12px; }
+.box-card.complete { opacity: .6; }
+.box-card .box-preview-btn { font-size: 13px; font-weight: 700; }
+.shop-item.locked > .shop-preview { filter: grayscale(.6) brightness(.8); }
+
+/* what is inside a box */
+.box-preview { position: fixed; inset: 0; z-index: 350; display: grid; place-items: center; padding: 16px; background: rgba(5,10,8,.8); backdrop-filter: blur(3px); }
+.box-preview .bp-card { position: relative; width: min(760px, 100%); max-height: 88vh; overflow-y: auto; padding: 20px; border-radius: 20px; background: #13201A; border: 1px solid rgba(255,255,255,.12); color: #F1F4F0; font-family: 'Montserrat', system-ui, sans-serif; }
+.box-preview h3 { margin: 0 0 4px; font-size: 20px; }
+.box-preview .bp-x { position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,.08); color: #fff; border: 0; cursor: pointer; }
+.box-preview .bp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-top: 12px; }
+.box-preview .bp-item { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 8px; border-radius: 14px; background: rgba(255,255,255,.04); border: 1px solid color-mix(in srgb, var(--rc) 55%, transparent); text-align: center; }
+.box-preview .bp-item b { font-size: 13px; }
+.box-preview .bp-item em { font-style: normal; font-size: 12px; font-weight: 700; }
+.box-preview .bp-item.owned { opacity: .5; }

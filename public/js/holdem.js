@@ -351,7 +351,7 @@
     const st = ctx.st;
     const bb = st.settings.bigBlind;
     const menu = ctx.h('div', 'tip-menu');
-    menu.innerHTML = `<b>Tip the dealer</b>${[1, 5, 25].map((x) => `<button data-a="${bb * x}">${fmt(bb * x)}</button>`).join('')}`;
+    menu.innerHTML = `<b>Tip the dealer</b><small>🐷 goes into the piggy bank</small>${[1, 5, 25].map((x) => `<button data-a="${bb * x}">${fmt(bb * x)}</button>`).join('')}`;
     menu.querySelectorAll('button').forEach((b) => { b.onclick = () => { ctx.send({ t: 'tip', amount: Number(b.dataset.a) }); menu.remove(); }; });
     const r = anchor.getBoundingClientRect();
     menu.style.left = Math.max(8, Math.min(window.innerWidth - 220, r.left - 80)) + 'px';

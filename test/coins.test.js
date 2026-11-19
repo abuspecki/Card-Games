@@ -188,30 +188,42 @@ const C = require('../coins');
   assert.strictEqual((await coins.history(g2))[0].reason, 'gift-in:G1');
   assert.strictEqual((await coins.history(g1))[0].reason, 'gift-out:G2');
 
-  // ----- skin boxes: odds, no duplicates, paid with coins or chips -----
-  for (const b of Object.values(C.BOXES)) assert.strictEqual(Object.values(b.odds).reduce((x, y) => x + y, 0), 100, b.name + ' odds add up to 100');
+  // ----- skin boxes: one per category + Mystery; chance ∝ 1 / price; never a duplicate -----
+  assert.deepStrictEqual(Object.keys(C.BOXES), ['mystery', ...C.SHOP_TABS], 'a box for every category');
+  for (const b of Object.values(C.BOXES)) {
+    assert(b.coins >= 150 && b.chips === b.coins * C.CHIPS_PER_BOX_COIN, b.id + ' price');
+    const ch = C.boxChances(b.id, []);
+    assert(Math.abs(ch.reduce((a, x) => a + x.chance, 0) - 1) < 1e-9, b.id + ' chances add up to 100 %');
+  }
   {
-    // the draw follows the odds (10,000 draws, nothing owned)
-    const counts = { common: 0, rare: 0, epic: 0, legendary: 0 };
-    for (let i = 0; i < 10000; i++) counts[C.rarityOf(C.drawFromBox(C.BOXES.silver, []))]++;
-    for (const r of C.RARITIES) assert(Math.abs(counts[r] / 100 - C.BOXES.silver.odds[r]) < 2.5, `silver ${r}: ${counts[r] / 100} %`);
-    assert.strictEqual(C.drawFromBox(C.BOXES.gold, C.CATALOG.map((i) => i.id)), null, 'nothing left: no item');
+    // dearer skins are rarer: a 2,000-coin title is 10x rarer than a 200-coin one
+    const ch = Object.fromEntries(C.boxChances('badge', []).map((x) => [x.id, x.chance]));
+    assert(Math.abs(ch['title-sir'] / ch['title-grandduke'] - 2000 / 250) < 1e-9);
+    // the draw follows the chances (20,000 draws)
+    const n = {}; for (let i = 0; i < 20000; i++) { const it = C.drawFromBox('turn', []); n[it.id] = (n[it.id] || 0) + 1; }
+    for (const x of C.boxChances('turn', [])) assert(Math.abs(n[x.id] / 20000 - x.chance) < 0.02, `${x.id}: ${n[x.id] / 200} % vs ${x.chance * 100} %`);
+    // owned skins never come out; everything owned: nothing to draw
+    const ownedTurn = ['turn-candle', 'turn-hourglass'];
+    for (let i = 0; i < 300; i++) assert(!ownedTurn.includes(C.drawFromBox('turn', ownedTurn).id));
+    assert.strictEqual(C.drawFromBox('turn', C.CATALOG.filter((i) => i.slot === 'turn').map((i) => i.id)), null);
   }
   const bx = await newUser('box');
-  assert((await coins.openBox(bx, 'gold', 'coins')).error, 'not enough coins');
-  await coins.adjust(bx, 10000, 2000000, 'owner');
+  assert((await coins.openBox(bx, 'victory', 'coins')).error, 'not enough coins');
+  await coins.adjust(bx, 20000, 3000000, 'owner');
   const got = new Set();
-  for (let i = 0; i < 6; i++) {
-    const o = await coins.openBox(bx, 'silver', i % 2 ? 'chips' : 'coins');
-    assert(o.item, JSON.stringify(o));
+  for (let i = 0; i < 5; i++) {
+    const o = await coins.openBox(bx, 'victory', i % 2 ? 'chips' : 'coins');
+    assert(o.item && C.ITEMS[o.item].slot === 'victory', JSON.stringify(o));
     assert(!got.has(o.item), 'never a duplicate');
     got.add(o.item);
   }
+  assert((await coins.openBox(bx, 'victory', 'coins')).error, 'all five victory effects collected: the box is empty');
   const bst = await coins.getStatus(bx);
-  assert.strictEqual(bst.coins, 200 + 10000 - 3 * C.BOXES.silver.coins);
-  assert.strictEqual(bst.chips, 5000 + 2000000 - 3 * C.BOXES.silver.chips);
-  assert(bst.owned.length >= 6);
-  assert.strictEqual((await coins.history(bx))[0].reason, 'box:silver');
+  assert.strictEqual(bst.coins, 200 + 20000 - 3 * C.BOXES.victory.coins);
+  assert.strictEqual(bst.chips, 5000 + 3000000 - 2 * C.BOXES.victory.chips);
+  assert.strictEqual((await coins.history(bx))[0].reason, 'box:victory');
+  const pv = await coins.boxPreview(bx, 'victory');
+  assert(pv.items.every((x) => x.owned && x.chance === 0));
   assert((await coins.openBox(bx, 'diamond', 'coins')).error);
 
   // ----- rewards -----

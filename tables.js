@@ -83,7 +83,6 @@ function createLobby(ctx) {
     const settings = game === 'holdem' ? { smallBlind: stake / 2, bigBlind: stake } : { bigBlind: stake };
     return { settings, buyIn: stake * times, minBuyIn: stake * R.minBuyIn };
   }
-  let tipsTotal = 0;   // chips tipped to the dealers since the server started (the house keeps them)
   const PRIVATE_MAX = 30;
   const PRIVATE_IDLE = 10 * 60 * 1000;   // an empty private table closes after this
   const codeChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -705,7 +704,7 @@ function createLobby(ctx) {
           if (Date.now() - (me.lastTip || 0) < 3000) return;
           me.lastTip = Date.now();
           me.chips -= amount;
-          tipsTotal += amount;
+          if (ctx.piggy) ctx.piggy.add(amount);   // every tip goes into the piggy bank
           t.addLog(`${me.name} tips the dealer ${amount}`);
           broadcast(room, { t: 'tip', seat: t.seatOf(pid), name: me.name, amount });
           break;
@@ -864,7 +863,7 @@ function createLobby(ctx) {
     return { humans, bots: botsN, tablesPlaying: playing, tables: [...rooms.values()].map(tableSummary) };
   }
 
-  return { rooms, tableSummary, handleConnection, locate, leaveBy, seatedAccounts, refreshLook, kick, cashOutAll, liveStats, GAMES, createPrivate, PRIVATE_GAMES: Object.keys(PRIVATE), PRIVATE_STAKES, tipsTotal: () => tipsTotal, announce, currentAnnouncement, setMaintenance, maintenanceInfo, drain, isIdle, playerCount };
+  return { rooms, tableSummary, handleConnection, locate, leaveBy, seatedAccounts, refreshLook, kick, cashOutAll, liveStats, GAMES, createPrivate, PRIVATE_GAMES: Object.keys(PRIVATE), PRIVATE_STAKES, announce, currentAnnouncement, setMaintenance, maintenanceInfo, drain, isIdle, playerCount };
 }
 
 module.exports = { createLobby, TABLES, GAMES };

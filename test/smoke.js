@@ -48,9 +48,14 @@ async function checkScreen(page, where) {
   const id = (await (await fetch(`${B}/api/admin/players?search=player_${tag}`, { headers: { Authorization: 'Bearer ' + owner } })).json()).players[0].id;
   await post(`/api/admin/players/${id}/adjust`, { coins: 20000, chips: 600000 }, owner);
   // wear a few skins, so their markup is drawn everywhere
-  for (const [item, slot] of [['pf-halo', 'avatar'], ['title-legend', 'badge'], ['back-kitsune', 'cardback'], ['chips-holo', 'chips'], ['fx-confetti', 'victory']]) {
-    await post('/api/shop/buy', { item }, me); await post('/api/shop/equip', { slot, item }, me);
+  // skins come only from boxes: draw one per category and wear it
+  for (const slot of ['avatar', 'badge', 'cardback', 'chips', 'victory']) {
+    const r = await post('/api/shop/box', { box: slot, pay: 'coins' }, me);
+    if (!r.item) fail('box ' + slot, JSON.stringify(r));
+    else await post('/api/shop/equip', { slot, item: r.item }, me);
   }
+  const direct = await post('/api/shop/buy', { item: 'pf-signet' }, me);
+  if (!direct.error) fail('shop', 'skins can still be bought directly');
 
   const browser = await chromium.launch();
   for (const [dev, opts] of [['phone', devices['iPhone 13']], ['computer', { viewport: { width: 1300, height: 850 } }]]) {
@@ -76,6 +81,13 @@ async function checkScreen(page, where) {
         await (await page.$$('.subtabs button'))[i].click(); await page.waitForTimeout(250);
         await checkScreen(page, where('shop tab ' + i));
       }
+      // a box preview
+      await page.click('.subtabs .box-tab'); await page.waitForTimeout(300);
+      await page.click('.box-card .box-preview-btn'); await page.waitForTimeout(500);
+      if (!(await page.$('.box-preview .bp-item'))) fail(where('box preview'), 'empty');
+      await checkScreen(page, where('box preview'));
+      await page.evaluate(() => document.querySelectorAll('.box-preview').forEach((x) => x.remove()));
+      if (!(await page.$('#piggy:not(.hidden)'))) fail(where('lobby'), 'no piggy bank on the home page');
       await page.evaluate(() => App.closeModal());
       // private table dialog and leaderboard
       await page.evaluate(() => App.openPrivate()); await page.waitForTimeout(300);

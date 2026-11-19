@@ -14,6 +14,7 @@ const { createErrorLog } = require('./errorlog');
 const { createQuests } = require('./quests');
 const { createBackups } = require('./backups');
 const { createWeekly } = require('./weekly');
+const { createPiggy } = require('./piggy');
 // Error monitoring first, so every console.error from here on is recorded.
 const errors = createErrorLog();
 errors.hookConsole();
@@ -47,6 +48,7 @@ ctx.goldrush = createGoldRush(ctx);
 ctx.quests = createQuests(ctx);
 ctx.backups = createBackups(ctx);
 ctx.weekly = createWeekly(ctx);
+ctx.piggy = createPiggy(ctx);
 const api = createApi(ctx);
 
 const SECURITY_HEADERS = {

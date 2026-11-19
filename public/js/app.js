@@ -438,8 +438,32 @@
   async function loadTables() {
     if (!$('hub').classList.contains('hidden') || !App.tables.length) {
       const r = await api('/api/tables');
-      if (r.ok) { App.tables = r.data.tables; renderTables(); showMaintenance(r.data.maintenance); showAnnouncement(r.data.announcement); }
+      if (r.ok) { App.tables = r.data.tables; renderTables(); showMaintenance(r.data.maintenance); showAnnouncement(r.data.announcement); renderPiggy(r.data.piggy); }
     }
+  }
+
+  // The piggy bank on the home page: every dealer tip goes in; when it is full, every member gets coins.
+  const PIGGY_SVG = `<svg viewBox="0 0 120 100" aria-hidden="true"><defs><clipPath id="pigClip"><path d="M18 52 Q16 22 52 18 Q66 8 80 14 L84 6 Q92 10 90 22 Q104 30 106 46 L114 48 L114 62 L104 64 Q98 80 84 84 L84 94 L72 94 L70 88 L44 88 L42 94 L30 94 L30 84 Q14 76 18 52 Z"/></clipPath></defs>
+    <path d="M18 52 Q16 22 52 18 Q66 8 80 14 L84 6 Q92 10 90 22 Q104 30 106 46 L114 48 L114 62 L104 64 Q98 80 84 84 L84 94 L72 94 L70 88 L44 88 L42 94 L30 94 L30 84 Q14 76 18 52 Z" fill="#F7B6C9" stroke="#C9648A" stroke-width="3"/>
+    <g clip-path="url(#pigClip)"><rect class="pig-fill" x="0" y="100" width="120" height="100" fill="#F2C14E"/></g>
+    <path d="M18 52 Q16 22 52 18 Q66 8 80 14 L84 6 Q92 10 90 22 Q104 30 106 46 L114 48 L114 62 L104 64 Q98 80 84 84 L84 94 L72 94 L70 88 L44 88 L42 94 L30 94 L30 84 Q14 76 18 52 Z" fill="none" stroke="#C9648A" stroke-width="3"/>
+    <rect x="48" y="22" width="22" height="5" rx="2.5" fill="#7A2E4A"/><circle cx="90" cy="40" r="3.5" fill="#3A1022"/>
+    <ellipse cx="110" cy="55" rx="3" ry="5" fill="#C9648A"/><path d="M14 50 q-8 -2 -6 -10" stroke="#C9648A" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`;
+  function renderPiggy(p) {
+    const box = $('piggy');
+    if (!box || !p) return;
+    const pct = Math.max(0, Math.min(1, p.total / p.goal));
+    box.classList.remove('hidden');
+    if (!box.dataset.built) {
+      box.dataset.built = '1';
+      box.innerHTML = `<div class="pig-art">${PIGGY_SVG}</div>
+        <div class="pig-text"><b>🐷 The piggy bank</b><span class="pig-line"></span>
+          <div class="pig-bar"><i></i></div>
+          <small>Every tip for a poker dealer goes in. When it holds ${fmt(p.goal)} chips, every member gets ${p.reward} coins.</small></div>`;
+    }
+    box.querySelector('.pig-line').innerHTML = `<b>${fmt(p.total)}</b> / ${fmt(p.goal)} chips`;
+    box.querySelector('.pig-bar i').style.width = (pct * 100).toFixed(1) + '%';
+    box.querySelector('.pig-fill').setAttribute('y', String(100 - pct * 88));
   }
 
   function renderTables() {
@@ -1425,7 +1449,8 @@
     if (kind === 'gift-out') return two('Chips sent to', detail);
     if (kind === 'gift-in') return two('Chips from', detail);
     if (kind === 'gift-back') return two('Gift returned:', detail);
-    if (kind === 'box') return two('Skin box:', ({ bronze: 'Bronze', silver: 'Silver', gold: 'Gold' })[detail] || detail);
+    if (kind === 'box') return two('Skin box:', (BOX_LOOK[detail] || ['', detail])[1]);
+    if (kind === 'piggy') return '<span>Piggy bank full — a gift for everyone</span>';
     if (kind === 'weekly') return `<span>Weekly ranking</span> · <b>Place ${esc(detail)}</b>`;
     if (kind === 'gift') return '<span>Gift from the house</span>';
     if (kind === 'bonus') return '<span>Thank-you bonus for an update</span>';
@@ -1687,7 +1712,7 @@
 
   // ----- shop -----
   const SLOT_INFO = {
-    boxes: ['🎁 Boxes', 'A random skin you don\'t own yet — never a duplicate. Pay with coins, or with chips. The odds are shown on every box.'],
+    boxes: ['🎁 Boxes', 'Skins now come only from boxes: one for every category, and a Mystery Box with everything. You always get a skin you don\'t own yet. Look inside before you open one.'],
     cardback: ['Card backs', 'The back of your face-down cards — everyone at your table sees it.'],
     cardface: ['Card faces', 'How the faces of the cards are printed — on your screen.'],
     felt: ['Table felt', 'The cloth of every table you sit at — on your screen.'],
@@ -1699,42 +1724,75 @@
     turn: ['Turn markers', 'Your emblem when it is your turn — everyone at your table sees it.'],
     gesture: ['Gestures', 'Little courtesies for the table. Every gesture you own is yours to use — open the hat button at any table.'],
   };
-  let shopSlot = 'cardback';
+  let shopSlot = 'boxes';
 
   // ----- skin boxes -----
   const RARITY = { common: ['Common', '#B8C4BE'], rare: ['Rare', '#4FA3FF'], epic: ['Epic', '#B36BFF'], legendary: ['Legendary', '#F2C14E'] };
+  let boxFocus = null;   // a box whose preview to open right away
+  const BOX_LOOK = { mystery: ['🎲', 'Mystery Box'], cardback: ['🂠', 'Card back box'], cardface: ['🃏', 'Card face box'], felt: ['🟩', 'Table felt box'], chips: ['🪙', 'Chip set box'],
+    background: ['🖼️', 'Background box'], avatar: ['👤', 'Portrait box'], badge: ['🎩', 'Title box'], turn: ['⏳', 'Turn marker box'], victory: ['🎆', 'Victory effect box'], gesture: ['👋', 'Gesture box'] };
   function paintBoxes(body) {
     const w = App.wallet;
     const grid = h('div', 'box-grid');
-    for (const [tier, b] of Object.entries(App.shop.boxes)) {
-      const card = h('div', 'box-card tier-' + tier);
+    for (const b of Object.values(App.shop.boxes)) {
+      const [icon, name] = BOX_LOOK[b.id] || ['🎁', b.id];
+      const inside = App.shop.items.filter((i) => !i.retired && (b.id === 'mystery' || i.slot === b.id));
+      const have = inside.filter((i) => w.owned.includes(i.id)).length;
+      const card = h('div', 'box-card box-' + b.id + (have === inside.length ? ' complete' : ''));
       card.innerHTML = `
-        <div class="chest"><div class="chest-lid"></div><div class="chest-body"></div><div class="chest-glow"></div></div>
-        <b>${esc(b.name)}</b>
-        <ul class="odds">${['common', 'rare', 'epic', 'legendary'].filter((r) => b.odds[r]).map((r) => `<li><i style="background:${RARITY[r][1]}"></i><span>${RARITY[r][0]}</span><em>${b.odds[r]} %</em></li>`).join('')}</ul>`;
-      const pay = (kind) => {
-        const price = b[kind];
-        const btn = h('button', 'pill ' + (kind === 'coins' ? 'gold' : ''), `<i class="${kind === 'coins' ? 'ico-coin' : 'ico-chip'}"></i>${fmt(price)}`);
-        btn.disabled = w[kind] < price;
-        btn.onclick = () => openBox(body, tier, kind, btn);
-        return btn;
-      };
+        <div class="chest"><div class="chest-lid"></div><div class="chest-body"></div><div class="chest-glow"></div><span class="chest-icon">${icon}</span></div>
+        <b>${esc(name)}</b>
+        <small class="box-count">${have} / ${inside.length} collected</small>`;
       const row = h('div', 'box-pay');
-      row.append(pay('coins'), pay('chips'));
+      for (const kind of ['coins', 'chips']) {
+        const btn = h('button', 'pill ' + (kind === 'coins' ? 'gold' : ''), `<i class="${kind === 'coins' ? 'ico-coin' : 'ico-chip'}"></i>${fmt(b[kind])}`);
+        btn.disabled = w[kind] < b[kind] || have === inside.length;
+        btn.onclick = () => openBox(body, b.id, kind, btn);
+        row.appendChild(btn);
+      }
       card.appendChild(row);
+      const pv = h('button', 'link box-preview-btn', have === inside.length ? '✓ All collected' : '👁 What is inside?');
+      pv.onclick = () => boxPreview(body, b.id);
+      card.appendChild(pv);
       grid.appendChild(card);
     }
     body.appendChild(grid);
-    body.appendChild(h('p', 'fine', 'Play money only: coins and chips cannot be bought with real money or paid out. If a box has nothing new left for you, it cannot be opened.'));
+    body.appendChild(h('p', 'fine', 'Play money only: coins and chips cannot be bought with real money or paid out. Dearer skins are rarer. You never get a skin twice.'));
+    if (boxFocus) { const f = boxFocus; boxFocus = null; boxPreview(body, f); }
   }
-  async function openBox(body, tier, pay, btn) {
+  // The preview: every skin in the box with your chance to draw it.
+  async function boxPreview(body, boxId) {
+    const r = await api('/api/shop/box/' + boxId);
+    if (!r.ok) { toast(r.data.error || 'Could not load the box', { kind: 'bad' }); return; }
+    const [icon, name] = BOX_LOOK[boxId] || ['🎁', boxId];
+    const ov = h('div', 'box-preview');
+    const list = r.data.items.slice().sort((a, b) => b.chance - a.chance);
+    ov.innerHTML = `<div class="bp-card"><button class="bp-x" aria-label="Close">✕</button><h3>${icon} <span>${esc(name)}</span></h3>
+      <p class="fine">Your chance for each skin. Skins you already have can't come out again.</p><div class="bp-grid"></div></div>`;
+    const grid = ov.querySelector('.bp-grid');
+    for (const x of list) {
+      const item = App.shop.items.find((i) => i.id === x.id);
+      if (!item) continue;
+      const [rName, rColor] = RARITY[x.rarity];
+      const cell = h('div', 'bp-item' + (x.owned ? ' owned' : ''));
+      cell.style.setProperty('--rc', rColor);
+      cell.appendChild(shopPreview(item));
+      cell.appendChild(h('b', '', esc(item.name)));
+      cell.appendChild(h('em', '', x.owned ? '✓ Yours' : `<span style="color:${rColor}">${rName}</span> · ${x.chance < 0.01 ? (x.chance * 100).toFixed(1) : Math.round(x.chance * 100)} %`));
+      grid.appendChild(cell);
+    }
+    ov.querySelector('.bp-x').onclick = () => ov.remove();
+    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    document.body.appendChild(ov);
+  }
+  async function openBox(body, boxId, pay, btn) {
     btn.disabled = true;
-    const r = await walletAction('/api/shop/box', { box: tier, pay });
+    const r = await walletAction('/api/shop/box', { box: boxId, pay });
     btn.disabled = false;
     if (!r) return;
     const item = App.shop.items.find((i) => i.id === r.item);
     const [rName, rColor] = RARITY[r.rarity];
-    const ov = h('div', 'box-reveal tier-' + tier);
+    const ov = h('div', 'box-reveal box-' + boxId);
     ov.style.setProperty('--rc', rColor);
     ov.innerHTML = `<div class="chest big shaking"><div class="chest-lid"></div><div class="chest-body"></div><div class="chest-glow"></div></div><div class="reveal hidden"></div>`;
     document.body.appendChild(ov);
@@ -1826,25 +1884,18 @@
       el.appendChild(shopPreview(item));
       if (item.animated) el.appendChild(h('span', 'anim-tag', '✨ Animated'));
       el.appendChild(h('b', '', esc(item.name)));
-      el.appendChild(h('em', '', owned ? (item.retired ? 'Retired · still yours' : 'In your collection') : `<i class="ico-coin"></i>${fmt(item.price)}`));
+      const [rName, rColor] = RARITY[item.rarity || 'common'];
+      el.appendChild(h('em', '', owned ? (item.retired ? 'Retired · still yours' : 'In your collection') : `<span style="color:${rColor}">${rName}</span> · in the box`));
+      if (!owned) el.classList.add('locked');
       const b = h('button', 'pill');
       if (isGesture && owned) { b.textContent = 'Use at the table'; b.disabled = true; }
       else if (on) { b.textContent = 'In use'; b.disabled = true; }
       else if (owned) { b.textContent = 'Use'; b.onclick = async () => { if (await walletAction('/api/shop/equip', { slot: item.slot, item: item.id })) paintLounge(body); }; }
       else {
-        const short = item.price - w.coins;
-        b.textContent = short > 0 ? `${fmt(short)} more coins` : 'Purchase';
+        // skins come only from boxes: go to this category's box
+        b.textContent = '🎁 To the box';
         b.className = 'pill gold';
-        b.disabled = short > 0;
-        b.onclick = async () => {
-          if (!confirm(`Purchase "${item.name}" for ${fmt(item.price)} coins?`)) return;
-          if (await walletAction('/api/shop/buy', { item: item.id })) {
-            Sound.play('win');
-            if (!isGesture) await walletAction('/api/shop/equip', { slot: item.slot, item: item.id });
-            toast(`"${item.name}" is yours.`, { kind: 'good' });
-            paintLounge(body);
-          }
-        };
+        b.onclick = () => { shopSlot = 'boxes'; boxFocus = item.slot; paintLounge(body); };
       }
       el.appendChild(b);
       grid.appendChild(el);

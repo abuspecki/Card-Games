@@ -143,19 +143,19 @@
     const [k, ...rest] = String(e.reason || '').split(':');
     const d = rest.join(':');
     return ({ win: `Gewinn: ${MODE[d] || d}`, daily: `Tagesbonus (Tag ${d})`, topup: 'Tägliches Auffüllen', bank: e.coins > 0 ? 'Bank: Chips → Münzen' : 'Bank: Münzen → Chips',
-      shop: `Shop: ${d}`, quest: `Aufgabe: ${d}`, achievement: `Erfolg: ${d}`, tourney: 'Sit-&-Go-Preis', weekly: `Wochen-Rangliste: Platz ${d}`, box: `Skin-Box (${({ bronze: 'Bronze', silver: 'Silber', gold: 'Gold' })[d] || d})`, 'gift-out': `Chips an ${d}`, 'gift-in': `Chips von ${d}`, 'gift-back': `Geschenk zurück: ${d}`, gift: 'Geschenk an alle', bonus: 'Update-Bonus', owner: 'Korrektur (Owner)' })[k] || e.reason;
+      shop: `Shop: ${d}`, quest: `Aufgabe: ${d}`, achievement: `Erfolg: ${d}`, tourney: 'Sit-&-Go-Preis', weekly: `Wochen-Rangliste: Platz ${d}`, box: `Skin-Box (${d})`, piggy: 'Sparschwein voll', 'gift-out': `Chips an ${d}`, 'gift-in': `Chips von ${d}`, 'gift-back': `Geschenk zurück: ${d}`, gift: 'Geschenk an alle', bonus: 'Update-Bonus', owner: 'Korrektur (Owner)' })[k] || e.reason;
   }
   // Economy: where coins and chips came from and went in the last 7 days.
   function paintEconomy(e) {
     const box = $('economy');
     if (!box || !e) return;
     const NAME = { win: 'Gewinne an den Tischen', daily: 'Tagesbonus', topup: 'Tägliches Auffüllen', bank: 'Bank (Tausch)', shop: 'Shop-Käufe', box: 'Skin-Boxen',
-      quest: 'Aufgaben', achievement: 'Erfolge', weekly: 'Wochen-Preise', tourney: 'Turnier-Preise', gift: 'Geschenke an alle', bonus: 'Update-Boni', owner: 'Korrekturen (Owner)',
+      quest: 'Aufgaben', achievement: 'Erfolge', weekly: 'Wochen-Preise', tourney: 'Turnier-Preise', gift: 'Geschenke an alle', bonus: 'Update-Boni', piggy: 'Sparschwein voll', owner: 'Korrekturen (Owner)',
       'gift-out': 'Chips an Freunde (raus)', 'gift-in': 'Chips von Freunden (rein)', 'gift-back': 'Geschenke zurück' };
     const sgn = (n) => (n > 0 ? '+' : '') + fmt(n);
     const sum = (k) => e.flows.reduce((a, f) => a + f[k], 0);
     box.innerHTML = `<h2>Wirtschaft · letzte 7 Tage</h2>
-      <p class="sub">Was ins Spiel kam (+) und was hinausging (−). Chips, die an den Tischen zwischen Spielern wandern, stehen hier nicht. Trinkgeld an die Dealer seit dem letzten Neustart: <b>${fmt(e.tipsSinceRestart)}</b> Chips.</p>
+      <p class="sub">Was ins Spiel kam (+) und was hinausging (−). Chips, die an den Tischen zwischen Spielern wandern, stehen hier nicht. Sparschwein (Dealer-Trinkgeld): <b>${fmt(e.piggy.total)}</b> / ${fmt(e.piggy.goal)} Chips — bei vollem Schwein bekommt jedes Mitglied ${e.piggy.reward} Münzen.</p>
       ${e.flows.length ? `<table class="grid small"><thead><tr><th>Grund</th><th class="num">Buchungen</th><th class="num">Münzen</th><th class="num">Chips</th></tr></thead><tbody>
         ${e.flows.map((f) => `<tr><td>${NAME[f.kind] || esc(f.kind)}</td><td class="num">${fmt(f.n)}</td><td class="num ${f.coins >= 0 ? 'pos' : 'neg'}">${f.coins ? sgn(f.coins) : ''}</td><td class="num ${f.chips >= 0 ? 'pos' : 'neg'}">${f.chips ? sgn(f.chips) : ''}</td></tr>`).join('')}
         <tr class="total"><td><b>Summe</b></td><td></td><td class="num ${sum('coins') >= 0 ? 'pos' : 'neg'}"><b>${sgn(sum('coins'))}</b></td><td class="num ${sum('chips') >= 0 ? 'pos' : 'neg'}"><b>${sgn(sum('chips'))}</b></td></tr></tbody></table>`

@@ -149,33 +149,44 @@ const CATALOG = [
 ];
 const ITEMS = Object.fromEntries(CATALOG.map((i) => [i.id, i]));
 
-// ----- skin boxes: a random skin you don't own yet, odds shown openly -----
-// Paid with play money only (coins, or many chips — a way to spend big chip piles).
-// Coins can never be bought with real money, so a box is never a stake of real value.
-const rarityOf = (item) => (item.price >= 2500 ? 'legendary' : item.price >= 1200 ? 'epic' : item.price >= 500 ? 'rare' : 'common');
-const BOXES = {
-  bronze: { name: 'Bronze Box', coins: 500, chips: 75000, odds: { common: 70, rare: 25, epic: 5, legendary: 0 } },
-  silver: { name: 'Silver Box', coins: 1400, chips: 210000, odds: { common: 25, rare: 45, epic: 25, legendary: 5 } },
-  gold: { name: 'Gold Box', coins: 3200, chips: 480000, odds: { common: 0, rare: 25, epic: 50, legendary: 25 } },
-};
-const RARITIES = ['common', 'rare', 'epic', 'legendary'];
-// The skins a box can give: everything for sale, never items you already own.
-const boxPool = (owned) => CATALOG.filter((i) => !i.retired && !owned.includes(i.id));
-// Draw: a rarity by the box's odds (only among rarities you can still get), then an item.
-function drawFromBox(box, owned, rand = Math.random) {
-  const pool = boxPool(owned);
-  const left = RARITIES.filter((r) => box.odds[r] > 0 && pool.some((i) => rarityOf(i) === r));
-  if (!left.length) return null;
-  const total = left.reduce((a, r) => a + box.odds[r], 0);
-  let x = rand() * total;
-  let rarity = left[left.length - 1];
-  for (const r of left) { if (x < box.odds[r]) { rarity = r; break; } x -= box.odds[r]; }
-  const items = pool.filter((i) => rarityOf(i) === rarity);
-  return items[Math.floor(rand() * items.length)];
-}
+
 const SLOTS = ['cardback', 'cardface', 'felt', 'chips', 'background', 'turn', 'avatar', 'badge', 'victory'];
 const SHOP_TABS = ['cardback', 'cardface', 'felt', 'chips', 'background', 'avatar', 'badge', 'turn', 'victory', 'gesture'];
 const GESTURE_COOLDOWN = 4000;   // ms between gestures per player
+
+// ----- skin boxes: the only way to get skins -----
+// One box per category plus a Mystery box with everything. A box gives a skin you
+// don't own yet (never a duplicate); dearer skins are rarer (chance ∝ 1 / price).
+// The price follows what is inside. Paid with play money only (coins, or chips):
+// coins can never be bought with real money, so a box is never a stake of real value.
+const rarityOf = (item) => (item.price >= 2500 ? 'legendary' : item.price >= 1200 ? 'epic' : item.price >= 500 ? 'rare' : 'common');
+const RARITIES = ['common', 'rare', 'epic', 'legendary'];
+const CHIPS_PER_BOX_COIN = 150;          // paying with chips: 150 chips per coin of the price
+const boxItems = (boxId) => CATALOG.filter((i) => !i.retired && (boxId === 'mystery' || i.slot === boxId));
+const weight = (i) => 1 / i.price;
+function boxPrice(boxId) {
+  const items = boxItems(boxId);
+  const avg = items.length / items.reduce((a, i) => a + weight(i), 0);   // the expected price of what you draw
+  const coins = Math.max(150, Math.ceil((avg * 1.1) / 50) * 50);
+  return { coins, chips: coins * CHIPS_PER_BOX_COIN };
+}
+const BOX_IDS = ['mystery', ...SHOP_TABS];
+const BOXES = Object.fromEntries(BOX_IDS.map((id) => [id, { id, slot: id === 'mystery' ? null : id, ...boxPrice(id), size: boxItems(id).length }]));
+// Each skin's chance for this player (0 for skins already owned).
+function boxChances(boxId, owned) {
+  const items = boxItems(boxId);
+  const open = items.filter((i) => !owned.includes(i.id));
+  const total = open.reduce((a, i) => a + weight(i), 0);
+  return items.map((i) => ({ id: i.id, rarity: rarityOf(i), owned: owned.includes(i.id), chance: owned.includes(i.id) || !total ? 0 : weight(i) / total }));
+}
+function drawFromBox(boxId, owned, rand = Math.random) {
+  const open = boxItems(boxId).filter((i) => !owned.includes(i.id));
+  if (!open.length) return null;
+  const total = open.reduce((a, i) => a + weight(i), 0);
+  let x = rand() * total;
+  for (const i of open) { if (x < weight(i)) return i; x -= weight(i); }
+  return open[open.length - 1];
+}
 
 const dayString = (t) => new Date(t).toISOString().slice(0, 10); // UTC day
 const dailyAmount = (streak) => DAILY_BASE + DAILY_STEP * (Math.min(streak, DAILY_MAX_DAYS) - 1);
@@ -375,17 +386,23 @@ function makeCoins(store) {
     },
 
     // Open a skin box, paid with coins or chips.
-    async openBox(userId, tier, pay = 'coins', rand = Math.random) {
-      const box = BOXES[tier];
+    async openBox(userId, boxId, pay = 'coins', rand = Math.random) {
+      const box = BOXES[boxId];
       if (!box) return { error: 'Pick a box' };
       if (pay !== 'coins' && pay !== 'chips') return { error: 'Pay with coins or chips' };
       return wallet(userId, (w, owned) => {
         const price = box[pay];
-        if (w[pay] < price) return { result: { error: `The ${box.name} costs ${price.toLocaleString()} ${pay} — you have ${w[pay].toLocaleString()}` } };
-        const item = drawFromBox(box, owned, rand);
+        if (w[pay] < price) return { result: { error: `This box costs ${price.toLocaleString()} ${pay} — you have ${w[pay].toLocaleString()}` } };
+        const item = drawFromBox(boxId, owned, rand);
         if (!item) return { result: { error: 'You already own everything this box can give' } };
         return { update: { [pay]: w[pay] - price }, addItem: item.id, result: { item: item.id, rarity: rarityOf(item), paid: price, pay } };
-      }, `box:${tier}`);
+      }, `box:${boxId}`);
+    },
+    // What a box can give this player, and the chance for each skin.
+    async boxPreview(userId, boxId) {
+      if (!BOXES[boxId]) return { error: 'Pick a box' };
+      const { owned } = await store.getItems(userId);
+      return { box: BOXES[boxId], items: boxChances(boxId, owned) };
     },
 
     // Send chips to a friend: taken from your bankroll, added to theirs, both on the statement.
@@ -441,5 +458,5 @@ function rewardFor(r) {
 module.exports = {
   makeCoins, rewardFor, status, dailyAmount, dayString, CATALOG, ITEMS, SLOTS, SHOP_TABS, GESTURE_COOLDOWN,
   WELCOME_COINS, WELCOME_CHIPS, TABLE_DAILY_CAP, CHIPS_PER_COIN, EXCHANGE_FEE, CONVERT_RATE, COIN_TO_CHIPS, BUYCHIPS_MAX,
-  TOPUP_TO, BANKRUPT_GRANT, coinsForWin, BOXES, RARITIES, rarityOf, drawFromBox, boxPool, GIFT_MIN, GIFT_DAILY, GIFT_MIN_HANDS,
+  TOPUP_TO, BANKRUPT_GRANT, coinsForWin, BOXES, RARITIES, rarityOf, drawFromBox, boxChances, boxItems, CHIPS_PER_BOX_COIN, GIFT_MIN, GIFT_DAILY, GIFT_MIN_HANDS,
 };

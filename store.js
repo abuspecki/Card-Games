@@ -241,6 +241,21 @@ function postgresStore(url) {
       return r.rowCount === 1;
     },
 
+    // ----- the piggy bank (dealer tips): add, read, and take a full load exactly once -----
+    async piggyAdd(amount) {
+      const r = await q(`INSERT INTO meta (key, value) VALUES ('piggy', $1) ON CONFLICT (key)
+        DO UPDATE SET value = (COALESCE(NULLIF(meta.value, ''), '0')::bigint + $1::bigint)::text, at = now() RETURNING value`, [String(Math.floor(amount))]);
+      return Number(r.rows[0].value);
+    },
+    async piggyTotal() {
+      const r = await q(`SELECT value FROM meta WHERE key = 'piggy'`);
+      return r.rows[0] ? Number(r.rows[0].value) || 0 : 0;
+    },
+    async piggyTake(goal) {
+      const r = await q(`UPDATE meta SET value = (value::bigint - $1::bigint)::text, at = now() WHERE key = 'piggy' AND value::bigint >= $1::bigint RETURNING value`, [String(goal)]);
+      return r.rowCount ? Number(r.rows[0].value) : null;
+    },
+
     // ----- users & sessions -----
     async createUser(username, pass) {
       const r = await q(
@@ -663,6 +678,9 @@ function fileStore(file) {
       save();
       return true;
     },
+    async piggyAdd(amount) { db.piggy = (db.piggy || 0) + Math.floor(amount); save(); return db.piggy; },
+    async piggyTotal() { return db.piggy || 0; },
+    async piggyTake(goal) { if ((db.piggy || 0) < goal) return null; db.piggy -= goal; save(); return db.piggy; },
     async refundInPlay() {
       let n = 0;
       for (const w of Object.values(db.wallets)) if (w.in_play > 0) { w.chips += w.in_play; w.in_play = 0; n++; }
