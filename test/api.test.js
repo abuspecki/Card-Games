@@ -289,6 +289,26 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   pg1.ws.send(JSON.stringify({ t: 'leave' })); pg2.ws.send(JSON.stringify({ t: 'leave' }));
   await wait(300); pg1.ws.close(); pg2.ws.close();
 
+  // own blinds and buy-in for private chip tables (only values from the list)
+  assert.strictEqual((await call('POST', '/api/private', ta, { game: 'holdem', stake: 7, buyIn: 700 })).status, 400, 'blinds must come from the list');
+  assert.strictEqual((await call('POST', '/api/private', ta, { game: 'holdem', stake: 100, buyIn: 1234 })).status, 400, 'buy-in must come from the list');
+  const ph = (await call('POST', '/api/private', ta, { game: 'holdem', stake: 100, buyIn: 2000 })).data;
+  assert(ph.id && ph.id !== pv.id, 'a new table (the empty Durak table is replaced)');
+  assert.strictEqual((await call('POST', '/api/private', ta, { game: 'holdem', stake: 100, buyIn: 2000 })).data.id, ph.id, 'same stakes: reused');
+  const ph2 = (await call('POST', '/api/private', ta, { game: 'holdem', stake: 20, buyIn: 1000 })).data;
+  assert(ph2.id && ph2.id !== ph.id, 'other stakes while empty: replaced');
+  const ph3 = (await call('POST', '/api/private', ta, { game: 'holdem', stake: 100, buyIn: 2000 })).data;
+  const ps = await sit(ph3.id, ta);
+  assert.strictEqual(ps.first.t, 'joined');
+  await wait(300);
+  const pst = ps.msgs.filter((m) => m.t === 'state').pop().state;
+  assert.deepStrictEqual([pst.settings.smallBlind, pst.settings.bigBlind], [50, 100], 'own blinds');
+  assert(pst.seats[pst.mySeat].chips <= 2000, 'own buy-in');
+  assert.strictEqual((await call('POST', '/api/private', ta, { game: 'blackjack', stake: 25, buyIn: 2500 })).status, 400, 'cannot replace a table you sit at');
+  ps.ws.send(JSON.stringify({ t: 'leave' })); await wait(300); ps.ws.close();
+  const pb = (await call('POST', '/api/private', ta, { game: 'blackjack', stake: 25, buyIn: 2500 })).data;
+  assert(pb.id, 'blackjack with own minimum bet: ' + JSON.stringify(pb));
+
   // ----- owner tools: history, gift for all, announcement -----
   const annId = (await call('GET', '/api/admin/players?search=' + A, to)).data.players[0].id;
   const file = (await call('GET', `/api/admin/players/${annId}`, to)).data;

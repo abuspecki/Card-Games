@@ -412,3 +412,10 @@ html[data-theme="light"] .toast { background: #14231B !important; }
 .modal-card .hl-ach { display: flex; gap: 6px; flex-wrap: wrap; margin: 2px 0 6px; }
 .modal-card .hl-ach span { padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: rgba(242, 193, 78, .12); border: 1px solid rgba(242, 193, 78, .35); }
 @media (max-width: 560px) { .modal-card .hl-grid { grid-template-columns: repeat(2, 1fr); } }
+/* private table: choosing blinds and buy-in */
+.priv-set { display: flex; flex-direction: column; gap: 12px; }
+.priv-set label { display: flex; flex-direction: column; gap: 6px; font-weight: 700; font-size: 13px; color: var(--a-muted); }
+.priv-set select { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--a-line); background: var(--a-surface2); color: var(--a-text); font: 700 16px var(--a-font); }
+.priv-set .priv-note { margin: 0; font-size: 14px; line-height: 1.5; }
+.priv-set .priv-note .warn { color: #E0715F; font-weight: 700; }
+.priv-set .row { display: flex; gap: 10px; justify-content: flex-end; }

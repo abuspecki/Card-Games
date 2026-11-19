@@ -64,22 +64,44 @@ function createLobby(ctx) {
     durak: { capacity: 6, label: 'Durak' },
     flamingo: { capacity: 6, label: 'Flamingo' },
   };
+  // Stakes the owner of a private table may choose (blind / minimum bet), and the
+  // buy-in as a multiple of it. Validated here, whatever the browser sends.
+  const PRIVATE_STAKES = {
+    holdem: { stakes: [10, 20, 50, 100, 200, 500, 1000, 2000, 5000], buyIns: [20, 50, 100, 200], minBuyIn: 10 },
+    blackjack: { stakes: [5, 10, 25, 50, 100, 250, 500, 1000], buyIns: [20, 50, 100, 200], minBuyIn: 5 },
+    roulette: { stakes: [5, 10, 25, 50, 100, 250, 500], buyIns: [20, 50, 100, 200], minBuyIn: 5 },
+  };
+  function privateStakes(game, opts) {
+    const P = PRIVATE[game];
+    const R = PRIVATE_STAKES[game];
+    if (!R) return { settings: P.settings, buyIn: P.buyIn, minBuyIn: P.minBuyIn };
+    const stake = opts.stake === undefined ? P.settings.bigBlind : Number(opts.stake);
+    const times = opts.buyIn === undefined ? P.buyIn / P.settings.bigBlind : Number(opts.buyIn) / stake;
+    if (!R.stakes.includes(stake)) return { error: 'Pick blinds from the list' };
+    if (!R.buyIns.includes(times)) return { error: 'Pick a buy-in from the list' };
+    const settings = game === 'holdem' ? { smallBlind: stake / 2, bigBlind: stake } : { bigBlind: stake };
+    return { settings, buyIn: stake * times, minBuyIn: stake * R.minBuyIn };
+  }
   const PRIVATE_MAX = 30;
   const PRIVATE_IDLE = 10 * 60 * 1000;   // an empty private table closes after this
   const codeChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  function createPrivate(userId, username, game) {
+  function createPrivate(userId, username, game, opts = {}) {
     const P = PRIVATE[game];
     if (!P) return { error: 'Pick a game' };
-    // one private table per member: reuse it
+    const st = privateStakes(game, opts);
+    if (st.error) return st;
+    // one private table per member: reuse it (same game and stakes), else replace it while it is empty
     for (const r of rooms.values()) if (r.private && r.ownerId === userId) {
-      if (r.game === game) return { ok: true, id: r.id, reused: true };
+      const stake = (st.settings && st.settings.bigBlind) || null;
+      const same = r.game === game && r.buyIn === st.buyIn && r.stake === stake;
+      if (same) return { ok: true, id: r.id, reused: true };
       if (r.table.seats.some((s) => s && !s.isBot)) return { error: `You already have a private ${PRIVATE[r.game].label} table (${r.id}) — close it first by leaving it` };
       closeRoom(r);
     }
     if ([...rooms.values()].filter((r) => r.private).length >= PRIVATE_MAX) return { error: 'All private tables are taken right now — try again later' };
     let id;
     do { id = 'P-' + Array.from({ length: 5 }, () => codeChars[crypto.randomInt(codeChars.length)]).join(''); } while (rooms.has(id));
-    const room = makeRoom({ id, name: `${P.label} · ${username}'s table`, game, capacity: P.capacity, buyIn: P.buyIn, minBuyIn: P.minBuyIn, settings: P.settings, private: true, ownerId: userId, host: username });
+    const room = makeRoom({ id, name: `${P.label} · ${username}'s table`, game, capacity: P.capacity, buyIn: st.buyIn, minBuyIn: st.minBuyIn, settings: st.settings, stake: (st.settings && st.settings.bigBlind) || null, private: true, ownerId: userId, host: username });
     room.emptySince = Date.now();
     return { ok: true, id: room.id };
   }
@@ -821,7 +843,7 @@ function createLobby(ctx) {
     return { humans, bots: botsN, tablesPlaying: playing, tables: [...rooms.values()].map(tableSummary) };
   }
 
-  return { rooms, tableSummary, handleConnection, locate, leaveBy, seatedAccounts, refreshLook, kick, cashOutAll, liveStats, GAMES, createPrivate, PRIVATE_GAMES: Object.keys(PRIVATE), announce, currentAnnouncement, setMaintenance, maintenanceInfo, drain, isIdle, playerCount };
+  return { rooms, tableSummary, handleConnection, locate, leaveBy, seatedAccounts, refreshLook, kick, cashOutAll, liveStats, GAMES, createPrivate, PRIVATE_GAMES: Object.keys(PRIVATE), PRIVATE_STAKES, announce, currentAnnouncement, setMaintenance, maintenanceInfo, drain, isIdle, playerCount };
 }
 
 module.exports = { createLobby, TABLES, GAMES };

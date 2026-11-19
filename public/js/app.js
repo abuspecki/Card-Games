@@ -535,16 +535,63 @@
         closeModal();
         joinTable(r.data.id);
       };
-      body.querySelectorAll('[data-g]').forEach((b) => { b.onclick = async () => {
-        b.disabled = true;
-        const r = await api('/api/private', { game: b.dataset.g });
-        b.disabled = false;
-        if (!r.ok) { err.textContent = r.data.error; return; }
+      const create = async (payload, btn) => {
+        btn.disabled = true;
+        const r = await api('/api/private', payload);
+        btn.disabled = false;
+        if (!r.ok) { const e = card.querySelector('.priv .merror'); if (e) e.textContent = r.data.error; return; }
         closeModal();
         joinTable(r.data.id);
         setTimeout(() => toast(`Your private table is open — code ${r.data.id}. Share it with your friends!`, { kind: 'good', timeout: 9000 }), 800);
+      };
+      body.querySelectorAll('[data-g]').forEach((b) => { b.onclick = () => {
+        const g = b.dataset.g;
+        if (PRIV_STAKES[g]) privateSettings(card, g, create);
+        else create({ game: g }, b);
       }; });
     });
+  }
+  // Chip games: the owner picks the blinds (or minimum bet) and the buy-in.
+  const PRIV_STAKES = {
+    holdem: { stakes: [10, 20, 50, 100, 200, 500, 1000, 2000, 5000], buyIns: [20, 50, 100, 200], def: [10, 100], minBuyIn: 10, label: "Hold'em" },
+    blackjack: { stakes: [5, 10, 25, 50, 100, 250, 500, 1000], buyIns: [20, 50, 100, 200], def: [10, 100], minBuyIn: 5, label: 'Blackjack' },
+    roulette: { stakes: [5, 10, 25, 50, 100, 250, 500], buyIns: [20, 50, 100, 200], def: [5, 200], minBuyIn: 5, label: 'Roulette' },
+  };
+  function privateSettings(card, game, create) {
+    const P = PRIV_STAKES[game];
+    const holdem = game === 'holdem';
+    const body = card.querySelector('.priv');
+    body.innerHTML = `
+      <section class="priv-set"><h4>${P.label} · your table</h4>
+        <label>${holdem ? 'Blinds' : 'Minimum bet'}<select name="stake">${P.stakes.map((v) => `<option value="${v}"${v === P.def[0] ? ' selected' : ''}>${holdem ? `${fmt(v / 2)} / ${fmt(v)}` : fmt(v)}</option>`).join('')}</select></label>
+        <label>Buy-in<select name="buyIn"></select></label>
+        <p class="priv-note"></p>
+        <p class="merror" role="alert"></p>
+        <div class="row gap"><button class="btn btn-outline" data-back>Back</button><button class="btn btn-navy" data-go>Open the table</button></div>
+      </section>`;
+    const stakeSel = body.querySelector('[name=stake]'), buySel = body.querySelector('[name=buyIn]'), note = body.querySelector('.priv-note');
+    const paintBuyIns = (keep) => {
+      const stake = Number(stakeSel.value);
+      buySel.innerHTML = P.buyIns.map((x) => `<option value="${stake * x}"${x === keep ? ' selected' : ''}>${fmt(stake * x)} ${holdem ? `(${x} big blinds)` : `(${x}× the minimum)`}</option>`).join('');
+      paintNote();
+    };
+    const paintNote = () => {
+      const stake = Number(stakeSel.value), buyIn = Number(buySel.value), min = stake * P.minBuyIn;
+      const have = App.wallet ? App.wallet.chips : 0;
+      note.innerHTML = `Everyone brings up to <b>${fmt(buyIn)}</b> chips and needs at least <b>${fmt(min)}</b> to sit down. You have <b>${fmt(have)}</b>.`
+        + (have < min ? ' <span class="warn">That is not enough for you yet.</span>' : '');
+    };
+    // changing the blinds keeps the buy-in in big blinds (e.g. 100 big blinds)
+    let lastStake = Number(stakeSel.value);
+    stakeSel.onchange = () => { const times = Number(buySel.value) / lastStake; lastStake = Number(stakeSel.value); paintBuyIns(times); };
+    buySel.onchange = paintNote;
+    paintBuyIns(P.def[1]);
+    body.querySelector('[data-back]').onclick = () => openPrivate();
+    const go = body.querySelector('[data-go]');
+    go.onclick = () => {
+      body.querySelector('.merror').textContent = '';
+      create({ game, stake: Number(stakeSel.value), buyIn: Number(buySel.value) }, go);
+    };
   }
   App.openPrivate = openPrivate;
   async function shareCode(code) {
