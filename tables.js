@@ -7,6 +7,7 @@ const { Blackjack } = require('./games/blackjack');
 const { Durak } = require('./games/durak');
 const { Roulette } = require('./games/roulette');
 const { Flamingo } = require('./games/flamingo');
+const { Draw } = require('./games/draw');
 const { rewardFor, dayString, GESTURE_COOLDOWN } = require('./coins');
 
 const GAMES = {
@@ -15,6 +16,7 @@ const GAMES = {
   durak: { name: 'Durak', make: (settings) => new Durak(settings) },
   roulette: { name: 'Roulette', make: (settings) => new Roulette(settings) },
   flamingo: { name: 'Flamingo', make: (settings) => new Flamingo(settings) },
+  draw: { name: 'Five Card Draw', make: (settings) => new Draw(settings) },
 };
 
 // Two tables per game. `buyIn` is the stack you bring (from your bankroll if
@@ -31,6 +33,7 @@ const TABLES = [
   { id: 'ROULETTE-1', name: 'Roulette · Table 1', game: 'roulette', capacity: 8, buyIn: 5000, minBuyIn: 100, settings: { bigBlind: 5 } },
   { id: 'TOURNEY-1', name: "Hold'em · Sit & Go", game: 'holdem', capacity: 6, accountsOnly: true, tourney: { entry: 500, stack: 1500, handsPerLevel: 6 }, settings: { smallBlind: 10, bigBlind: 20 }, buyIn: 1500 },
   { id: 'FLAMINGO-1', name: 'Flamingo · Table 1', game: 'flamingo', capacity: 6 },
+  { id: 'DRAW-1', name: 'Five Card Draw · Table 1', game: 'draw', capacity: 6, buyIn: 1000, minBuyIn: 200, settings: { smallBlind: 5, bigBlind: 10 } },
   { id: 'ROULETTE-2', name: 'Roulette · High Roller', game: 'roulette', capacity: 8, highRoller: true, buyIn: 50000, minBuyIn: 1000, settings: { bigBlind: 25 } },
 ];
 
@@ -64,11 +67,13 @@ function createLobby(ctx) {
     roulette: { capacity: 8, buyIn: 1000, minBuyIn: 100, settings: { bigBlind: 5 }, label: 'Roulette' },
     durak: { capacity: 6, label: 'Durak' },
     flamingo: { capacity: 6, label: 'Flamingo' },
+    draw: { capacity: 6, buyIn: 1000, minBuyIn: 200, settings: { smallBlind: 5, bigBlind: 10 }, label: 'Five Card Draw' },
   };
   // Stakes the owner of a private table may choose (blind / minimum bet), and the
   // buy-in as a multiple of it. Validated here, whatever the browser sends.
   const PRIVATE_STAKES = {
     holdem: { stakes: [10, 20, 50, 100, 200, 500, 1000, 2000, 5000], buyIns: [20, 50, 100, 200], minBuyIn: 10 },
+    draw: { stakes: [10, 20, 50, 100, 200, 500, 1000, 2000, 5000], buyIns: [20, 50, 100, 200], minBuyIn: 10 },
     blackjack: { stakes: [5, 10, 25, 50, 100, 250, 500, 1000], buyIns: [20, 50, 100, 200], minBuyIn: 5 },
     roulette: { stakes: [5, 10, 25, 50, 100, 250, 500], buyIns: [20, 50, 100, 200], minBuyIn: 5 },
   };
@@ -80,7 +85,7 @@ function createLobby(ctx) {
     const times = opts.buyIn === undefined ? P.buyIn / P.settings.bigBlind : Number(opts.buyIn) / stake;
     if (!R.stakes.includes(stake)) return { error: 'Pick blinds from the list' };
     if (!R.buyIns.includes(times)) return { error: 'Pick a buy-in from the list' };
-    const settings = game === 'holdem' ? { smallBlind: stake / 2, bigBlind: stake } : { bigBlind: stake };
+    const settings = game === 'holdem' || game === 'draw' ? { smallBlind: stake / 2, bigBlind: stake } : { bigBlind: stake };
     return { settings, buyIn: stake * times, minBuyIn: stake * R.minBuyIn };
   }
   const PRIVATE_MAX = 30;
@@ -250,7 +255,7 @@ function createLobby(ctx) {
       minBuyIn: room.minBuyIn || 0,
       minBankroll: room.minBankroll || 0,
       tourney: tourneyInfo(room),
-      stakes: room.tourney ? `Sit & Go · entry ${room.tourney.entry}` : room.game === 'holdem' ? `Blinds ${s.smallBlind} / ${s.bigBlind}`
+      stakes: room.tourney ? `Sit & Go · entry ${room.tourney.entry}` : room.game === 'holdem' || room.game === 'draw' ? `Blinds ${s.smallBlind} / ${s.bigBlind}`
         : room.game === 'blackjack' || room.game === 'roulette' ? `Bets from ${s.bigBlind}` : '2–6 players',
     };
   }
@@ -388,6 +393,32 @@ function createLobby(ctx) {
     }
   }
 
+  // A round played together with a friend counts for the friend quests.
+  // Friendships are looked up at most every few minutes per pair.
+  const friendCache = new Map();
+  async function areFriends(a, b) {
+    const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+    const hit = friendCache.get(key);
+    if (hit && Date.now() - hit.at < 5 * 60 * 1000) return hit.ok;
+    const f = await ctx.store().getFriendship(a, b);
+    const ok = !!(f && f.status === 'accepted');
+    friendCache.set(key, { ok, at: Date.now() });
+    if (friendCache.size > 5000) friendCache.clear();
+    return ok;
+  }
+  async function countFriendRounds(room, ids) {
+    if (!ctx.quests) return;
+    const seated = [...new Set(room.table.seats.filter((s) => s && s.accountId && !s.isBot).map((s) => s.accountId))];
+    if (seated.length < 2) return;
+    for (const id of new Set(ids)) {
+      try {
+        for (const other of seated) {
+          if (other !== id && await areFriends(id, other)) { ctx.quests.onEvent(id, 'friendHand'); break; }
+        }
+      } catch (e) { console.error('friend rounds', e); }
+    }
+  }
+
   // Save each account's result, coin reward and the day's activity.
   function recordResults(room) {
     if (room.tourney) return; // tournament chips are not real: only the final result counts
@@ -395,7 +426,9 @@ function createLobby(ctx) {
     const store = ctx.store();
     const coins = ctx.coins();
     store.recordActivity(dayString(Date.now()), room.game).catch((e) => console.error('activity error', e));
-    for (const r of t.resultsForRecord()) {
+    const results = t.resultsForRecord();
+    countFriendRounds(room, results.map((r) => r.accountId));
+    for (const r of results) {
       store.recordHand(r.accountId, r.mode, r.net, r.won, r.pot).catch((e) => console.error('record error', e));
       const amount = rewardFor(r);
       if (!amount) continue;
@@ -622,6 +655,7 @@ function createLobby(ctx) {
           if (entry) seat.tEntry = entry;
           seat.avatar = look.avatar || null;
           seat.badge = look.badge || null;
+          seat.tag = look.tag || null;
           seat.skin = look.skin || null;
           room = target;
           pid = newPid;
@@ -692,19 +726,28 @@ function createLobby(ctx) {
           broadcast(room, { t: 'gesture', seat: t.seatOf(pid), name: me.name, text: g.preview });
           return;
         }
-        // Tip the dealer (Hold'em): 1, 5 or 25 big blinds from your table stack, not
-        // while you are still in a hand. The chips go to the house.
+        // Tip the dealer, any amount from 1 chip. At chip tables it comes from your
+        // table stack (not while you are still in a hand); at Durak and Flamingo,
+        // which have no table chips, members tip from their bankroll.
+        // Every tip goes into the piggy bank.
         case 'tip': {
-          if (room.game !== 'holdem' || room.tourney) return;
-          const bb = t.settings.bigBlind;
+          if (room.tourney) return;
           const amount = Math.floor(Number(m.amount));
-          if (![1, 5, 25].map((x) => x * bb).includes(amount)) return send(ws, { t: 'error', msg: 'Pick a tip from the list' });
-          if (me.inHand && !me.folded && t.isPlaying()) return send(ws, { t: 'error', msg: 'Tip the dealer between hands (or after you fold)' });
-          if (me.chips < amount) return send(ws, { t: 'error', msg: 'Not enough chips at the table for that tip' });
-          if (Date.now() - (me.lastTip || 0) < 3000) return;
-          me.lastTip = Date.now();
-          me.chips -= amount;
-          if (ctx.piggy) ctx.piggy.add(amount);   // every tip goes into the piggy bank
+          if (!(amount >= 1) || amount > 1e9) return send(ws, { t: 'error', msg: 'Pick an amount for the tip' });
+          if (Date.now() - (me.lastTip || 0) < 3000) return send(ws, { t: 'error', msg: 'One tip every few seconds' });
+          if (usesChips(room)) {
+            if (me.inHand && !me.folded && t.isPlaying()) return send(ws, { t: 'error', msg: 'Tip the dealer between rounds' + (room.game === 'holdem' ? ' (or after you fold)' : '') });
+            if (me.chips < amount) return send(ws, { t: 'error', msg: `You have ${me.chips.toLocaleString()} chips at the table` });
+            me.lastTip = Date.now();
+            me.chips -= amount;
+          } else {
+            if (!me.accountId) return send(ws, { t: 'error', msg: 'Sign in to tip the dealer here — the tip comes from your bankroll' });
+            me.lastTip = Date.now();
+            const r = await ctx.coins().spendChips(me.accountId, amount, 'tip');
+            if (r.error) { me.lastTip = 0; return send(ws, { t: 'error', msg: r.error }); }
+          }
+          if (ctx.piggy) ctx.piggy.add(amount);
+          if (me.accountId && ctx.quests) ctx.quests.onEvent(me.accountId, 'tip', amount);
           t.addLog(`${me.name} tips the dealer ${amount}`);
           broadcast(room, { t: 'tip', seat: t.seatOf(pid), name: me.name, amount });
           break;
@@ -792,7 +835,7 @@ function createLobby(ctx) {
     ctx.coins().lookOf(userId).then((look) => {
       for (const room of rooms.values()) {
         const seat = room.table.seats.find((s) => s && s.accountId === userId);
-        if (seat) { seat.avatar = look.avatar; seat.badge = look.badge; seat.skin = look.skin || null; pushState(room); }
+        if (seat) { seat.avatar = look.avatar; seat.badge = look.badge; seat.tag = look.tag || null; seat.skin = look.skin || null; pushState(room); }
       }
     }).catch(() => {});
   }

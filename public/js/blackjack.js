@@ -38,6 +38,10 @@
   let pending = 0;      // bet being built with chips, before you deal
   let lastBet = 0;
   let betHand = -1;     // hand number the pending bet was prepared for
+  // A move chosen in advance, while the others are still playing (like at Hold'em):
+  // { kind: 'stand' | 'hit' | 'book' | 'bet', hand, cards }. It runs when your turn
+  // comes — but only if your cards are still the same.
+  let pre = null;
 
   function build(ctx) {
     const G = L[ctx.layout];
@@ -75,6 +79,14 @@
           <button class="plaque" id="bClear"><b>Clear</b><em>Remove bet</em></button>
           <button class="plaque gold" id="bDeal"><b>Deal</b><em>Place your bet</em></button>
         </div>
+        <div class="row pre hidden" id="bPre" role="group" aria-label="Choose your move in advance">
+          <button class="pre-btn" data-pre="stand">Stand</button>
+          <button class="pre-btn" data-pre="hit">Hit</button>
+          <button class="pre-btn" data-pre="book">Follow the book</button>
+        </div>
+        <div class="row pre hidden" id="bPreBet" role="group" aria-label="Bet in advance">
+          <button class="pre-btn" data-pre="bet">Bet again automatically</button>
+        </div>
         <div class="row actions hidden" id="bRebuyRow"><button class="plaque gold" id="bRebuy"><b>Rebuy</b><em>A fresh stack</em></button></div>
         <div class="col info right"><small>Your bet</small><strong id="bBet">0</strong><em id="bBalance"></em></div>
       </section>`;
@@ -95,6 +107,15 @@
     $('bDeal').onclick = () => { lastBet = pending; ctx.send({ t: 'action', action: 'bet', amount: pending }); };
     ['Hit', 'Stand', 'Double', 'Split'].forEach((a) => { $('b' + a).onclick = () => ctx.send({ t: 'action', action: a.toLowerCase() }); });
     $('bRebuy').onclick = () => ctx.send({ t: 'rebuy' });
+    ctx.controls.querySelectorAll('#bPre .pre-btn, #bPreBet .pre-btn').forEach((b) => b.addEventListener('click', () => {
+      const st = ctx.st;
+      const me = st && st.mySeat !== -1 ? st.seats[st.mySeat] : null;
+      if (!me) return;
+      const kind = b.dataset.pre;
+      const hand = me.hands && me.hands.length ? me.hands[me.handIdx || 0] : null;
+      pre = pre && pre.kind === kind ? null : { kind, hand: st.handNo, cards: hand ? hand.cards.join() : '', idx: me.handIdx || 0 };
+      redraw();
+    }));
   }
 
   // Phone (portrait): three seats down each side, you large in the middle at the bottom,
@@ -246,6 +267,27 @@
       $('bRepeat').disabled = !lastBet || lastBet > lim.maxBet || lastBet === pending;
       $('bX2').disabled = !pending || pending * 2 > lim.maxBet;
     }
+    // moves chosen in advance
+    const myHand = me && me.hands && me.hands.length ? me.hands[me.handIdx || 0] : null;
+    const othersPlaying = st.stage === 'playing' && !playing && me && me.inHand && myHand && !myHand.done && !myHand.bust && !myHand.blackjack && myHand.total < 21;
+    const othersBetting = st.stage === 'betting' && !betting && me && !(me.bet > 0) && me.chips >= st.minBet && lastBet > 0;
+    if (pre && pre.hand !== st.handNo && pre.kind !== 'bet') pre = null;
+    if (pre && pre.kind !== 'bet' && myHand && (myHand.cards.join() !== pre.cards || (me.handIdx || 0) !== pre.idx)) pre = null;   // your cards changed: ask again
+    $('bPre').classList.toggle('hidden', !othersPlaying);
+    $('bPreBet').classList.toggle('hidden', !othersBetting);
+    $('bPreBet').querySelector('button').textContent = `Bet ${fmt(lastBet)} again automatically`;
+    ctx.controls.querySelectorAll('.pre-btn').forEach((b) => b.classList.toggle('on', !!pre && pre.kind === b.dataset.pre));
+    if (othersPlaying || othersBetting) $('bPlay').classList.add('hidden');
+    // your turn: play the move chosen in advance
+    if (pre && playing && myHand && pre.kind !== 'bet') {
+      const p = pre; pre = null;
+      let move = p.kind;
+      if (move === 'book') move = advise(myHand.cards, st.dealer.cards[0], lim).move.toLowerCase();
+      setTimeout(() => ctx.send({ t: 'action', action: move }), 250);
+    } else if (pre && betting && pre.kind === 'bet') {
+      pre = null;
+      if (lastBet >= lim.minBet && lastBet <= lim.maxBet) setTimeout(() => ctx.send({ t: 'action', action: 'bet', amount: lastBet }), 250);
+    }
     $('bHit').disabled = !playing;
     $('bStand').disabled = !playing;
     $('bDouble').disabled = !(playing && lim.canDouble);
@@ -253,5 +295,5 @@
     $('bBar').classList.toggle('my-turn', !!lim);
   }
 
-  window.TableUI.blackjack = { size: { land: [1440, 780], port: [440, 760] }, build, render, advise };
+  window.TableUI.blackjack = { size: { land: [1440, 780], port: [440, 760] }, build, render, advise, dealer: { land: { x: 470, y: 0, size: 112 }, port: { x: 52, y: 6, size: 62 } } };
 })();

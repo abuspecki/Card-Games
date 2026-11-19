@@ -238,5 +238,5 @@
     else b2.textContent = 'Pass';
   }
 
-  window.TableUI.durak = { size: { land: [1440, 780], port: [440, 800] }, build, render };
+  window.TableUI.durak = { size: { land: [1440, 780], port: [440, 800] }, build, render, dealer: { land: { x: 112, y: 4, size: 100 }, port: { x: 46, y: 0, size: 56 } } };
 })();

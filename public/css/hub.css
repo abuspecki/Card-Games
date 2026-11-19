@@ -231,3 +231,7 @@ body.hub { background: var(--ivory); color: var(--ink); }
   .wordmark { font-size: 24px; }
   .trio { transform: scale(.7); transform-origin: top center; height: 190px; }
 }
+/* Five Card Draw: a burgundy card room */
+.room-draw { background: radial-gradient(circle at 50% 40%, #6A2232, #4A1422 60%, #2A0A12); border: 10px solid #5C4416; }
+.room-draw h3 { font-family: 'Cormorant Garamond', serif; }
+.room-draw .room-btn { background: linear-gradient(90deg, #DCC07A, #A07C45); color: #1A1208; }

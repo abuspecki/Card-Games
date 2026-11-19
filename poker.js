@@ -368,7 +368,7 @@ class Table {
       this.results = { winners: [{ seat: this.seats.indexOf(w), amount: total, hand: null }], shown: false };
       // Everyone folded before the river: still show what the board would have been.
       // Display only — it changes nothing about the result. Dealt as usual (burn card before each street).
-      if (this.board.length < 5 && this.deck.length) {
+      if (this.usesBoard !== false && this.board.length < 5 && this.deck.length) {
         const d = this.deck.slice();
         const run = [];
         let n = this.board.length;
@@ -416,11 +416,11 @@ class Table {
   }
 
   showdown() {
-    while (this.board.length < 5) this.board.push(this.deck.pop());
+    if (this.usesBoard !== false) while (this.board.length < 5) this.board.push(this.deck.pop());
     const live = [];
     this.seats.forEach((s, i) => {
       if (s && s.inHand && !s.folded) {
-        s.best = bestHand(s.hole, this.board, this.variant);
+        s.best = this.handOf(s);
         live.push(i);
       }
     });
@@ -467,6 +467,9 @@ class Table {
     this.endHand();
   }
 
+  // A player's best five cards (Five Card Draw overrides this: no board).
+  handOf(s) { return bestHand(s.hole, this.board, this.variant); }
+
   endHand() {
     this.stage = 'showdown';
     this.toAct = -1;
@@ -498,7 +501,7 @@ class Table {
       chat: (this.chat || []).slice(-50),
       seats: this.seats.map((s, i) => s && {
         name: s.name, chips: s.chips, bet: s.bet, folded: s.folded, allIn: s.allIn,
-        inHand: s.inHand, sitOut: !!s.sitOut, connected: s.connected, lastAction: s.lastAction, isBot: s.isBot, hasAccount: !!s.accountId, badge: s.badge || null, avatar: s.avatar || null, skin: s.skin || null,
+        inHand: s.inHand, sitOut: !!s.sitOut, connected: s.connected, lastAction: s.lastAction, isBot: s.isBot, hasAccount: !!s.accountId, badge: s.badge || null, tag: s.tag || null, avatar: s.avatar || null, skin: s.skin || null,
         cardCount: s.hole.length,
         hole: i === me || (showAll && s.inHand && !s.folded) ? s.hole : null,
         handName: (i === me || showAll) && s.inHand && !s.folded && this.board.length >= 3

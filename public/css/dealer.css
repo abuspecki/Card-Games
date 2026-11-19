@@ -1,0 +1,95 @@
+/* The dealer at every table (public/js/dealer.js) */
+/* ---------- the dealer ---------- */
+.dealer-figure { position: absolute; z-index: 4; pointer-events: none; filter: drop-shadow(0 6px 10px rgba(0,0,0,.45)); }
+.dealer-figure svg { width: 100%; height: 100%; overflow: visible; }
+.dealer-figure .d-body { transform-origin: 60px 120px; animation: d-breathe 4s ease-in-out infinite; }
+.dealer-figure .d-head { transform-origin: 60px 80px; animation: d-sway 7s ease-in-out infinite; }
+.dealer-figure .d-eyes { transform-origin: 60px 45px; animation: d-blink 4.6s infinite; }
+.dealer-figure .d-arm { transform-box: fill-box; }
+.dealer-figure .d-arm-r { transform-origin: 20% 0%; }
+.dealer-figure .d-arm-l { transform-origin: 80% 0%; }
+.dealer-figure.dealing .d-arm-r { animation: d-deal .32s ease-in-out 5; }
+.dealer-figure.dealing .d-arm-l { animation: d-deal-l .32s ease-in-out 5; }
+.dealer-figure.bow .d-body { animation: d-bow 1.2s ease-in-out; }
+.dealer-figure.bow .d-mouth, .dealer-figure.talking .d-mouth { d: path("M55.5 59 Q60 64 64.5 59"); }
+.dealer-figure .d-bubble { position: absolute; left: 100%; top: 6%; margin-left: 4px; padding: 6px 12px; border-radius: 14px 14px 14px 4px; white-space: nowrap;
+  background: #FFFDF5; color: #2A2350; font: 700 13px 'Montserrat', system-ui, sans-serif; box-shadow: 0 6px 16px rgba(0,0,0,.35); opacity: 0; transform: translateY(6px) scale(.9); transition: opacity .25s, transform .25s; }
+.dealer-figure.talking .d-bubble { opacity: 1; transform: none; }
+body.portrait .dealer-figure .d-bubble { font-size: 9px; padding: 4px 8px; top: 0; }
+@keyframes d-breathe { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.015); } }
+@keyframes d-sway { 0%, 100% { transform: rotate(0deg); } 30% { transform: rotate(-2.5deg); } 70% { transform: rotate(2deg); } }
+@keyframes d-blink { 0%, 93%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+@keyframes d-deal { 0%, 100% { transform: rotate(0deg) translateY(0); } 50% { transform: rotate(-24deg) translateY(-4px); } }
+@keyframes d-deal-l { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(10deg); } }
+@keyframes d-bow { 0%, 100% { transform: rotate(0) translateY(0); } 35%, 60% { transform: translateY(5px) scaleY(.94); } }
+/* tip button and menu */
+.tip-btn { position: absolute; z-index: 6; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 20px; cursor: pointer;
+  background: radial-gradient(circle at 35% 30%, #FFE9A8, #F2C14E 60%, #B8862A); border: 2px solid #FFF3CC; box-shadow: 0 4px 12px rgba(0,0,0,.45); animation: tip-pulse 3s ease-in-out infinite; }
+.tip-btn[hidden] { display: none; }
+body.portrait .tip-btn { width: 30px; height: 30px; font-size: 15px; }
+@keyframes tip-pulse { 0%, 100% { box-shadow: 0 4px 12px rgba(0,0,0,.45); } 50% { box-shadow: 0 0 0 6px rgba(242,193,78,.25), 0 4px 12px rgba(0,0,0,.45); } }
+.tip-menu { position: fixed; z-index: 300; display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 14px; background: #13201A; border: 1px solid rgba(242,193,78,.5);
+  box-shadow: 0 12px 30px rgba(0,0,0,.5); color: #F1F4F0; font: 700 13px 'Montserrat', system-ui, sans-serif; }
+.tip-menu b { margin-right: 4px; }
+.tip-menu button { padding: 7px 12px; border-radius: 10px; background: #F2C14E; color: #231A02; font: 800 13px 'Montserrat', system-ui, sans-serif; border: 0; cursor: pointer; }
+@media (prefers-reduced-motion: reduce) {
+  .dealer-figure :is(.d-body, .d-head, .d-eyes, .d-arm), .tip-btn { animation: none !important; }
+}
+.tip-menu small { font-weight: 600; font-size: 11px; color: #F7B6C9; margin-right: 4px; }
+
+.dealer-figure .d-head { transform-origin: 60px 78px; }
+.tip-fly { position: absolute; z-index: 8; pointer-events: none; }
+.tip-menu { flex-direction: column; align-items: stretch; gap: 8px; width: 256px; padding: 12px; }
+.tip-menu .tm-head { display: flex; flex-direction: column; gap: 2px; }
+.tip-menu .tm-quick { display: flex; gap: 6px; }
+.tip-menu .tm-quick button { flex: 1; }
+.tip-menu .tm-own { display: flex; gap: 6px; }
+.tip-menu .tm-own input { flex: 1; min-width: 0; padding: 7px 10px; border-radius: 10px; border: 1px solid rgba(242,193,78,.45); background: #0B1410; color: #F1F4F0; font: 700 14px 'Montserrat', system-ui, sans-serif; }
+.tip-menu .tm-src { color: rgba(241,244,240,.6) !important; margin: 0; }
+
+/* =========================================================
+   A real casino table: padded leather rail on a wooden frame,
+   brushed felt with a lamp above it, and soft shadows.
+   The felt colours (and felt skins) stay as they are — only light
+   and texture are laid over them.
+   ========================================================= */
+/* leather rail (Hold'em, Durak, Blackjack; the Flamingo rail stays gold) */
+body.game:is(.holdem, .durak, .blackjack) .stage .table .rail {
+  background:
+    radial-gradient(ellipse 70% 30% at 50% 4%, rgba(255, 236, 210, .22), transparent 70%),
+    radial-gradient(ellipse at 50% 50%, transparent 60%, rgba(0, 0, 0, .35) 100%),
+    linear-gradient(180deg, #4A2E1E 0%, #2A170E 45%, #1A0E08 100%) !important;
+  box-shadow:
+    0 34px 70px rgba(0, 0, 0, .7),
+    0 0 0 3px #120A05,
+    0 0 0 6px #6B4426, 0 0 0 7px rgba(255, 215, 160, .25),
+    inset 0 3px 3px rgba(255, 230, 200, .25),
+    inset 0 -10px 18px rgba(0, 0, 0, .55) !important;
+}
+/* the stitched seam on the leather */
+body.game:is(.holdem, .durak) .stage .table .rail::after {
+  content: ''; position: absolute; inset: 12px; border-radius: inherit;
+  border: 1px dashed rgba(255, 222, 180, .22); pointer-events: none;
+}
+body.game.blackjack .stage .table .rail::after {
+  content: ''; position: absolute; inset: 11px; border-radius: 50%; border: 1px dashed rgba(255, 222, 180, .22); pointer-events: none;
+}
+/* brass inlay between rail and felt */
+body.game.holdem .stage .table .trim { border: 2px solid #C9A45C !important; box-shadow: 0 0 0 1px rgba(0, 0, 0, .45), inset 0 0 0 1px rgba(255, 240, 190, .35), 0 0 10px rgba(242, 193, 78, .15); }
+/* felt: brushed texture and the lamp light from above */
+body.game .stage .table .felt { overflow: hidden; }
+body.game .stage .table .felt::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: radial-gradient(ellipse 55% 60% at 50% 38%, rgba(255, 250, 225, .16), rgba(255, 250, 225, .05) 45%, transparent 70%),
+              radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0, 0, 0, .38) 100%);
+}
+body.game .stage .table .felt::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: .32; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+/* the room around the table: a pool of light, the rest in shadow */
+body.game .stage-wrap { background-image: radial-gradient(ellipse 70% 60% at 50% 42%, rgba(255, 240, 200, .07), transparent 70%); }
+/* cards and chips cast soft shadows on the felt */
+body.game .stage .card, body.game .stage .card-back { box-shadow: 0 2px 2px rgba(0, 0, 0, .25), 0 6px 14px rgba(0, 0, 0, .3); }
+body.game .stage .chip { filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .35)); }
+@media (prefers-reduced-transparency: reduce) { body.game .stage .table .felt::after { display: none; } }

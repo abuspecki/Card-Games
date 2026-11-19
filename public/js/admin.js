@@ -8,7 +8,7 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = (n) => Number(n || 0).toLocaleString('en-US');
   const session = localStorage.getItem('cg.session') || localStorage.getItem('poker.session');
-  const GAME = { holdem: "Hold'em", blackjack: 'Blackjack', durak: 'Durak' };
+  const GAME = { holdem: "Hold'em", draw: 'Five Card Draw', blackjack: 'Blackjack', durak: 'Durak' };
   const MODE = { friends: "Hold'em (friends)", bots: "Hold'em (bots)", blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette', flamingo: 'Flamingo', goldrush: 'Gold Rush', tourney: 'Sit & Go' };
   const CAT = { bug: 'Bug report', suggestion: 'Suggestion', feature: 'Feature request', general: 'General' };
 

@@ -21,9 +21,13 @@ const C = require('../coins');
   let st = await coins.getStatus(id);
   assert.strictEqual(st.coins, C.WELCOME_COINS);
   assert.strictEqual(st.chips, C.WELCOME_CHIPS);
-  const amounts = [];
-  for (let d = 0; d < 9; d++) amounts.push((await coins.claimDaily(id, t0 + d * DAY)).amount);
-  assert.deepStrictEqual(amounts, [100, 125, 150, 175, 200, 225, 250, 250, 250]);
+  const amounts = [], gifts = [];
+  for (let d = 0; d < 9; d++) { const x = await coins.claimDaily(id, t0 + d * DAY); amounts.push(x.amount); gifts.push(x.item); }
+  // weeks of 7 days: 100 → 250, then day 1 again; day 7 also gives a Mystery Box skin
+  assert.deepStrictEqual(amounts, [100, 125, 150, 175, 200, 225, 250, 100, 125]);
+  assert(gifts[6] && gifts.filter(Boolean).length === 1, 'a skin on day 7 only');
+  assert((await coins.getStatus(id)).owned.includes(gifts[6]));
+  assert(!C.ITEMS[gifts[6]].earned, 'never an earned tag');
   assert((await coins.claimDaily(id, t0 + 8 * DAY + 3600000)).error, 'second claim same day refused');
   assert.strictEqual((await coins.claimDaily(id, t0 + 10 * DAY)).amount, 100, 'missed day resets streak');
   const both = await Promise.all([coins.claimDaily(id, t0 + 11 * DAY), coins.claimDaily(id, t0 + 11 * DAY)]);
@@ -119,7 +123,7 @@ const C = require('../coins');
   assert.ok((await coins.equip(s, 'avatar', 'pf-crest')).ok);
   assert.ok((await coins.buy(s, 'title-baron')).item);
   assert.ok((await coins.equip(s, 'badge', 'title-baron')).ok);
-  assert.deepStrictEqual(await coins.lookOf(s), { avatar: 'pf:crest', badge: 't:Baron', skin: { back: null, chips: null, turn: null, victory: null } });
+  assert.deepStrictEqual(await coins.lookOf(s), { avatar: 'pf:crest', badge: 't:Baron', tag: null, skin: { back: null, chips: null, turn: null, victory: null } });
   // what others see also includes the card back, chip set and turn marker
   await coins.adjust(s, 5000, 0, 'owner');
   for (const id of ['back-aurora', 'chips-holo', 'turn-lightning']) assert.ok((await coins.buy(s, id)).item, id);
@@ -134,6 +138,17 @@ const C = require('../coins');
   await store.updateWallet(s, { coins: 0, chips: 0 }, () => ({ addItem: 'avatar-lion', result: true }));
   assert.ok((await coins.equip(s, 'avatar', 'avatar-lion')).ok, 'owned retired item still usable');
   assert.strictEqual((await coins.lookOf(s)).avatar, '🦁');
+  // player tags: box tags can be drawn, earned tags never; earned tags are given once
+  assert(C.boxItems('tag').length >= 5 && C.boxItems('tag').every((i) => !i.earned));
+  assert(C.boxItems('mystery').every((i) => !i.earned));
+  assert.strictEqual(await coins.grantItem(s, 'tag-shark'), true);
+  assert.strictEqual(await coins.grantItem(s, 'tag-shark'), false);
+  assert.ok((await coins.equip(s, 'tag', 'tag-shark')).ok);
+  assert.strictEqual((await coins.lookOf(s)).tag, '🦈 Shark');
+  // a tip from the bankroll
+  const before = (await coins.balances(s)).chips;
+  assert((await coins.spendChips(s, before + 1, 'tip')).error);
+  assert.strictEqual((await coins.spendChips(s, 7, 'tip')).chips, before - 7);
   // gestures: only owned ones can be used, and they can't be equipped
   assert.strictEqual(await coins.gestureOf(s, 'gesture-hat'), null);
   assert.ok((await coins.buy(s, 'gesture-hat')).item);

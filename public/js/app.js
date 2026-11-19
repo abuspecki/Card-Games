@@ -12,9 +12,10 @@
   const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
   window.TableUI = window.TableUI || {};
 
-  const GAME_NAMES = { holdem: "Texas Hold'em", blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette', flamingo: 'Flamingo' };
+  const GAME_NAMES = { holdem: "Texas Hold'em", draw: 'Five Card Draw', blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette', flamingo: 'Flamingo' };
   const ROOM_INFO = {
     holdem: { tag: 'The Club Room', desc: 'No-Limit poker · up to 8 players', cards: [['A', 'spade'], ['K', 'spade']] },
+    draw: { tag: 'The Card Room', desc: 'Five cards, one draw · up to 6 players', cards: [['Q', 'heart'], ['Q', 'diamond']] },
     blackjack: { tag: 'Salon Privé', desc: 'Beat the dealer to 21', cards: [['A', 'heart'], ['K', 'club']] },
     durak: { tag: 'The Winter Palace', desc: 'Attack, defend — don\'t be the fool', cards: [['6', 'heart'], ['Q', 'spade']] },
     roulette: { tag: 'The Wheel Room', desc: 'Red, black or your lucky number' },
@@ -270,7 +271,7 @@
     }
     else if (r.status === 401) { App.session = null; localStorage.removeItem('cg.session'); App.account = null; }
     renderAccount();
-    if (App.account) { await loadWallet(); pollPresence(); loadQuestSummary(); }
+    if (App.account) { await loadWallet(); pollPresence(); loadQuestSummary(); setTimeout(maybeDailyPopup, 900); }
     if (App.account && App.account.mustChange) passwordModal(true);
   }
 
@@ -328,8 +329,16 @@
     if (b.startsWith('ta:')) return `<span class="title anim">${esc(b.slice(3))}</span> `;   // animated title
     return b.startsWith('t:') ? `<span class="title">${esc(b.slice(2))}</span> ` : `<span class="badge">${esc(b)}</span>`;
   }
+  // Player tags: a small label next to the name ('🦈 Shark').
+  function tagMarkup(t) {
+    if (!t) return '';
+    const item = App.shop && App.shop.items.find((i) => i.slot === 'tag' && i.preview === t);
+    const text = window.I18n ? I18n.t(t) : t;   // inside player names, so translated here
+    return ` <span class="ptag${item && item.animated ? ' anim' : ''}" data-no-i18n>${esc(text)}</span>`;
+  }
   App.avatarMarkup = avatarMarkup;
   App.titleMarkup = titleMarkup;
+  App.tagMarkup = tagMarkup;
   function equippedPreview(slot) {
     const id = App.wallet && App.wallet.equipped && App.wallet.equipped[slot];
     const item = id && App.shop && App.shop.items.find((i) => i.id === id);
@@ -389,7 +398,7 @@
   function buildRooms() {
     const grid = $('roomGrid');
     grid.replaceChildren();
-    for (const game of ['holdem', 'blackjack', 'durak', 'roulette', 'flamingo']) {
+    for (const game of ['holdem', 'draw', 'blackjack', 'durak', 'roulette', 'flamingo']) {
       const info = ROOM_INFO[game];
       const art = h('article', `room room-${game}`);
       const vis = h('div', 'visual');
@@ -401,7 +410,7 @@
         vis.appendChild(fan);
       } else {
         const fan = h('div', 'fan');
-        const b = CardUI.back(game, { size: 104, noOverride: true });
+        const b = CardUI.back(game === 'draw' ? 'holdem' : game, { size: 104, noOverride: true });
         const r = CardUI.card(info.cards[1][0], info.cards[1][1], { size: 104 });
         const m = CardUI.card(info.cards[0][0], info.cards[0][1], { size: 104 });
         b.classList.add('f-left'); r.classList.add('f-right'); m.classList.add('f-mid');
@@ -459,7 +468,7 @@
       box.innerHTML = `<div class="pig-art">${PIGGY_SVG}</div>
         <div class="pig-text"><b>🐷 The piggy bank</b><span class="pig-line"></span>
           <div class="pig-bar"><i></i></div>
-          <small>Every tip for a poker dealer goes in. When it holds ${fmt(p.goal)} chips, every member gets ${p.reward} coins.</small></div>`;
+          <small>Every tip for a dealer goes in. When it holds ${fmt(p.goal)} chips, every member gets ${p.reward} coins.</small></div>`;
     }
     box.querySelector('.pig-line').innerHTML = `<b>${fmt(p.total)}</b> / ${fmt(p.goal)} chips`;
     box.querySelector('.pig-bar i').style.width = (pct * 100).toFixed(1) + '%';
@@ -518,6 +527,9 @@
     if (!r.ok) { body.textContent = r.data.error || 'Could not load'; return; }
     App.questSummary = r.data;
     const { daily, achievements, resetsIn } = r.data;
+    collSets = r.data.sets || [];
+    const TIER = { bronze: '🥉', silver: '🥈', gold: '🥇' };
+    const tagName = (id) => { const it = id && App.shop && App.shop.items.find((i) => i.id === id); return it ? it.preview : ''; };
     const hrs = Math.floor(resetsIn / 3600000), mins = Math.floor((resetsIn % 3600000) / 60000);
     const done = achievements.filter((a) => a.done).length;
     body.innerHTML = `
@@ -527,14 +539,14 @@
           <div class="q-main"><b></b><div class="q-bar"><i style="width:${Math.round((q.progress / q.goal) * 100)}%"></i></div></div>
           <span class="q-val">${fmt(q.progress)} / ${fmt(q.goal)}<em><i class="ico-coin"></i>${q.reward}</em></span></li>`).join('')}</ul></section>
       <section class="q-sec"><header><h4>Achievements</h4><small>${done} of ${achievements.length} unlocked</small></header>
-        <div class="a-grid">${achievements.map((a) => `<div class="ach ${a.done ? 'done' : ''}"><span class="a-ico">${a.done ? '🏆' : '🔒'}</span><b></b><small></small><em><i class="ico-coin"></i>${a.reward}</em></div>`).join('')}</div></section>`;
+        <div class="a-grid">${achievements.map((a) => `<div class="ach tier-${a.tier || 'bronze'} ${a.done ? 'done' : ''}"><span class="a-ico">${a.done ? TIER[a.tier] || '🏆' : '🔒'}</span><b></b><small></small><em><i class="ico-coin"></i>${a.reward}${a.tag ? `<span class="a-tag">+ Tag ${tagMarkup(tagName(a.tag))}</span>` : ''}</em></div>`).join('')}</div></section>`;
     body.querySelectorAll('.q-list li').forEach((li, i) => { li.querySelector('b').textContent = daily[i].text; });
     body.querySelectorAll('.ach').forEach((el, i) => { el.querySelector('b').textContent = achievements[i].text; el.querySelector('small').textContent = achievements[i].desc; });
   }
   App.openQuests = () => { loungeTab = 'quests'; openLounge('quests'); };
 
   // ================= PRIVATE TABLES =================
-  const PRIV_GAMES = [['holdem', "Hold'em", '♠'], ['blackjack', 'Blackjack', '🂡'], ['roulette', 'Roulette', '◉'], ['durak', 'Durak', '♦'], ['flamingo', 'Flamingo', '🦩']];
+  const PRIV_GAMES = [['holdem', "Hold'em", '♠'], ['draw', 'Five Card Draw', '🃏'], ['blackjack', 'Blackjack', '🂡'], ['roulette', 'Roulette', '◉'], ['durak', 'Durak', '♦'], ['flamingo', 'Flamingo', '🦩']];
   function openPrivate() {
     openModal((card) => {
       modalHead(card, 'Friends only', 'Private table');
@@ -577,12 +589,13 @@
   // Chip games: the owner picks the blinds (or minimum bet) and the buy-in.
   const PRIV_STAKES = {
     holdem: { stakes: [10, 20, 50, 100, 200, 500, 1000, 2000, 5000], buyIns: [20, 50, 100, 200], def: [10, 100], minBuyIn: 10, label: "Hold'em" },
+    draw: { stakes: [10, 20, 50, 100, 200, 500, 1000, 2000, 5000], buyIns: [20, 50, 100, 200], def: [10, 100], minBuyIn: 10, label: 'Five Card Draw' },
     blackjack: { stakes: [5, 10, 25, 50, 100, 250, 500, 1000], buyIns: [20, 50, 100, 200], def: [10, 100], minBuyIn: 5, label: 'Blackjack' },
     roulette: { stakes: [5, 10, 25, 50, 100, 250, 500], buyIns: [20, 50, 100, 200], def: [5, 200], minBuyIn: 5, label: 'Roulette' },
   };
   function privateSettings(card, game, create) {
     const P = PRIV_STAKES[game];
-    const holdem = game === 'holdem';
+    const holdem = game === 'holdem' || game === 'draw';
     const body = card.querySelector('.priv');
     body.innerHTML = `
       <section class="priv-set"><h4>${P.label} · your table</h4>
@@ -791,10 +804,9 @@
       renderTable();
       return;
     }
-    if (m.t === 'sfx') { Sound.play(m.name); return; }
+    if (m.t === 'sfx') { Sound.play(m.name); if (window.Dealer) Dealer.onSfx(m.name); return; }
     if (m.t === 'tip') {
-      const ui = window.TableUI[App.game];
-      if (ui && ui.onTip) ui.onTip(m, ctx);
+      if (window.Dealer) Dealer.onTip(m, ctx);
       Sound.play('chips');
       return;
     }
@@ -910,7 +922,7 @@
     openRules: () => openHowTo(App.game),
     plates: {},   // seat index -> [x, y] on the stage (for chat bubbles)
     avatarHtml: (s) => avatarMarkup(s.avatar, s.name),
-    nameHtml: (s) => `${titleMarkup(s.badge)}${s.isBot ? '<span class="botmark" title="Computer player">🤖</span>' : ''}${esc(s.name)}`,
+    nameHtml: (s) => `${titleMarkup(s.badge)}${s.isBot ? '<span class="botmark" title="Computer player">🤖</span>' : ''}${esc(s.name)}${tagMarkup(s.tag)}`,
   };
   App.ctx = ctx;
 
@@ -922,7 +934,7 @@
     const layout = computeLayout();
     const ui = window.TableUI[game];
     if (!ui) return;
-    document.body.className = `game ${game} ${layout === 'port' ? 'portrait' : 'landscape'}${$('drawer').classList.contains('open') ? ' drawer-open' : ''}${S.watching ? ' spectating' : ''}`;
+    document.body.className = `game ${game}${game === 'draw' ? ' holdem' : ''} ${layout === 'port' ? 'portrait' : 'landscape'}${$('drawer').classList.contains('open') ? ' drawer-open' : ''}${S.watching ? ' spectating' : ''}`;
     if (App.game !== game || App.layout !== layout) {
       App.game = game;
       App.layout = layout;
@@ -931,14 +943,16 @@
       ctx.controls.replaceChildren();
       ctx.topbar.replaceChildren();
       ui.build(ctx);
+      if (window.Dealer) Dealer.build(ctx, ui.dealer && ui.dealer[layout]);
       buildTopbar(game);
-      $('oddsTab').classList.toggle('hidden', game === 'durak' || game === 'roulette' || game === 'flamingo');
+      $('oddsTab').classList.toggle('hidden', game !== 'holdem' && game !== 'blackjack');
     }
     ctx.S = S;
     ctx.st = st;
     ctx.plates = {};
     fit();
     ui.render(st, S, ctx);
+    if (window.Dealer) Dealer.update(ctx, st, S);
     markTurn(st);
     playVictory(st);
     renderChat(st);
@@ -957,12 +971,12 @@
       const name = S.tableName.replace(/^[^·]*·\s*/, '');
       const game = st.game;
       if (layout === 'port') {
-        const SHORT = { holdem: "Hold'em", blackjack: 'Blackjack', roulette: 'Roulette', durak: 'Durak', flamingo: 'Flamingo' };
-        const stake = game === 'holdem' ? `${st.settings.smallBlind}/${st.settings.bigBlind}` : game === 'blackjack' || game === 'roulette' ? `from ${st.minBet}` : st.stage !== 'waiting' ? `Game ${st.handNo}` : '';
+        const SHORT = { holdem: "Hold'em", draw: 'Draw', blackjack: 'Blackjack', roulette: 'Roulette', durak: 'Durak', flamingo: 'Flamingo' };
+        const stake = game === 'holdem' || game === 'draw' ? `${st.settings.smallBlind}/${st.settings.bigBlind}` : game === 'blackjack' || game === 'roulette' ? `from ${st.minBet}` : st.stage !== 'waiting' ? `Game ${st.handNo}` : '';
         title.textContent = name;
         if (sub) sub.textContent = SHORT[game] + (stake ? ` · ${stake}` : '');
       } else {
-        title.textContent = name + (game === 'holdem' ? ` · Blinds ${st.settings.smallBlind} / ${st.settings.bigBlind}` : game === 'blackjack' || game === 'roulette' ? ` · Bets from ${st.minBet}` : st.stage !== 'waiting' ? ` · Game ${st.handNo}` : '');
+        title.textContent = name + (game === 'holdem' || game === 'draw' ? ` · Blinds ${st.settings.smallBlind} / ${st.settings.bigBlind}` : game === 'blackjack' || game === 'roulette' ? ` · Bets from ${st.minBet}` : st.stage !== 'waiting' ? ` · Game ${st.handNo}` : '');
         if (sub) sub.textContent = sub.dataset.full;
       }
     }
@@ -1008,7 +1022,7 @@
   }
 
   // Top bar shared by every room (styled per room by its CSS).
-  const ROOM_TITLES = { holdem: ["Texas Hold'em", 'The Club Room'], blackjack: ['Blackjack', 'Salon Privé'], durak: ['Дурак', 'The Winter Palace'], roulette: ['Roulette', 'The Wheel Room'], flamingo: ['Flamingo', 'The Flamingo Lounge'] };
+  const ROOM_TITLES = { holdem: ["Texas Hold'em", 'The Club Room'], draw: ['Five Card Draw', 'The Card Room'], blackjack: ['Blackjack', 'Salon Privé'], durak: ['Дурак', 'The Winter Palace'], roulette: ['Roulette', 'The Wheel Room'], flamingo: ['Flamingo', 'The Flamingo Lounge'] };
   function buildTopbar(game) {
     const tb = ctx.topbar;
     const [title, room] = ROOM_TITLES[game];
@@ -1049,7 +1063,7 @@
     if (!App.account) menu.appendChild(h('p', '', 'Gestures are for members.'));
     else if (!owned.length) {
       const b = h('button', 'pill gold', 'Get gestures in the Shop');
-      b.onclick = () => { menu.remove(); shopSlot = 'gesture'; openLounge('shop'); };
+      b.onclick = () => { menu.remove(); boxFocus = 'gesture'; openLounge('shop'); };
       menu.appendChild(b);
     } else {
       for (const g of owned) {
@@ -1261,7 +1275,7 @@
   function renderTableInfo(S, st) {
     const g = st.game;
     const s = st.settings || {};
-    const info = g === 'holdem' ? `Blinds ${s.smallBlind} / ${s.bigBlind}` : g === 'blackjack' || g === 'roulette' ? `Bets from ${st.minBet}` : g === 'flamingo' ? 'Two to six players · 108 pink cards' : 'Two to six players · 36 cards';
+    const info = g === 'holdem' || g === 'draw' ? `Blinds ${s.smallBlind} / ${s.bigBlind}` : g === 'blackjack' || g === 'roulette' ? `Bets from ${st.minBet}` : g === 'flamingo' ? 'Two to six players · 108 pink cards' : 'Two to six players · 36 cards';
     $('tableInfo').innerHTML = `<b>${esc(S.tableName)}</b><span>${esc(info)} · cards are dealt automatically once enough players are seated.</span>
       ${S.usesChips && App.account ? '<span>Your chips come from your bankroll and return to it when you leave.</span>' : S.usesChips ? '<span>As a guest you play with free table chips.</span>' : ''}`;
     const seated = st.seats.filter(Boolean).length;
@@ -1345,7 +1359,7 @@
     openModal((card) => {
       modalHead(card, `The Members' Lounge`, `Good evening, <em>${esc(App.account.username)}</em>`);
       const body = h('div', 'lounge-body');
-      tabs(card, [['wallet', 'Wallet'], ['quests', 'Quests'], ['shop', 'The Shop'], ['friends', 'Friends'], ['profile', 'Profile']], (k) => { loungeTab = k; paintLounge(body); }, loungeTab);
+      tabs(card, [['wallet', 'Wallet'], ['quests', 'Quests'], ['shop', 'The Shop'], ['collection', 'Collection'], ['friends', 'Friends'], ['profile', 'Profile']], (k) => { loungeTab = k; paintLounge(body); }, loungeTab);
       card.appendChild(body);
       const foot = h('div', 'lounge-foot');
       if (App.account.isOwner) foot.appendChild(h('a', 'btn btn-outline', 'Owner dashboard')).setAttribute('href', '/admin');
@@ -1366,6 +1380,7 @@
     if (loungeTab === 'wallet') paintWallet(body);
     else if (loungeTab === 'quests') paintQuests(body);
     else if (loungeTab === 'shop') paintShop(body);
+    else if (loungeTab === 'collection') paintCollection(body);
     else if (loungeTab === 'friends') paintFriends(body);
     else paintMyProfile(body);
   }
@@ -1385,6 +1400,53 @@
       <li><b>The Bank trades both ways</b> at ${fmt(r.chipsPerCoin)} chips = 1 coin and keeps ${Math.round(r.fee * 100)} % of each exchange.</li></ol>`;
   }
 
+  // ----- the daily bonus: a week of 7 days, a skin on day 7 -----
+  const DAILY_COINS = [100, 125, 150, 175, 200, 225, 250];
+  function streakDays(d) {
+    return `<div class="streak week">${DAILY_COINS.map((c, i) => {
+      const k = i + 1;
+      const cls = (k <= d.week ? 'done' : '') + (d.ready && k === d.nextDay ? ' next' : '') + (k === 7 ? ' box' : '');
+      return `<span class="${cls}"><small>Day ${k}</small>${k === 7 ? '🎁' : '<i class="ico-coin"></i>'}<b>${c}</b>${k === 7 ? '<em>+ skin</em>' : ''}</span>`;
+    }).join('')}</div>`;
+  }
+  async function claimDaily() {
+    const r = await walletAction('/api/wallet/daily');
+    if (!r) return null;
+    coinPop(r.amount, r.streak > 1 ? `Day ${r.streak} in a row` : 'Daily bonus');
+    Sound.play('win');
+    if (r.item) {
+      const it = App.shop && App.shop.items.find((i) => i.id === r.item);
+      if (it) toast(`🎁 Day 7: ${it.name} from the Mystery Box is yours — find it in your collection.`, { kind: 'good', timeout: 9000 });
+    }
+    renderMemberBar();
+    return r;
+  }
+  // Shown once a day after signing in, while the bonus is waiting.
+  function dailyModal() {
+    const d = App.wallet && App.wallet.daily;
+    if (!d) return;
+    openModal((card) => {
+      modalHead(card, 'Welcome back', 'Your daily bonus');
+      const body = h('div', 'daily-pop');
+      body.innerHTML = `${streakDays(d)}
+        <p class="fine center"><b>${d.ready ? `Day ${d.nextDay} of 7` : `Come back in ${untilText(d.nextAt)} for day ${d.nextDay}.`}</b><br><span>Collect every day — a missed day starts the week again.</span><br><span>Milestones: 30 days in a row → 1,000 coins + tag, 100 days → 5,000 coins + tag.</span></p>
+        <button class="btn btn-gold wide" data-claim ${d.ready ? '' : 'disabled'}>${d.ready ? `Collect day ${d.nextDay}` : 'Collected today'}</button>`;
+      card.appendChild(body);
+      const b = body.querySelector('[data-claim]');
+      b.onclick = async () => { b.disabled = true; const r = await claimDaily(); if (r) { body.querySelector('.streak').outerHTML = streakDays(App.wallet.daily); b.textContent = r.item ? '🎁 A skin is waiting in your collection' : 'See you tomorrow!'; } else b.disabled = false; };
+    });
+  }
+  App.dailyModal = dailyModal;
+  function maybeDailyPopup() {
+    const d = App.wallet && App.wallet.daily;
+    const key = 'cg.dailyPop';
+    const today = new Date().toISOString().slice(0, 10);
+    if (!d || !d.ready || App.tableId || localStorage.getItem(key) === today || App.account.mustChange) return;
+    if (!$('modal').classList.contains('hidden')) return;
+    localStorage.setItem(key, today);
+    dailyModal();
+  }
+
   function paintWallet(body) {
     const w = App.wallet;
     if (!w) { body.textContent = 'Loading…'; return; }
@@ -1400,9 +1462,9 @@
       <div class="wcards">
         <section class="wcard">
           <h4>The Daily Bonus</h4>
-          <p>Visit every day for a growing gift of coins — up to 250 on the seventh day in a row.</p>
-          <div class="streak">${[1, 2, 3, 4, 5, 6, 7].map((k) => `<span class="${k <= d.streak ? 'done' : ''}${d.ready && k === Math.min(d.streak + 1, 7) ? ' next' : ''}">${k}</span>`).join('')}</div>
-          <button class="btn btn-navy wide" data-daily ${d.ready ? '' : 'disabled'}>${d.ready ? `Collect ${d.amount} coins` : `Next gift in ${untilText(d.nextAt)} · ${d.amount} coins`}</button>
+          <p>Visit every day for a growing gift of coins — and a free skin from the Mystery Box on day 7. 30 and 100 days in a row unlock big rewards.</p>
+          ${streakDays(d)}
+          <button class="btn btn-navy wide" data-daily ${d.ready ? '' : 'disabled'}>${d.ready ? `Collect day ${d.nextDay}` : `Next gift in ${untilText(d.nextAt)} · day ${d.nextDay}`}</button>
         </section>
         <section class="wcard">
           <h4>The Bank</h4>
@@ -1427,13 +1489,13 @@
     paintStatement(body.querySelector('[data-statement]'));
     body.querySelector('[data-bank]').onclick = () => openBank();
     const daily = body.querySelector('[data-daily]');
-    if (daily) daily.onclick = async () => { const r = await walletAction('/api/wallet/daily'); if (r) { coinPop(r.amount, r.streak > 1 ? `Day ${r.streak} in a row` : 'Daily bonus'); Sound.play('win'); paintLounge(body); } };
+    if (daily) daily.onclick = async () => { if (await claimDaily()) paintLounge(body); };
     const bk = body.querySelector('[data-bankrupt]');
     if (bk) bk.onclick = async () => { const r = await walletAction('/api/wallet/bankrupt'); if (r) { coinPop(r.amount, 'Your daily top-up', 'chip'); Sound.play('chips'); paintLounge(body); } };
   }
 
   // ----- the statement: where coins and chips came from and went -----
-  const GAME_NAME = { friends: "Hold'em", bots: "Hold'em", blackjack: 'Blackjack', roulette: 'Roulette', durak: 'Durak', flamingo: 'Flamingo', goldrush: 'Gold Rush', tourney: 'Sit & Go' };
+  const GAME_NAME = { friends: "Hold'em", bots: "Hold'em", draw: 'Five Card Draw', blackjack: 'Blackjack', roulette: 'Roulette', durak: 'Durak', flamingo: 'Flamingo', goldrush: 'Gold Rush', tourney: 'Sit & Go' };
   function bookingLabel(e) {
     const [kind, ...rest] = String(e.reason || '').split(':');
     const detail = rest.join(':');
@@ -1590,6 +1652,18 @@
   }
   App.openBank = openBank;
 
+  async function paintGiftFriends(box) {
+    const r = await api('/api/friends');
+    const friends = r.ok ? r.data.friends.filter((f) => f.status === 'friend') : [];
+    box.replaceChildren();
+    if (!friends.length) { box.appendChild(h('p', 'muted', 'Add friends first — then you can send them chips from here.')); return; }
+    for (const f of friends) {
+      const b = h('button', 'pill', `<span class="mini-avatar">${avatarMarkup(f.avatar, f.username)}</span>${esc(f.username)}`);
+      b.onclick = () => sendChipsModal(f.username);
+      box.appendChild(b);
+    }
+  }
+
   function paintBank(body) {
     const w = App.wallet;
     const c = w.convert;
@@ -1627,7 +1701,13 @@
           <p class="fine">Up to ${fmt(b.max)} coins per exchange.</p>
         </section>
       </div>
+      <section class="desk gift-desk">
+        <h4>💸 Chips for friends</h4>
+        <p>Send chips from your bankroll to a friend — up to 50,000 a day (after 20 rounds played).</p>
+        <div class="gift-friends" data-gift-friends><p class="muted">Loading…</p></div>
+      </section>
       <p class="fine center">Play money only — nothing here can be bought with or exchanged for real money.</p>`;
+    paintGiftFriends(body.querySelector('[data-gift-friends]'));
     const wire = (numSel, rangeSel, outSel, rate, max) => {
       const num = body.querySelector(numSel), range = body.querySelector(rangeSel), out = body.querySelector(outSel);
       if (!num) return null;
@@ -1686,15 +1766,12 @@
       <button class="mb-stat" data-open="bank" title="The Bank"><small>Chips</small><b><i class="ico-chip"></i>${w ? fmt(w.chips) : '…'}</b></button>
       <button class="mb-stat" data-open="shop" title="The Shop"><small>Coins</small><b><i class="ico-coin"></i>${w ? fmt(w.coins) : '…'}</b></button>
       <button class="mb-stat" data-open="friends" title="Friends"><small>Friends online</small><b>${p.onlineFriends ?? '–'}${p.requests ? ` <em>· ${p.requests} new request${p.requests === 1 ? '' : 's'}</em>` : ''}</b></button>
-      ${w && w.daily.ready ? `<button class="mb-bonus" data-mb-bonus>🎁 Collect ${w.daily.amount} coins</button>` : ''}
+      ${w && w.daily.ready ? `<button class="mb-bonus" data-mb-bonus>🎁 Daily bonus · day ${w.daily.nextDay}</button>` : ''}
       ${App.questSummary ? `<button class="mb-quests" data-mb-quests>🎯 Quests ${App.questSummary.daily.filter((q) => q.done).length}/3</button>` : ''}
       ${a.isOwner ? '<a class="mb-owner" href="/admin" title="Owner dashboard">♛ Owner</a>' : ''}
       <button class="btn btn-navy mb-play" data-mb-play>Quick seat</button>`;
     const bonus = bar.querySelector('[data-mb-bonus]');
-    if (bonus) bonus.onclick = async () => {
-      const r = await walletAction('/api/wallet/daily');
-      if (r) { coinPop(r.amount, r.streak > 1 ? `Day ${r.streak} in a row` : 'Daily bonus'); Sound.play('win'); }
-    };
+    if (bonus) bonus.onclick = () => dailyModal();
     bar.querySelector('[data-mb-play]').onclick = () => { const t = quickSeat(); if (t) joinTable(t.id); };
     const qb = bar.querySelector('[data-mb-quests]');
     if (qb) qb.onclick = () => App.openQuests();
@@ -1720,23 +1797,23 @@
     chips: ['Chip sets', 'Your chips when you bet — everyone at your table sees them.'],
     avatar: ['Portraits', 'A frame around your initials on your nameplate — everyone at your table sees it.'],
     badge: ['Titles', 'A title written before your name — everyone at your table and on your profile sees it.'],
+    tag: ['Tags', 'A small label next to your name — everyone at your table and on your profile sees it. Rare tags come from the Tag box, the others you earn with achievements.'],
     victory: ['Victory effects', 'A big moment over your seat when you win a round — everyone at your table sees it. Tap a preview to play it.'],
     turn: ['Turn markers', 'Your emblem when it is your turn — everyone at your table sees it.'],
     gesture: ['Gestures', 'Little courtesies for the table. Every gesture you own is yours to use — open the hat button at any table.'],
   };
-  let shopSlot = 'boxes';
 
   // ----- skin boxes -----
   const RARITY = { common: ['Common', '#B8C4BE'], rare: ['Rare', '#4FA3FF'], epic: ['Epic', '#B36BFF'], legendary: ['Legendary', '#F2C14E'] };
   let boxFocus = null;   // a box whose preview to open right away
   const BOX_LOOK = { mystery: ['🎲', 'Mystery Box'], cardback: ['🂠', 'Card back box'], cardface: ['🃏', 'Card face box'], felt: ['🟩', 'Table felt box'], chips: ['🪙', 'Chip set box'],
-    background: ['🖼️', 'Background box'], avatar: ['👤', 'Portrait box'], badge: ['🎩', 'Title box'], turn: ['⏳', 'Turn marker box'], victory: ['🎆', 'Victory effect box'], gesture: ['👋', 'Gesture box'] };
+    background: ['🖼️', 'Background box'], avatar: ['👤', 'Portrait box'], badge: ['🎩', 'Title box'], tag: ['🏷️', 'Tag box'], turn: ['⏳', 'Turn marker box'], victory: ['🎆', 'Victory effect box'], gesture: ['👋', 'Gesture box'] };
   function paintBoxes(body) {
     const w = App.wallet;
     const grid = h('div', 'box-grid');
     for (const b of Object.values(App.shop.boxes)) {
       const [icon, name] = BOX_LOOK[b.id] || ['🎁', b.id];
-      const inside = App.shop.items.filter((i) => !i.retired && (b.id === 'mystery' || i.slot === b.id));
+      const inside = App.shop.items.filter((i) => !i.retired && !i.earned && (b.id === 'mystery' || i.slot === b.id));
       const have = inside.filter((i) => w.owned.includes(i.id)).length;
       const card = h('div', 'box-card box-' + b.id + (have === inside.length ? ' complete' : ''));
       card.innerHTML = `
@@ -1846,38 +1923,62 @@
       box.appendChild(fx);
     } else if (item.slot === 'gesture') box.appendChild(h('span', 'mini-gesture', `<b>${esc(App.account.username)}</b> ${esc(item.preview)}`));
     else if (item.slot === 'avatar') box.appendChild(h('span', 'mini-avatar', avatarMarkup(item.preview === 'classic' ? null : item.preview, App.account.username)));
+    else if (item.slot === 'tag') box.appendChild(h('span', 'mini-badge', `${esc(App.account.username)}${item.preview === 'classic' ? '' : tagMarkup(item.preview)}`));
     else box.appendChild(h('span', 'mini-badge', `${item.preview === 'classic' ? '' : titleMarkup(item.preview)}${esc(App.account.username)}`));
     return box;
   }
   function paintShop(body) {
     const w = App.wallet;
-    const head = h('div', 'shop-head', `<span>Your coins: <b><i class="ico-coin"></i>${fmt(w.coins)}</b></span>`);
-    body.appendChild(head);
+    body.appendChild(h('div', 'shop-head', `<span>Your coins: <b><i class="ico-coin"></i>${fmt(w.coins)}</b></span>`));
+    body.appendChild(h('p', 'fine', esc(SLOT_INFO.boxes[1])));
+    const go = h('button', 'pill coll-link', '🗃️ To your collection');
+    go.onclick = () => { loungeTab = 'collection'; paintLounge(body); };
+    body.appendChild(go);
+    paintBoxes(body);
+  }
+
+  // ----- the collection: every category, what you own and what is still in the boxes -----
+  let collSlot = 'cardback';
+  let collSets = null;   // categories completed (from the quests)
+  async function paintCollection(body) {
+    const w = App.wallet;
+    if (!collSets) { const r = await api('/api/quests'); collSets = r.ok ? r.data.sets || [] : []; if (r.ok) App.questSummary = r.data; }
+    const achOf = (tag) => (App.questSummary ? App.questSummary.achievements.find((a) => a.tag === tag) : null);
+    const inSlot = (slot) => App.shop.items.filter((i) => i.slot === slot && !i.retired);
+    const total = App.shop.items.filter((i) => !i.retired).length;
+    const mine = App.shop.items.filter((i) => !i.retired && w.owned.includes(i.id)).length;
+    body.appendChild(h('div', 'shop-head coll-head', `<span>Your collection: <b>${fmt(mine)} / ${fmt(total)}</b></span>`));
     const sub = h('div', 'subtabs');
-    for (const slot of ['boxes', ...App.shop.slots]) {
-      const b = h('button', (slot === shopSlot ? 'on' : '') + (slot === 'boxes' ? ' box-tab' : ''), SLOT_INFO[slot][0]);
-      b.onclick = () => { shopSlot = slot; paintLounge(body); };
+    for (const slot of App.shop.slots) {
+      const items = inSlot(slot);
+      const have = items.filter((i) => w.owned.includes(i.id)).length;
+      const b = h('button', (slot === collSlot ? 'on' : '') + (collSets.includes(slot) ? ' complete' : ''), `${SLOT_INFO[slot][0]} <small>${have}/${items.length}</small>`);
+      b.onclick = () => { collSlot = slot; paintLounge(body); };
       sub.appendChild(b);
     }
     body.appendChild(sub);
-    body.appendChild(h('p', 'fine', esc(SLOT_INFO[shopSlot][1])));
-    if (shopSlot === 'boxes') { paintBoxes(body); return; }
-    const grid = h('div', 'shop-grid');
-    const isGesture = shopSlot === 'gesture';
-    const equipped = w.equipped[shopSlot];
+    body.appendChild(h('p', 'fine', esc(SLOT_INFO[collSlot][1])));
+    if (collSets.includes(collSlot)) body.appendChild(h('p', 'coll-done', '🏁 Category complete — gold frame earned'));
+    else body.appendChild(h('p', 'fine coll-hint', `Complete a whole category for ${fmt((App.questSummary && App.questSummary.setReward) || 300)} coins and a gold frame.`));
+    const slot = collSlot;
+    const grid = h('div', 'shop-grid' + (collSets.includes(slot) ? ' set-complete' : ''));
+    const isGesture = slot === 'gesture';
+    const equipped = w.equipped[slot];
     if (!isGesture) {
       const def = h('div', 'shop-item' + (!equipped ? ' on' : ''));
-      def.appendChild(shopPreview({ slot: shopSlot, preview: 'classic' }));
-      def.appendChild(h('b', '', shopSlot === 'badge' ? 'No title' : shopSlot === 'avatar' ? 'Initials' : shopSlot === 'victory' ? 'No effect' : 'House classic'));
+      def.appendChild(shopPreview({ slot, preview: 'classic' }));
+      def.appendChild(h('b', '', slot === 'badge' ? 'No title' : slot === 'tag' ? 'No tag' : slot === 'avatar' ? 'Initials' : slot === 'victory' ? 'No effect' : 'House classic'));
       def.appendChild(h('em', '', 'Free'));
       const db = h('button', 'pill', equipped ? 'Use' : 'In use');
       db.disabled = !equipped;
-      db.onclick = async () => { if (await walletAction('/api/shop/equip', { slot: shopSlot, item: null })) paintLounge(body); };
+      db.onclick = async () => { if (await walletAction('/api/shop/equip', { slot, item: null })) paintLounge(body); };
       def.appendChild(db);
       grid.appendChild(def);
     }
-    // Retired items are only shown to players who own them.
-    for (const item of App.shop.items.filter((i) => i.slot === shopSlot && (!i.retired || w.owned.includes(i.id)))) {
+    // Retired items are only shown to players who own them; owned first.
+    const items = App.shop.items.filter((i) => i.slot === slot && (!i.retired || w.owned.includes(i.id)))
+      .sort((a, b) => w.owned.includes(b.id) - w.owned.includes(a.id));
+    for (const item of items) {
       const owned = w.owned.includes(item.id);
       const on = equipped === item.id;
       const el = h('div', 'shop-item' + (on ? ' on' : '') + (owned ? ' owned' : '') + (item.animated ? ' animated' : ''));
@@ -1885,23 +1986,27 @@
       if (item.animated) el.appendChild(h('span', 'anim-tag', '✨ Animated'));
       el.appendChild(h('b', '', esc(item.name)));
       const [rName, rColor] = RARITY[item.rarity || 'common'];
-      el.appendChild(h('em', '', owned ? (item.retired ? 'Retired · still yours' : 'In your collection') : `<span style="color:${rColor}">${rName}</span> · in the box`));
+      const ach = item.earned ? achOf(item.id) : null;
+      el.appendChild(h('em', '', owned ? (item.retired ? 'Retired · still yours' : `<span style="color:${rColor}">${rName}</span> · yours`)
+        : item.earned ? `🏆 Achievement: <span class="ach-name"></span>` : `<span style="color:${rColor}">${rName}</span> · in the box`));
+      if (ach) el.querySelector('.ach-name').textContent = ach.text;
       if (!owned) el.classList.add('locked');
       const b = h('button', 'pill');
       if (isGesture && owned) { b.textContent = 'Use at the table'; b.disabled = true; }
       else if (on) { b.textContent = 'In use'; b.disabled = true; }
       else if (owned) { b.textContent = 'Use'; b.onclick = async () => { if (await walletAction('/api/shop/equip', { slot: item.slot, item: item.id })) paintLounge(body); }; }
+      else if (item.earned) { b.textContent = '🎯 To the quests'; b.onclick = () => { loungeTab = 'quests'; paintLounge(body); }; }
       else {
-        // skins come only from boxes: go to this category's box
         b.textContent = '🎁 To the box';
         b.className = 'pill gold';
-        b.onclick = () => { shopSlot = 'boxes'; boxFocus = item.slot; paintLounge(body); };
+        b.onclick = () => { loungeTab = 'shop'; boxFocus = item.slot; paintLounge(body); };
       }
       el.appendChild(b);
       grid.appendChild(el);
     }
     body.appendChild(grid);
   }
+  App.openCollection = () => openLounge('collection');
 
   // ----- friends -----
   async function paintFriends(body) {
@@ -1957,7 +2062,8 @@
       row.appendChild(who(f));
       if (f.where) row.appendChild(btn('Join', 'gold', () => { closeModal(); joinTable(f.where.table); }));
       if (App.tableId && f.online) row.appendChild(btn('Invite', '', () => inviteFriend(f.username)));
-      row.appendChild(btn('🎁 Chips', '', () => sendChipsModal(f.username)));
+      row.appendChild(btn('🃏 Play together', '', () => playTogether(f.username)));
+      row.appendChild(btn('💸 Send chips', 'gold', () => sendChipsModal(f.username)));
       row.appendChild(btn('Remove', 'quiet', () => { if (confirm(`Remove ${f.username} from your friends?`)) act('/api/friends/remove', f.username); }));
       return row;
     });
@@ -1968,6 +2074,31 @@
     });
     if (!list.length) body.appendChild(h('p', 'muted mt', 'No friends yet. Add someone by their username — once they accept, you can see when they are online and invite them to your table.'));
   }
+
+  // Open a private Hold'em table and invite a friend to it.
+  async function playTogether(username) {
+    const game = await new Promise((resolve) => {
+      openModal((card) => {
+        modalHead(card, 'Play together', `A private table for you and ${esc(username)}`);
+        const g = h('div', 'priv-games');
+        for (const [id, name, icon] of PRIV_GAMES) {
+          const b = h('button', '', `<i>${icon}</i>${name}`);
+          b.onclick = () => resolve(id);
+          g.appendChild(b);
+        }
+        card.appendChild(g);
+        card.appendChild(h('p', 'fine', `${esc(username)} gets an invitation and can join with one tap.`));
+      });
+    });
+    closeModal();
+    const r = await api('/api/private', { game });
+    if (!r.ok) { toast(r.data.error, { kind: 'bad' }); return; }
+    const table = r.data.id;
+    const inv = await api('/api/friends/invite', { username, table });
+    toast(inv.ok ? `Invitation sent to ${username}.` : inv.data.error, { kind: inv.ok ? 'good' : 'bad' });
+    joinTable(table);
+  }
+  App.playTogether = playTogether;
 
   async function inviteFriend(username) {
     if (!App.tableId) return;
@@ -2029,7 +2160,8 @@
     $('navDot').classList.toggle('hidden', !r.data.requests);
     App.presence = r.data;
     for (const n of r.data.questNews || []) {
-      coinPop(n.coins, n.kind === 'achievement' ? `🏆 ${n.text}` : `✅ ${n.text}`);
+      coinPop(n.coins, n.kind === 'achievement' ? `🏆 ${n.text}` : n.kind === 'set' ? `🏁 ${(SLOT_INFO[n.text.slice(4)] || [n.text])[0]} complete` : `✅ ${n.text}`);
+      if (n.kind === 'set') collSets = null;
       Sound.play('win');
       loadWallet();
     }
@@ -2056,7 +2188,7 @@
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pollPresence(); });
 
   // ----- profiles -----
-  const MODE_NAMES = { friends: "Hold'em with friends", bots: "Hold'em with bots", blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette', flamingo: 'Flamingo', goldrush: 'Gold Rush' };
+  const MODE_NAMES = { friends: "Hold'em with friends", bots: "Hold'em with bots", draw: 'Five Card Draw', blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette', flamingo: 'Flamingo', goldrush: 'Gold Rush' };
   function statsTable(stats) {
     if (!stats.length) return '<p class="muted">No hands played yet.</p>';
     return `<table class="stats"><thead><tr><th>Game</th><th>Hands</th><th>Won</th><th>${'Result'}</th></tr></thead><tbody>
@@ -2070,7 +2202,7 @@
   }
   function profileHtml(p) {
     return `<div class="profile-head"><span class="big-avatar">${avatarMarkup(p.avatar, p.username)}</span>
-      <div><h3>${titleMarkup(p.badge)}${esc(p.username)}</h3>
+      <div><h3>${titleMarkup(p.badge)}${esc(p.username)}${tagMarkup(p.tag)}</h3>
       <p class="muted"><i class="presence ${p.online ? 'on' : ''}"></i>${p.online ? (p.where ? `Playing at ${esc(p.where.tableName)}` : 'Online') : 'Offline'} · Member since ${new Date(p.memberSince).toLocaleDateString([], { month: 'long', year: 'numeric' })} · ${p.friends} friend${p.friends === 1 ? '' : 's'}</p></div></div>
       ${highlightsHtml(p)}
       ${statsTable(p.stats)}`;
@@ -2211,6 +2343,11 @@
 
   // ================= HOW TO PLAY =================
   const RULES = {
+    draw: `<ol class="rules-list">
+      <li>Everyone receives <b>five private cards</b> — there are no shared cards.</li>
+      <li><b>First betting round:</b> fold, check, call or raise, as in Hold'em (No-Limit, with blinds).</li>
+      <li><b>The draw:</b> tap the cards you want to swap and get new ones — up to <b>three</b>, or <b>four</b> if the card you keep is an ace. Or stand pat and keep all five.</li>
+      <li><b>Second betting round</b>, then the showdown: the best five-card hand wins the pot.</li></ol><h4>The hands, from best to worst</h4><div id="rankings"></div>`,
     holdem: `<ol class="rules-list">
       <li>Everyone receives <b>two private cards</b>. Five shared cards are dealt to the middle: three (the flop), one (the turn), one (the river).</li>
       <li>Make the best five-card hand from your two cards and the five on the board, in any combination.</li>
@@ -2251,6 +2388,11 @@
       <li>A cave-in loses the stake. Every dig is decided by the server; the house keeps 3 % on average.</li></ol>`;
   // German rules (shown when the site is in German).
   const RULES_DE = {
+    draw: `<ol class="rules-list">
+      <li>Jeder bekommt <b>fünf eigene Karten</b> – es gibt keine gemeinsamen Karten in der Mitte.</li>
+      <li><b>Erste Setzrunde:</b> passen, schieben, mitgehen oder erhöhen, wie bei Hold'em (No-Limit, mit Blinds).</li>
+      <li><b>Der Tausch:</b> tippe die Karten an, die du tauschen willst, und bekomme neue – bis zu <b>drei</b>, oder <b>vier</b>, wenn die Karte, die du behältst, ein Ass ist. Oder du behältst alle fünf.</li>
+      <li><b>Zweite Setzrunde</b>, dann wird aufgedeckt: die beste Fünf-Karten-Hand gewinnt den Pot.</li></ol><h4>Die Hände, von der besten zur schlechtesten</h4><div id="rankings"></div>`,
     holdem: `<ol class="rules-list">
       <li>Jeder bekommt <b>zwei eigene Karten</b>. In die Mitte kommen fünf gemeinsame Karten: drei (Flop), eine (Turn), eine (River).</li>
       <li>Bilde die beste Fünf-Karten-Hand aus deinen zwei Karten und den fünf in der Mitte, in beliebiger Kombination.</li>
@@ -2311,7 +2453,7 @@
           });
         }
       };
-      tabs(card, [['holdem', "Hold'em"], ['blackjack', 'Blackjack'], ['durak', 'Durak'], ['roulette', 'Roulette'], ['flamingo', 'Flamingo'], ['goldrush', 'Gold Rush']], paint, game);
+      tabs(card, [['holdem', "Hold'em"], ['draw', 'Five Card Draw'], ['blackjack', 'Blackjack'], ['durak', 'Durak'], ['roulette', 'Roulette'], ['flamingo', 'Flamingo'], ['goldrush', 'Gold Rush']], paint, game);
       card.appendChild(body);
       paint(game);
     }, { wide: true });

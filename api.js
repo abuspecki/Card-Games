@@ -283,10 +283,14 @@ function createApi(ctx) {
       else if (url === '/api/shop/box') r = await coins.openBox(user.id, String(body.box || ''), String(body.pay || 'coins'));
       else if (url === '/api/shop/equip') {
         r = await coins.equip(user.id, String(body.slot || ''), body.item ? String(body.item) : null);
-        if (r.ok && ['badge', 'avatar', 'cardback', 'chips', 'turn', 'victory'].includes(body.slot)) ctx.lobby.refreshLook(user.id);
+        if (r.ok && ['badge', 'avatar', 'tag', 'cardback', 'chips', 'turn', 'victory'].includes(body.slot)) ctx.lobby.refreshLook(user.id);
       } else return json(res, 404, { error: 'Not found' });
       if (r.error) return json(res, 400, r);
-      return json(res, 200, { ...r, wallet: await coins.getStatus(user.id) });
+      const wallet = await coins.getStatus(user.id);
+      // boxes and the day-7 skin count for quests, achievements and completed categories
+      if (url === '/api/shop/box') { ctx.quests.onEvent(user.id, 'box'); ctx.quests.onEvent(user.id, 'collection', { owned: wallet.owned }); }
+      if (url === '/api/wallet/daily' && r.item) ctx.quests.onEvent(user.id, 'collection', { owned: wallet.owned });
+      return json(res, 200, { ...r, wallet });
     }
 
     // ----- daily quests & achievements -----
@@ -402,6 +406,7 @@ function createApi(ctx) {
         if (hands < GIFT_MIN_HANDS) return json(res, 400, { error: `Play ${GIFT_MIN_HANDS - hands} more rounds before you can send chips` });
         const r = await coins.sendChips(user.id, other.id, body.amount, user.username, other.username);
         if (r.error) return json(res, 400, r);
+        ctx.quests.onEvent(user.id, 'gift', r.sent);
         const list = gifts.get(other.id) || [];
         list.push({ from: user.username, amount: r.sent, at: Date.now() });
         gifts.set(other.id, list.slice(-10));

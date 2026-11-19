@@ -81,13 +81,13 @@ html[data-theme="light"] body.game .drawer .tabs button.on { color: #12201A !imp
 
 /* hold'em: moves chosen in advance while someone else is thinking */
 body.holdem .action-panel.waiting :is(#hSizing, #hChipRow, .row.buttons) { display: none !important; }
-body.holdem .row.pre { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; }
-body.holdem .row.pre.hidden { display: none; }
-body.holdem .pre-btn { min-height: 52px; border-radius: 14px; border: 1px solid var(--m-line); background: rgba(255, 255, 255, .05); color: var(--m-text);
+body:is(.holdem, .blackjack) .row.pre { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; }
+body:is(.holdem, .blackjack) .row.pre.hidden { display: none; }
+body:is(.holdem, .blackjack) .pre-btn { min-height: 52px; border-radius: 14px; border: 1px solid var(--m-line); background: rgba(255, 255, 255, .05); color: var(--m-text);
   font: 700 15px var(--m-font); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
-body.holdem .pre-btn::before { content: ''; width: 16px; height: 16px; border-radius: 5px; border: 2px solid rgba(255, 255, 255, .35); flex: none; }
-body.holdem .pre-btn.on { border-color: var(--m-accent); background: rgba(242, 193, 78, .14); color: var(--m-accent); }
-body.holdem .pre-btn.on::before { border-color: var(--m-accent); background: var(--m-accent); box-shadow: inset 0 0 0 3px #10170f; }
+body:is(.holdem, .blackjack) .pre-btn::before { content: ''; width: 16px; height: 16px; border-radius: 5px; border: 2px solid rgba(255, 255, 255, .35); flex: none; }
+body:is(.holdem, .blackjack) .pre-btn.on { border-color: var(--m-accent); background: rgba(242, 193, 78, .14); color: var(--m-accent); }
+body:is(.holdem, .blackjack) .pre-btn.on::before { border-color: var(--m-accent); background: var(--m-accent); box-shadow: inset 0 0 0 3px #10170f; }
 
 /* blackjack: a disabled main button must not look active */
 body.blackjack .plaque.gold:disabled { background: rgba(255, 255, 255, .05) !important; color: var(--m-muted) !important; border: 1px solid var(--m-line) !important; }
@@ -122,3 +122,6 @@ body.roulette.portrait .r-buttons .r-spin { grid-column: 1 / -1; padding: 12px !
 .spectate { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 16px; border-radius: 16px;
   background: rgba(9, 16, 13, .9); border: 1px solid rgba(242, 193, 78, .5); color: #F1F4F0; font: 700 14px var(--m-font, 'Montserrat', sans-serif); box-shadow: 0 10px 30px rgba(0, 0, 0, .45); white-space: nowrap; }
 .spectate .btn { border-radius: 12px; padding: 9px 16px; min-height: 0; background: #F2C14E; color: #231A02; font-weight: 800; }
+
+body.blackjack .row.pre { flex: 1; max-width: 640px; margin: 0 auto; }
+body.blackjack #bPreBet { grid-template-columns: 1fr; }

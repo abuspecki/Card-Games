@@ -146,12 +146,47 @@ const CATALOG = [
   { id: 'gesture-eyebrow', slot: 'gesture', name: 'A Raised Eyebrow', price: 300, preview: 'raises an eyebrow' },
   { id: 'gesture-watch', slot: 'gesture', name: 'Checks the Watch', price: 300, preview: 'checks the pocket watch' },
   { id: 'gesture-monocle', slot: 'gesture', name: 'The Monocle Drop', price: 500, preview: 'drops the monocle' },
+  // ----- player tags: a small label next to your name (everyone sees it) -----
+  // From the Tag box …
+  { id: 'tag-nightowl', slot: 'tag', name: 'Night Owl', price: 300, preview: '🦉 Night Owl' },
+  { id: 'tag-bluffer', slot: 'tag', name: 'Bluffer', price: 350, preview: '🎭 Bluffer' },
+  { id: 'tag-lucky', slot: 'tag', name: 'Lucky Charm', price: 400, preview: '🍀 Lucky Charm' },
+  { id: 'tag-gentleman', slot: 'tag', name: 'Gentleman', price: 600, preview: '🎩 Gentleman' },
+  { id: 'tag-icecold', slot: 'tag', name: 'Ice Cold', price: 900, preview: '🧊 Ice Cold' },
+  { id: 'tag-highroller', slot: 'tag', name: 'High Roller', price: 1500, preview: '💎 High Roller', animated: true },
+  { id: 'tag-phantom', slot: 'tag', name: 'Phantom', price: 2000, preview: '👻 Phantom', animated: true },
+  { id: 'tag-dragon', slot: 'tag', name: 'Dragon', price: 3000, preview: '🐉 Dragon', animated: true },
+  // … and earned with achievements (never in a box)
+  { id: 'tag-regular', slot: 'tag', name: 'Regular', price: 300, preview: '☕ Regular', earned: true },
+  { id: 'tag-furniture', slot: 'tag', name: 'Furniture', price: 600, preview: '🛋️ Furniture', earned: true },
+  { id: 'tag-institution', slot: 'tag', name: 'Institution', price: 2500, preview: '🏛️ Institution', earned: true },
+  { id: 'tag-winner', slot: 'tag', name: 'Winner', price: 600, preview: '🏅 Winner', earned: true },
+  { id: 'tag-champion', slot: 'tag', name: 'Champion', price: 2500, preview: '🏆 Champion', earned: true },
+  { id: 'tag-earner', slot: 'tag', name: 'Earner', price: 300, preview: '💰 Earner', earned: true },
+  { id: 'tag-shark', slot: 'tag', name: 'Shark', price: 1200, preview: '🦈 Shark', earned: true },
+  { id: 'tag-whale', slot: 'tag', name: 'Whale', price: 2500, preview: '🐋 Whale', earned: true },
+  { id: 'tag-pothunter', slot: 'tag', name: 'Pot Hunter', price: 1200, preview: '🎯 Pot Hunter', earned: true },
+  { id: 'tag-allrounder', slot: 'tag', name: 'All-rounder', price: 600, preview: '🎲 All-rounder', earned: true },
+  { id: 'tag-flamingo', slot: 'tag', name: 'Flamingo Royalty', price: 1200, preview: '🦩 Flamingo Royalty', earned: true },
+  { id: 'tag-durak', slot: 'tag', name: 'Durak Master', price: 1200, preview: '🃏 Durak Master', earned: true },
+  { id: 'tag-digger', slot: 'tag', name: 'Digger', price: 600, preview: '⛏️ Digger', earned: true },
+  { id: 'tag-loyal', slot: 'tag', name: 'Loyal', price: 1200, preview: '🤝 Loyal', earned: true },
+  { id: 'tag-devoted', slot: 'tag', name: 'Devoted', price: 3000, preview: '🌟 Devoted', earned: true },
+  { id: 'tag-generous', slot: 'tag', name: 'Generous', price: 600, preview: '🤲 Generous', earned: true },
+  { id: 'tag-patron', slot: 'tag', name: 'Patron', price: 2500, preview: '👑 Patron', earned: true },
+  { id: 'tag-unboxer', slot: 'tag', name: 'Unboxer', price: 1200, preview: '🎁 Unboxer', earned: true },
+  { id: 'tag-collector', slot: 'tag', name: 'Collector', price: 600, preview: '🗃️ Collector', earned: true },
+  { id: 'tag-curator', slot: 'tag', name: 'Curator', price: 2500, preview: '🖼️ Curator', earned: true },
+  { id: 'tag-goodfriend', slot: 'tag', name: 'Good Friend', price: 600, preview: '🎀 Good Friend', earned: true },
+  { id: 'tag-questor', slot: 'tag', name: 'Questor', price: 600, preview: '🧭 Questor', earned: true },
+  { id: 'tag-socialite', slot: 'tag', name: 'Socialite', price: 600, preview: '🥂 Socialite', earned: true },
+  { id: 'tag-completionist', slot: 'tag', name: 'Completionist', price: 1200, preview: '🏁 Completionist', earned: true },
 ];
 const ITEMS = Object.fromEntries(CATALOG.map((i) => [i.id, i]));
 
 
-const SLOTS = ['cardback', 'cardface', 'felt', 'chips', 'background', 'turn', 'avatar', 'badge', 'victory'];
-const SHOP_TABS = ['cardback', 'cardface', 'felt', 'chips', 'background', 'avatar', 'badge', 'turn', 'victory', 'gesture'];
+const SLOTS = ['cardback', 'cardface', 'felt', 'chips', 'background', 'turn', 'avatar', 'badge', 'victory', 'tag'];
+const SHOP_TABS = ['cardback', 'cardface', 'felt', 'chips', 'background', 'avatar', 'badge', 'tag', 'turn', 'victory', 'gesture'];
 const GESTURE_COOLDOWN = 4000;   // ms between gestures per player
 
 // ----- skin boxes: the only way to get skins -----
@@ -162,7 +197,9 @@ const GESTURE_COOLDOWN = 4000;   // ms between gestures per player
 const rarityOf = (item) => (item.price >= 2500 ? 'legendary' : item.price >= 1200 ? 'epic' : item.price >= 500 ? 'rare' : 'common');
 const RARITIES = ['common', 'rare', 'epic', 'legendary'];
 const CHIPS_PER_BOX_COIN = 150;          // paying with chips: 150 chips per coin of the price
-const boxItems = (boxId) => CATALOG.filter((i) => !i.retired && (boxId === 'mystery' || i.slot === boxId));
+const boxItems = (boxId) => CATALOG.filter((i) => !i.retired && !i.earned && (boxId === 'mystery' || i.slot === boxId));
+// Everything that can be collected in a category (box skins and earned tags).
+const collectable = (slot) => CATALOG.filter((i) => !i.retired && i.slot === slot);
 const weight = (i) => 1 / i.price;
 function boxPrice(boxId) {
   const items = boxItems(boxId);
@@ -189,7 +226,11 @@ function drawFromBox(boxId, owned, rand = Math.random) {
 }
 
 const dayString = (t) => new Date(t).toISOString().slice(0, 10); // UTC day
-const dailyAmount = (streak) => DAILY_BASE + DAILY_STEP * (Math.min(streak, DAILY_MAX_DAYS) - 1);
+// The daily bonus runs in weeks: day 1 … 7 (100 → 250 coins), day 7 also gives a
+// skin from the Mystery Box, then the next week starts at day 1 again. The streak
+// itself keeps counting (milestones at 30 and 100 days are achievements).
+const cycleDay = (streak) => ((Math.max(1, streak) - 1) % DAILY_MAX_DAYS) + 1;
+const dailyAmount = (streak) => DAILY_BASE + DAILY_STEP * (cycleDay(streak) - 1);
 const int = (v) => Math.floor(Number(v));
 
 // The streak the next claim would reach (missing a day resets to 1).
@@ -221,6 +262,9 @@ function status(w, now = Date.now()) {
       ready: dailyReady,
       amount: dailyAmount(dailyReady ? streak : streak + 1),
       streak: dailyReady ? streak - 1 : w.streak, // days already collected in a row
+      week: dailyReady ? (streak - 1) % DAILY_MAX_DAYS : cycleDay(w.streak), // days of this week already collected
+      nextDay: cycleDay(dailyReady ? streak : streak + 1),                    // the day the next claim is
+      boxDay: DAILY_MAX_DAYS,
       nextAt: dailyReady ? null : tomorrow,
     },
     bankrupt: {                                    // the daily top-up
@@ -263,12 +307,17 @@ function makeCoins(store) {
     async balances(userId) { return wallet(userId, (w) => ({ result: { coins: w.coins, chips: w.chips, inPlay: w.in_play } })); },
 
     async claimDaily(userId, now = Date.now()) {
-      return wallet(userId, (w) => {
+      return wallet(userId, (w, owned) => {
         if (w.last_daily === dayString(now)) return { result: { error: 'You already claimed today\'s bonus' } };
         const streak = nextStreak(w, now);
-        const amount = dailyAmount(streak);
+        let amount = dailyAmount(streak);
+        const day = cycleDay(streak);
+        // day 7: a skin from the Mystery Box (or 250 extra coins if you own them all)
+        const item = day === DAILY_MAX_DAYS ? drawFromBox('mystery', owned) : null;
+        if (day === DAILY_MAX_DAYS && !item) amount += 250;
         const coins = w.coins + amount;
-        return { update: { coins, last_daily: dayString(now), streak }, result: { amount, streak, coins } };
+        return { update: { coins, last_daily: dayString(now), streak }, addItem: item ? item.id : undefined,
+          result: { amount, streak, day, coins, item: item ? item.id : null, rarity: item ? rarityOf(item) : null } };
       }, (out) => `daily:${out.result.streak}`);
     },
 
@@ -382,7 +431,7 @@ function makeCoins(store) {
       const { equipped } = await store.getItems(userId);
       const pick = (slot) => (equipped[slot] && ITEMS[equipped[slot]] ? ITEMS[equipped[slot]].preview : null);
       // seen by everyone at the table: portrait, title, card back, chip set, turn marker
-      return { avatar: pick('avatar'), badge: pick('badge'), skin: { back: pick('cardback'), chips: pick('chips'), turn: pick('turn'), victory: pick('victory') } };
+      return { avatar: pick('avatar'), badge: pick('badge'), tag: pick('tag'), skin: { back: pick('cardback'), chips: pick('chips'), turn: pick('turn'), victory: pick('victory') } };
     },
 
     // Open a skin box, paid with coins or chips.
@@ -427,6 +476,21 @@ function makeCoins(store) {
       return { ok: true, sent: n, chips: out.chips, left: out.left };
     },
 
+    // Give an item for free (earned tags); false if it was already owned.
+    async grantItem(userId, itemId) {
+      if (!ITEMS[itemId]) return false;
+      return wallet(userId, (w, owned) => (owned.includes(itemId) ? { result: false } : { addItem: itemId, result: true }));
+    },
+
+    // Pay chips from the bankroll (a dealer tip at Durak or Flamingo).
+    async spendChips(userId, amount, reason) {
+      const n = int(amount);
+      if (!(n >= 1)) return { error: 'Pick an amount' };
+      return wallet(userId, (w) => (w.chips < n
+        ? { result: { error: `You only have ${w.chips.toLocaleString()} chips in your bankroll` } }
+        : { update: { chips: w.chips - n }, result: { chips: w.chips - n } }), reason);
+    },
+
     // Owner tool: add or remove coins/chips (never below zero).
     // `reason`: owner, gift, quest:…, tourney, bonus …
     async adjust(userId, dCoins, dChips, reason = 'owner') {
@@ -458,5 +522,5 @@ function rewardFor(r) {
 module.exports = {
   makeCoins, rewardFor, status, dailyAmount, dayString, CATALOG, ITEMS, SLOTS, SHOP_TABS, GESTURE_COOLDOWN,
   WELCOME_COINS, WELCOME_CHIPS, TABLE_DAILY_CAP, CHIPS_PER_COIN, EXCHANGE_FEE, CONVERT_RATE, COIN_TO_CHIPS, BUYCHIPS_MAX,
-  TOPUP_TO, BANKRUPT_GRANT, coinsForWin, BOXES, RARITIES, rarityOf, drawFromBox, boxChances, boxItems, CHIPS_PER_BOX_COIN, GIFT_MIN, GIFT_DAILY, GIFT_MIN_HANDS,
+  TOPUP_TO, BANKRUPT_GRANT, coinsForWin, BOXES, RARITIES, rarityOf, drawFromBox, boxChances, boxItems, collectable, CHIPS_PER_BOX_COIN, GIFT_MIN, GIFT_DAILY, GIFT_MIN_HANDS,
 };

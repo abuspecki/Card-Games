@@ -331,5 +331,5 @@
     paintChips(ctx);
   }
 
-  window.TableUI.roulette = { size: { land: [1440, 780], port: [440, 920] }, build, render };
+  window.TableUI.roulette = { size: { land: [1440, 780], port: [440, 920] }, build, render, dealer: { land: { x: 100, y: 28, size: 124 }, port: { x: 56, y: 40, size: 74 } } };
 })();
