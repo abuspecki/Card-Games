@@ -51,7 +51,7 @@ class Roulette extends BaseTable {
   }
 
   minBet() { return this.settings.bigBlind || 5; }
-  maxSpot() { return this.minBet() * 100; }
+  maxSpot() { return this.minBet() * 1000; }   // per place: up to 1,000× the minimum
 
   isPlaying() { return this.stage === 'betting' || this.stage === 'spinning'; }
 

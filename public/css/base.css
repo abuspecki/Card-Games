@@ -177,6 +177,9 @@ svg { display: block; }
 .chip.v25  { --bg: #8E1B24; --acc: #F4EFE3; }
 .chip.v100 { --bg: #1E4632; --acc: #E9D9B0; }
 .chip.v500 { --bg: #14213D; --acc: #C9A45C; }
+.chip.v1000 { --bg: #C99A1E; --acc: #1A1208; }
+.chip.v5000 { --bg: #5B1F78; --acc: #F2C14E; }
+.chip.v1000::after { content: "1K"; } .chip.v5000::after { content: "5K"; }
 
 /* ---------- Game stage ----------
    Every table is designed on a 1440×900 canvas and scaled to

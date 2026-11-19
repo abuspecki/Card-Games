@@ -112,3 +112,8 @@ body.portrait .sitout-pill .short { display: inline; }
 /* phones: the short two-line title is always shown in full */
 body.game.portrait .tbar .tb-center small { display: block !important; font-size: 10.5px !important; letter-spacing: .06em !important; max-width: none !important; }
 body.game.portrait .tbar .tb-center strong { font-size: 16px !important; max-width: none !important; }
+
+/* roulette on phones: four small buttons in a row, the spin button full width below */
+body.roulette.portrait .r-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 100%; }
+body.roulette.portrait .r-buttons .pill { min-width: 0; padding: 10px 4px !important; font-size: 14px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.roulette.portrait .r-buttons .r-spin { grid-column: 1 / -1; padding: 12px !important; }

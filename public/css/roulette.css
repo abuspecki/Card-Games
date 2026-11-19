@@ -100,7 +100,7 @@ body.portrait.roulette .r-players { max-width: 410px; }
   .roulette .r-bar .info { min-width: 0; }
   .roulette .r-bar .info strong { font-size: 22px; }
   .roulette .r-chips { gap: 6px; }
-  .roulette .r-chip .chip { --s: 38px !important; }
+  .roulette .r-chip .chip { --s: 34px !important; }
   .roulette .r-buttons .pill { padding: 6px 10px; font-size: 13px; }
   .roulette .r-spin { padding: 10px 18px; }
 }

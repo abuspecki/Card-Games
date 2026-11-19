@@ -28,10 +28,10 @@ const TABLES = [
   { id: 'BLACKJACK-2', name: 'Blackjack · High Roller', game: 'blackjack', capacity: 7, highRoller: true, buyIn: 5000, minBuyIn: 1000, settings: { bigBlind: 50 } },
   { id: 'DURAK-1', name: 'Durak · Table 1', game: 'durak', capacity: 6 },
   { id: 'DURAK-2', name: 'Durak · High Roller', game: 'durak', capacity: 6, highRoller: true, minBankroll: 10000 },
-  { id: 'ROULETTE-1', name: 'Roulette · Table 1', game: 'roulette', capacity: 8, buyIn: 1000, minBuyIn: 100, settings: { bigBlind: 5 } },
+  { id: 'ROULETTE-1', name: 'Roulette · Table 1', game: 'roulette', capacity: 8, buyIn: 5000, minBuyIn: 100, settings: { bigBlind: 5 } },
   { id: 'TOURNEY-1', name: "Hold'em · Sit & Go", game: 'holdem', capacity: 6, accountsOnly: true, tourney: { entry: 500, stack: 1500, handsPerLevel: 6 }, settings: { smallBlind: 10, bigBlind: 20 }, buyIn: 1500 },
   { id: 'FLAMINGO-1', name: 'Flamingo · Table 1', game: 'flamingo', capacity: 6 },
-  { id: 'ROULETTE-2', name: 'Roulette · High Roller', game: 'roulette', capacity: 8, highRoller: true, buyIn: 5000, minBuyIn: 1000, settings: { bigBlind: 25 } },
+  { id: 'ROULETTE-2', name: 'Roulette · High Roller', game: 'roulette', capacity: 8, highRoller: true, buyIn: 50000, minBuyIn: 1000, settings: { bigBlind: 25 } },
 ];
 
 const NEXT_HAND_DELAY = 6000;

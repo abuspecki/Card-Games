@@ -136,7 +136,8 @@
         </div>
       </section>`;
     const $ = (id) => document.getElementById(id);
-    $('rChips').replaceChildren(...[5, 25, 100, 500].map((v) => {
+    // chips from 5 to 5,000; those outside the table's limits are hidden
+    $('rChips').replaceChildren(...[5, 25, 100, 500, 1000, 5000].map((v) => {
       const b = ctx.h('button', 'r-chip');
       b.dataset.v = v;
       b.setAttribute('aria-label', `Bet ${v} per tap`);
@@ -176,6 +177,8 @@
       const v = Number(b.dataset.v);
       b.classList.toggle('on', v === chipValue);
       b.disabled = !!lim && (v < lim.minBet || v > lim.available);
+      const min = (ctx.st && ctx.st.minBet) || 5, max = (ctx.st && ctx.st.maxSpot) || 500;
+      b.hidden = v < min || v > max;
     });
   }
 

@@ -13,6 +13,18 @@ assert.strictEqual(payout('red', 10, 0), 0, 'zero loses outside bets');
 assert.strictEqual(payout('dozen3', 10, 30), 30);
 assert.strictEqual(payout('col2', 10, 0), 0);
 
+// High stakes: up to 1,000× the minimum on one place (5,000 at a 5-chip table)
+{
+  const big = new Roulette({ bigBlind: 5, startingStack: 20000 });
+  big.sit({ id: 'x', name: 'Xi' });
+  assert(big.startHand(0));
+  assert.strictEqual(big.maxSpot(), 5000);
+  assert(big.act('x', 'bet', { spot: 'red', amount: 5000 }).ok, '5,000 on red');
+  assert(big.act('x', 'bet', { spot: 'red', amount: 5 }).error, 'not more than 5,000 on one place');
+  assert(big.act('x', 'bet', { spot: 'n17', amount: 1000 }).ok, 'a 1,000 chip on a number');
+  assert.strictEqual(big.view('x').limits.maxSpot, 5000);
+}
+
 // A round with a fixed wheel
 function table(seq) {
   let k = 0;

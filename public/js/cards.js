@@ -68,7 +68,7 @@
   /** Pick a few chips that visually represent an amount (max 4). */
   function chipsFor(amount) {
     const out = [];
-    for (const v of [500, 100, 25, 5]) {
+    for (const v of [5000, 1000, 500, 100, 25, 5]) {
       while (amount >= v && out.length < 4) { out.push(v); amount -= v; }
     }
     return out.length ? out : [5];
@@ -84,7 +84,7 @@
     const maxCols = opts.maxCols || 4;
     const cols = [];
     let left = Math.max(0, Math.round(amount));
-    for (const v of [500, 100, 25, 5]) {
+    for (const v of [5000, 1000, 500, 100, 25, 5]) {
       const n = Math.floor(left / v);
       if (!n) continue;
       left -= n * v;
