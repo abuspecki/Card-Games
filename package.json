@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "node test/engine.test.js && node test/games.test.js && node test/coins.test.js && node test/api.test.js && node test/bots.test.js && node test/feedback.test.js && node test/taskboard.test.js && node test/roulette.test.js && node test/flamingo.test.js && node test/goldrush.test.js && node test/quests.test.js && node test/account.test.js && node test/weekly.test.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "smoke": "node test/smoke.js"
   },
   "keywords": [],
   "author": "",

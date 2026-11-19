@@ -40,7 +40,8 @@ const TURN_TIMEOUT = Number(process.env.TURN_TIMEOUT_MS) || 40000;            //
 const BOT_THINK_MS = [700, 1800];
 const AUTO_START_DELAY = 3000;          // deal this long after enough players sit down
 const AWAY_LIMIT = Number(process.env.AWAY_LIMIT_MS) || 90 * 1000; // disconnected players lose their seat after this (also mid-game)
-const SITOUT_LIMIT = 15 * 60 * 1000; // sitting out longer than this frees the seat (and returns the chips)
+const SITOUT_LIMIT = 15 * 60 * 1000;
+const MAX_WATCHERS = 40;              // onlookers per table // sitting out longer than this frees the seat (and returns the chips)
 
 function createLobby(ctx) {
   // ctx: { store(), coins(), log }
@@ -82,6 +83,7 @@ function createLobby(ctx) {
     const settings = game === 'holdem' ? { smallBlind: stake / 2, bigBlind: stake } : { bigBlind: stake };
     return { settings, buyIn: stake * times, minBuyIn: stake * R.minBuyIn };
   }
+  let tipsTotal = 0;   // chips tipped to the dealers since the server started (the house keeps them)
   const PRIVATE_MAX = 30;
   const PRIVATE_IDLE = 10 * 60 * 1000;   // an empty private table closes after this
   const codeChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -541,13 +543,15 @@ function createLobby(ctx) {
       let m;
       try { m = JSON.parse(raw); } catch { return; }
 
-      // Owners only: watch a table without taking a seat (sees what any onlooker would).
+      // Anyone can watch a table without taking a seat (private tables: with the code).
+      // Onlookers see what any onlooker would: no hidden cards.
       if (m.t === 'watch') {
         let user = null;
         if (m.session) { try { user = await ctx.store().getUserBySession(String(m.session)); } catch (e) { console.error('session lookup', e); } }
-        if (!user || !ctx.owners || !ctx.owners.has(user.username.toLowerCase())) return send(ws, { t: 'error', msg: 'Only the owner can watch tables' });
+        const isOwner = !!(user && ctx.owners && ctx.owners.has(user.username.toLowerCase()));
         const target = rooms.get(String(m.room || '').toUpperCase().trim());
         if (!target) return send(ws, { t: 'error', msg: 'That table doesn\'t exist' });
+        if (!isOwner && target.watchers.size >= MAX_WATCHERS) return send(ws, { t: 'error', msg: 'Too many people are watching this table right now' });
         if (room && watching) room.watchers.delete(pid);
         room = target;
         pid = 'watch-' + crypto.randomUUID();
@@ -688,6 +692,23 @@ function createLobby(ctx) {
           me.lastGesture = Date.now();
           broadcast(room, { t: 'gesture', seat: t.seatOf(pid), name: me.name, text: g.preview });
           return;
+        }
+        // Tip the dealer (Hold'em): 1, 5 or 25 big blinds from your table stack, not
+        // while you are still in a hand. The chips go to the house.
+        case 'tip': {
+          if (room.game !== 'holdem' || room.tourney) return;
+          const bb = t.settings.bigBlind;
+          const amount = Math.floor(Number(m.amount));
+          if (![1, 5, 25].map((x) => x * bb).includes(amount)) return send(ws, { t: 'error', msg: 'Pick a tip from the list' });
+          if (me.inHand && !me.folded && t.isPlaying()) return send(ws, { t: 'error', msg: 'Tip the dealer between hands (or after you fold)' });
+          if (me.chips < amount) return send(ws, { t: 'error', msg: 'Not enough chips at the table for that tip' });
+          if (Date.now() - (me.lastTip || 0) < 3000) return;
+          me.lastTip = Date.now();
+          me.chips -= amount;
+          tipsTotal += amount;
+          t.addLog(`${me.name} tips the dealer ${amount}`);
+          broadcast(room, { t: 'tip', seat: t.seatOf(pid), name: me.name, amount });
+          break;
         }
         // Sit out from the next hand on (keep the seat), or come back in.
         case 'sitout': {
@@ -843,7 +864,7 @@ function createLobby(ctx) {
     return { humans, bots: botsN, tablesPlaying: playing, tables: [...rooms.values()].map(tableSummary) };
   }
 
-  return { rooms, tableSummary, handleConnection, locate, leaveBy, seatedAccounts, refreshLook, kick, cashOutAll, liveStats, GAMES, createPrivate, PRIVATE_GAMES: Object.keys(PRIVATE), PRIVATE_STAKES, announce, currentAnnouncement, setMaintenance, maintenanceInfo, drain, isIdle, playerCount };
+  return { rooms, tableSummary, handleConnection, locate, leaveBy, seatedAccounts, refreshLook, kick, cashOutAll, liveStats, GAMES, createPrivate, PRIVATE_GAMES: Object.keys(PRIVATE), PRIVATE_STAKES, tipsTotal: () => tipsTotal, announce, currentAnnouncement, setMaintenance, maintenanceInfo, drain, isIdle, playerCount };
 }
 
 module.exports = { createLobby, TABLES, GAMES };

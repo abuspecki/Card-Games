@@ -27,7 +27,7 @@ function checkPassword(password, stored) {
 }
 
 const WALLET_FIELDS = ['coins', 'chips', 'in_play', 'last_daily', 'streak', 'last_refill', 'last_bankrupt',
-  'earned_day', 'earned_today', 'converted_day', 'converted_today'];
+  'earned_day', 'earned_today', 'converted_day', 'converted_today', 'sent_day', 'sent_today'];
 // Restore order: parents before the tables that point at them.
 const BACKUP_TABLES = ['users', 'stats', 'wallets', 'user_items', 'equipped', 'friends', 'feedback', 'activity',
   'tasks', 'task_notes', 'dev_keys', 'meta', 'hand_log', 'quests', 'admin_log', 'error_log', 'coin_log', 'weekly'];
@@ -83,6 +83,8 @@ function postgresStore(url) {
       await q('ALTER TABLE wallets ADD COLUMN IF NOT EXISTS last_bankrupt BIGINT NOT NULL DEFAULT 0');
       await q('ALTER TABLE wallets ADD COLUMN IF NOT EXISTS converted_day TEXT');
       await q('ALTER TABLE wallets ADD COLUMN IF NOT EXISTS converted_today INTEGER NOT NULL DEFAULT 0');
+      await q('ALTER TABLE wallets ADD COLUMN IF NOT EXISTS sent_day TEXT');
+      await q('ALTER TABLE wallets ADD COLUMN IF NOT EXISTS sent_today INTEGER NOT NULL DEFAULT 0');
       await q(`CREATE TABLE IF NOT EXISTS user_items (
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         item_id TEXT NOT NULL,
@@ -331,7 +333,7 @@ function postgresStore(url) {
         await c.query('BEGIN');
         await c.query('INSERT INTO wallets (user_id, coins, chips) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [userId, init.coins, init.chips]);
         const r = await c.query(`SELECT coins, chips, in_play, last_daily, streak, last_refill::float8 AS last_refill,
-          last_bankrupt::float8 AS last_bankrupt, earned_day, earned_today, converted_day, converted_today
+          last_bankrupt::float8 AS last_bankrupt, earned_day, earned_today, converted_day, converted_today, sent_day, sent_today
           FROM wallets WHERE user_id = $1 FOR UPDATE`, [userId]);
         const owned = await c.query('SELECT item_id FROM user_items WHERE user_id = $1', [userId]);
         const out = fn(r.rows[0], owned.rows.map((x) => x.item_id)) || {};
@@ -445,6 +447,14 @@ function postgresStore(url) {
       const total = await q('SELECT count(*)::int AS n FROM users WHERE username_key LIKE $1', [like]);
       return { players: rows.rows, total: total.rows[0].n };
     },
+    // Economy: where coins and chips came from and went (last days), and the richest players.
+    async economy(days = 7) {
+      const flows = (await q(`SELECT split_part(reason, ':', 1) AS kind, COALESCE(sum(coins), 0)::float8 AS coins, COALESCE(sum(chips), 0)::float8 AS chips, count(*)::int AS n
+        FROM coin_log WHERE at > now() - ($1 || ' days')::interval GROUP BY 1 ORDER BY 1`, [String(days)])).rows;
+      const richest = (await q(`SELECT u.username, (w.chips + w.in_play)::float8 AS chips, w.coins::float8 AS coins FROM wallets w JOIN users u ON u.id = w.user_id
+        WHERE NOT u.banned ORDER BY w.chips + w.in_play DESC LIMIT 5`)).rows;
+      return { flows: flows.map((f) => ({ kind: f.kind, coins: num(f.coins), chips: num(f.chips), n: f.n })), richest: richest.map((x) => ({ username: x.username, chips: num(x.chips), coins: num(x.coins) })) };
+    },
     async totals(now) {
       const r = await q(`SELECT
           (SELECT count(*) FROM users)::int AS players,
@@ -483,7 +493,7 @@ function fileStore(file) {
   let seq = 0;
   const userById = (id) => db.users.find((u) => u.id === id);
   const freshWallet = (init) => ({ coins: init.coins, chips: init.chips, in_play: 0, last_daily: null, streak: 0, last_refill: 0,
-    last_bankrupt: 0, earned_day: null, earned_today: 0, converted_day: null, converted_today: 0 });
+    last_bankrupt: 0, earned_day: null, earned_today: 0, converted_day: null, converted_today: 0, sent_day: null, sent_today: 0 });
 
   return {
     kind: 'file',
@@ -739,6 +749,19 @@ function fileStore(file) {
           hands: st.reduce((a, x) => a + x.hands, 0), wins: st.reduce((a, x) => a + x.wins, 0) };
       }).sort((a, b) => b.last_seen - a.last_seen || b.id - a.id);
       return { players: all.slice(offset, offset + limit), total: all.length };
+    },
+    async economy(days = 7) {
+      const since = Date.now() - days * 86400000;
+      const by = {};
+      for (const e of db.coinLog || []) {
+        if (Date.parse(e.at) < since) continue;
+        const k = String(e.reason).split(':')[0];
+        const f = by[k] || (by[k] = { kind: k, coins: 0, chips: 0, n: 0 });
+        f.coins += e.coins; f.chips += e.chips; f.n++;
+      }
+      const richest = db.users.filter((u) => !u.banned && db.wallets[u.id]).map((u) => ({ username: u.username, chips: db.wallets[u.id].chips + db.wallets[u.id].in_play, coins: db.wallets[u.id].coins }))
+        .sort((a, b) => b.chips - a.chips).slice(0, 5);
+      return { flows: Object.values(by).sort((a, b) => a.kind.localeCompare(b.kind)), richest };
     },
     async totals(now) {
       const ws = Object.values(db.wallets);

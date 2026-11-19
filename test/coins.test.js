@@ -119,14 +119,14 @@ const C = require('../coins');
   assert.ok((await coins.equip(s, 'avatar', 'pf-crest')).ok);
   assert.ok((await coins.buy(s, 'title-baron')).item);
   assert.ok((await coins.equip(s, 'badge', 'title-baron')).ok);
-  assert.deepStrictEqual(await coins.lookOf(s), { avatar: 'pf:crest', badge: 't:Baron', skin: { back: null, chips: null, turn: null } });
+  assert.deepStrictEqual(await coins.lookOf(s), { avatar: 'pf:crest', badge: 't:Baron', skin: { back: null, chips: null, turn: null, victory: null } });
   // what others see also includes the card back, chip set and turn marker
   await coins.adjust(s, 5000, 0, 'owner');
   for (const id of ['back-aurora', 'chips-holo', 'turn-lightning']) assert.ok((await coins.buy(s, id)).item, id);
   assert.ok((await coins.equip(s, 'cardback', 'back-aurora')).ok);
   assert.ok((await coins.equip(s, 'chips', 'chips-holo')).ok);
   assert.ok((await coins.equip(s, 'turn', 'turn-lightning')).ok);
-  assert.deepStrictEqual((await coins.lookOf(s)).skin, { back: 'aurora', chips: 'holo', turn: 'lightning' });
+  assert.deepStrictEqual((await coins.lookOf(s)).skin, { back: 'aurora', chips: 'holo', turn: 'lightning', victory: null });
   assert(C.CATALOG.filter((i) => i.animated).length >= 8, 'animated skins for sale');
   // retired items can't be bought any more…
   assert((await coins.buy(s, 'avatar-lion')).error, 'retired items are not sold');
@@ -172,6 +172,47 @@ const C = require('../coins');
   ], JSON.stringify(log));
   const sum = log.reduce((a, e) => a + e.coins, C.WELCOME_COINS);
   assert.strictEqual(sum, (await coins.getStatus(sid)).coins, 'the statement adds up to the balance');
+
+  // ----- chips to a friend -----
+  const g1 = await newUser('gift1'), g2 = await newUser('gift2');
+  assert((await coins.sendChips(g1, g2, 50, 'G1', 'G2', t0)).error, 'at least 100');
+  assert((await coins.sendChips(g1, g2, 999999, 'G1', 'G2', t0)).error, 'not more than the daily limit');
+  await coins.adjust(g1, 0, 100000, 'owner');
+  const gs = await coins.sendChips(g1, g2, 30000, 'G1', 'G2', t0);
+  assert.deepStrictEqual([gs.sent, gs.left], [30000, C.GIFT_DAILY - 30000]);
+  assert((await coins.sendChips(g1, g2, 30000, 'G1', 'G2', t0)).error, 'daily limit reached');
+  assert.ok((await coins.sendChips(g1, g2, 30000, 'G1', 'G2', t0 + DAY)).ok, 'a new day, a new limit');
+  assert.strictEqual((await coins.getStatus(g2)).chips, C.WELCOME_CHIPS + 60000);
+  assert.strictEqual((await coins.getStatus(g1)).chips, C.WELCOME_CHIPS + 100000 - 60000);
+  assert((await coins.sendChips(g2, g1, 999999999, 'G2', 'G1', t0)).error, 'not more than you have');
+  assert.strictEqual((await coins.history(g2))[0].reason, 'gift-in:G1');
+  assert.strictEqual((await coins.history(g1))[0].reason, 'gift-out:G2');
+
+  // ----- skin boxes: odds, no duplicates, paid with coins or chips -----
+  for (const b of Object.values(C.BOXES)) assert.strictEqual(Object.values(b.odds).reduce((x, y) => x + y, 0), 100, b.name + ' odds add up to 100');
+  {
+    // the draw follows the odds (10,000 draws, nothing owned)
+    const counts = { common: 0, rare: 0, epic: 0, legendary: 0 };
+    for (let i = 0; i < 10000; i++) counts[C.rarityOf(C.drawFromBox(C.BOXES.silver, []))]++;
+    for (const r of C.RARITIES) assert(Math.abs(counts[r] / 100 - C.BOXES.silver.odds[r]) < 2.5, `silver ${r}: ${counts[r] / 100} %`);
+    assert.strictEqual(C.drawFromBox(C.BOXES.gold, C.CATALOG.map((i) => i.id)), null, 'nothing left: no item');
+  }
+  const bx = await newUser('box');
+  assert((await coins.openBox(bx, 'gold', 'coins')).error, 'not enough coins');
+  await coins.adjust(bx, 10000, 2000000, 'owner');
+  const got = new Set();
+  for (let i = 0; i < 6; i++) {
+    const o = await coins.openBox(bx, 'silver', i % 2 ? 'chips' : 'coins');
+    assert(o.item, JSON.stringify(o));
+    assert(!got.has(o.item), 'never a duplicate');
+    got.add(o.item);
+  }
+  const bst = await coins.getStatus(bx);
+  assert.strictEqual(bst.coins, 200 + 10000 - 3 * C.BOXES.silver.coins);
+  assert.strictEqual(bst.chips, 5000 + 2000000 - 3 * C.BOXES.silver.chips);
+  assert(bst.owned.length >= 6);
+  assert.strictEqual((await coins.history(bx))[0].reason, 'box:silver');
+  assert((await coins.openBox(bx, 'diamond', 'coins')).error);
 
   // ----- rewards -----
   assert.strictEqual(C.rewardFor({ mode: 'friends', won: true, net: 1250, pot: 1500 }), 13);

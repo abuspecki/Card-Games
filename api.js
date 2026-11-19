@@ -2,7 +2,7 @@
 // owner dashboard. Every request is validated here, on the server.
 const crypto = require('crypto');
 const { hashPassword, checkPassword, MODES, FEEDBACK_CATEGORIES, FEEDBACK_STATUSES } = require('./store');
-const { CATALOG, SHOP_TABS, CHIPS_PER_COIN, EXCHANGE_FEE, CONVERT_RATE, TOPUP_TO, COIN_TO_CHIPS, dayString } = require('./coins');
+const { CATALOG, SHOP_TABS, CHIPS_PER_COIN, EXCHANGE_FEE, CONVERT_RATE, TOPUP_TO, COIN_TO_CHIPS, dayString, GIFT_MIN_HANDS, GIFT_DAILY, GIFT_MIN, BOXES, rarityOf } = require('./coins');
 const fb = require('./feedback');
 const taskboard = require('./taskboard');
 
@@ -79,6 +79,7 @@ function createApi(ctx) {
 
   // ----- friend invites (short-lived, kept in memory) -----
   const invites = new Map(); // userId -> [{ id, from, table, tableName, at }]
+  const gifts = new Map();   // userId -> [{ from, amount, at }] chips received, not yet shown
   function invitesFor(userId) {
     const list = (invites.get(userId) || []).filter((i) => Date.now() - i.at < INVITE_TTL);
     invites.set(userId, list);
@@ -200,7 +201,7 @@ function createApi(ctx) {
       });
     }
     if (method === 'GET' && url === '/api/shop') {
-      return json(res, 200, { items: CATALOG, slots: SHOP_TABS, rules: { chipsPerCoin: CHIPS_PER_COIN, fee: EXCHANGE_FEE, convertRate: CONVERT_RATE, coinToChips: COIN_TO_CHIPS, topUpTo: TOPUP_TO } });
+      return json(res, 200, { items: CATALOG.map((i) => ({ ...i, rarity: rarityOf(i) })), slots: SHOP_TABS, boxes: BOXES, rules: { chipsPerCoin: CHIPS_PER_COIN, fee: EXCHANGE_FEE, convertRate: CONVERT_RATE, coinToChips: COIN_TO_CHIPS, topUpTo: TOPUP_TO } });
     }
     const profileMatch = url.match(/^\/api\/players\/([^/]{1,64})$/);
     if (method === 'GET' && profileMatch) {
@@ -277,9 +278,10 @@ function createApi(ctx) {
       else if (url === '/api/wallet/convert') r = await coins.convert(user.id, body.coins);
       else if (url === '/api/wallet/buychips') r = await coins.buyChips(user.id, body.coins);
       else if (url === '/api/shop/buy') r = await coins.buy(user.id, String(body.item || ''));
+      else if (url === '/api/shop/box') r = await coins.openBox(user.id, String(body.box || ''), String(body.pay || 'coins'));
       else if (url === '/api/shop/equip') {
         r = await coins.equip(user.id, String(body.slot || ''), body.item ? String(body.item) : null);
-        if (r.ok && ['badge', 'avatar', 'cardback', 'chips', 'turn'].includes(body.slot)) ctx.lobby.refreshLook(user.id);
+        if (r.ok && ['badge', 'avatar', 'cardback', 'chips', 'turn', 'victory'].includes(body.slot)) ctx.lobby.refreshLook(user.id);
       } else return json(res, 404, { error: 'Not found' });
       if (r.error) return json(res, 400, r);
       return json(res, 200, { ...r, wallet: await coins.getStatus(user.id) });
@@ -334,6 +336,7 @@ function createApi(ctx) {
         requests: friends.filter((f) => f.status === 'pending' && f.requested_by !== user.id).length,
         onlineFriends: friends.filter((f) => f.status === 'accepted' && presence(f.id, f.last_seen).online).length,
         questNews: await ctx.quests.takeNews(user.id),
+        gifts: (() => { const g = gifts.get(user.id) || []; gifts.delete(user.id); return g; })(),
       });
     }
 
@@ -388,6 +391,19 @@ function createApi(ctx) {
         list.push({ id: crypto.randomUUID(), from: user.username, table: room.id, tableName: room.name, game: room.game, at: Date.now() });
         invites.set(other.id, list.slice(-10));
         return json(res, 200, { ok: true });
+      }
+      // Send chips to a friend (limits against second accounts: see coins.js)
+      if (url === '/api/friends/chips') {
+        if (!rel || rel.status !== 'accepted') return json(res, 400, { error: 'You can only send chips to friends' });
+        if (limited(`gift:${user.id}`, 20, 60 * 60 * 1000)) return json(res, 429, { error: 'Too many gifts — try again later' });
+        const hands = (await store.userStats(user.id)).reduce((a, s) => a + Number(s.hands || 0), 0);
+        if (hands < GIFT_MIN_HANDS) return json(res, 400, { error: `Play ${GIFT_MIN_HANDS - hands} more rounds before you can send chips` });
+        const r = await coins.sendChips(user.id, other.id, body.amount, user.username, other.username);
+        if (r.error) return json(res, 400, r);
+        const list = gifts.get(other.id) || [];
+        list.push({ from: user.username, amount: r.sent, at: Date.now() });
+        gifts.set(other.id, list.slice(-10));
+        return json(res, 200, { ...r, wallet: await coins.getStatus(user.id) });
       }
       if (url === '/api/friends/dismiss') {
         invites.set(user.id, invitesFor(user.id).filter((i) => i.id !== String(body.id || '')));
@@ -502,6 +518,7 @@ function createApi(ctx) {
           totals: await store.totals(now),
           live: ctx.lobby.liveStats(),
           activity: await store.activity(since),
+          economy: { ...(await store.economy(7)), tipsSinceRestart: ctx.lobby.tipsTotal() },
           database: store.kind,
         });
       }

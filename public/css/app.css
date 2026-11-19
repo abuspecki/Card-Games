@@ -1066,3 +1066,25 @@ body[data-cardface="starlight"] .card:not(.shop-preview .card), .face-starlight 
   .card-back:is(.cb-sakura, .cb-kitsune, .cb-burst, .cb-starry) .deco, .card-back:is(.cb-kitsune, .cb-burst, .cb-starry) .deco::after, .card-back.cb-burst .deco::after,
   .card, .card::after, .card .pip, .card .corner { animation: none !important; }
 }
+
+/* =========================================================
+   Victory effects (skin category) — particles drawn by effects.js
+   ========================================================= */
+.fx-layer { position: absolute; inset: 0; pointer-events: none; z-index: 60; overflow: visible; }
+.fx { position: absolute; pointer-events: none; will-change: transform, opacity; }
+.fx-conf { transform-style: preserve-3d; }
+.fx-rocket { width: 4px; height: 18px; border-radius: 2px; background: linear-gradient(#FFF3B0, rgba(255,140,60,0)); box-shadow: 0 0 8px #FFD86B; }
+.fx-flash { border-radius: 50%; transform: translate(-50%,-50%); }
+.fx-spark { border-radius: 50%; }
+.fx-coin { border-radius: 50%; background: radial-gradient(circle at 35% 30%, #FFF4C2, #F2C14E 45%, #B8862A 80%); box-shadow: inset 0 0 0 2px #E0A93B, 0 2px 6px rgba(0,0,0,.4); }
+.fx-coin::after { content: '★'; position: absolute; inset: 0; display: grid; place-items: center; color: #9A6B12; font-size: 60%; }
+.fx-petal { border-radius: 70% 0 70% 0; background: linear-gradient(135deg, #FFE0EE, #FF8FC0); box-shadow: 0 0 6px rgba(255,143,192,.6); }
+.fx-dragon-seg { border-radius: 50%; background: radial-gradient(circle at 40% 35%, #FF6B5B, #C8202E 60%, #7A0B14); box-shadow: 0 0 10px rgba(255,90,60,.6); top: 0; left: 0; }
+.fx-dragon-seg.fin::before { content: ''; position: absolute; left: 30%; top: -45%; width: 40%; height: 60%; background: #F2C14E; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.fx-dragon-head { top: 0; left: 0; filter: drop-shadow(0 0 8px rgba(255,90,60,.7)); }
+.fx-dragon-head svg { width: 100%; height: 100%; overflow: visible; }
+.fx-fire { border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; background: radial-gradient(circle, #FFF6C2, #FFB23D 45%, #FF3D1C 75%, transparent 80%); mix-blend-mode: screen; }
+
+/* shop preview of a victory effect */
+.mini-fx { position: relative; width: 120px; height: 84px; border-radius: 12px; background: radial-gradient(ellipse at 50% 80%, #1F6B47, #0E3324); overflow: hidden; display: grid; place-items: center; cursor: pointer; }
+.mini-fx .mini-fx-play { position: relative; z-index: 2; font: 800 12px 'Montserrat', system-ui, sans-serif; color: #FFF; background: rgba(0,0,0,.45); padding: 4px 10px; border-radius: 999px; }

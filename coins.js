@@ -20,7 +20,11 @@ const EXCHANGE_FEE = 0.10;       // the Bank keeps 10 % of every exchange
 const CONVERT_RATE = Math.round(CHIPS_PER_COIN * (1 + EXCHANGE_FEE)); // chips you pay for 1 coin (110)
 const COIN_TO_CHIPS = Math.round(CHIPS_PER_COIN * (1 - EXCHANGE_FEE)); // chips you get for 1 coin (90)
 const BUYCHIPS_MAX = 1000;       // most coins per exchange
-const TOPUP_TO = 1000;           // the daily top-up brings you back to this many chips
+const TOPUP_TO = 1000;
+// Chips sent to friends: limits that keep second accounts from feeding a main one.
+const GIFT_MIN = 100;
+const GIFT_DAILY = 50000;        // most chips one member may send per day
+const GIFT_MIN_HANDS = 20;       // you must have played this many rounds before you can send           // the daily top-up brings you back to this many chips
 const BANKRUPT_GRANT = TOPUP_TO; // (name kept for the API)
 const INIT = { coins: WELCOME_COINS, chips: WELCOME_CHIPS };
 
@@ -128,6 +132,12 @@ const CATALOG = [
   { id: 'turn-candle', slot: 'turn', name: 'Candlelight', price: 200, preview: 'candle' },
   { id: 'turn-hourglass', slot: 'turn', name: 'Hourglass', price: 300, preview: 'hourglass' },
   { id: 'turn-watch', slot: 'turn', name: 'Pocket Watch', price: 400, preview: 'watch' },
+  // ----- victory effects: played over your seat when you win (everyone sees them) -----
+  { id: 'fx-confetti', slot: 'victory', name: 'Confetti Cannon', price: 1500, preview: 'confetti', animated: true },
+  { id: 'fx-goldrain', slot: 'victory', name: 'Gold Rain', price: 2200, preview: 'goldrain', animated: true },
+  { id: 'fx-sakura', slot: 'victory', name: 'Sakura Vortex', price: 2500, preview: 'sakura', animated: true },
+  { id: 'fx-fireworks', slot: 'victory', name: 'Fireworks', price: 3000, preview: 'fireworks', animated: true },
+  { id: 'fx-dragon', slot: 'victory', name: 'Dragon Flight', price: 5000, preview: 'dragon', animated: true },
   // ----- gestures (owned, used at the table) -----
   { id: 'gesture-nod', slot: 'gesture', name: 'A Courteous Nod', price: 100, preview: 'nods courteously' },
   { id: 'gesture-wellplayed', slot: 'gesture', name: 'Well Played', price: 150, preview: 'says “Well played.”' },
@@ -138,8 +148,33 @@ const CATALOG = [
   { id: 'gesture-monocle', slot: 'gesture', name: 'The Monocle Drop', price: 500, preview: 'drops the monocle' },
 ];
 const ITEMS = Object.fromEntries(CATALOG.map((i) => [i.id, i]));
-const SLOTS = ['cardback', 'cardface', 'felt', 'chips', 'background', 'turn', 'avatar', 'badge'];
-const SHOP_TABS = ['cardback', 'cardface', 'felt', 'chips', 'background', 'avatar', 'badge', 'turn', 'gesture'];
+
+// ----- skin boxes: a random skin you don't own yet, odds shown openly -----
+// Paid with play money only (coins, or many chips — a way to spend big chip piles).
+// Coins can never be bought with real money, so a box is never a stake of real value.
+const rarityOf = (item) => (item.price >= 2500 ? 'legendary' : item.price >= 1200 ? 'epic' : item.price >= 500 ? 'rare' : 'common');
+const BOXES = {
+  bronze: { name: 'Bronze Box', coins: 500, chips: 75000, odds: { common: 70, rare: 25, epic: 5, legendary: 0 } },
+  silver: { name: 'Silver Box', coins: 1400, chips: 210000, odds: { common: 25, rare: 45, epic: 25, legendary: 5 } },
+  gold: { name: 'Gold Box', coins: 3200, chips: 480000, odds: { common: 0, rare: 25, epic: 50, legendary: 25 } },
+};
+const RARITIES = ['common', 'rare', 'epic', 'legendary'];
+// The skins a box can give: everything for sale, never items you already own.
+const boxPool = (owned) => CATALOG.filter((i) => !i.retired && !owned.includes(i.id));
+// Draw: a rarity by the box's odds (only among rarities you can still get), then an item.
+function drawFromBox(box, owned, rand = Math.random) {
+  const pool = boxPool(owned);
+  const left = RARITIES.filter((r) => box.odds[r] > 0 && pool.some((i) => rarityOf(i) === r));
+  if (!left.length) return null;
+  const total = left.reduce((a, r) => a + box.odds[r], 0);
+  let x = rand() * total;
+  let rarity = left[left.length - 1];
+  for (const r of left) { if (x < box.odds[r]) { rarity = r; break; } x -= box.odds[r]; }
+  const items = pool.filter((i) => rarityOf(i) === rarity);
+  return items[Math.floor(rand() * items.length)];
+}
+const SLOTS = ['cardback', 'cardface', 'felt', 'chips', 'background', 'turn', 'avatar', 'badge', 'victory'];
+const SHOP_TABS = ['cardback', 'cardface', 'felt', 'chips', 'background', 'avatar', 'badge', 'turn', 'victory', 'gesture'];
 const GESTURE_COOLDOWN = 4000;   // ms between gestures per player
 
 const dayString = (t) => new Date(t).toISOString().slice(0, 10); // UTC day
@@ -336,7 +371,43 @@ function makeCoins(store) {
       const { equipped } = await store.getItems(userId);
       const pick = (slot) => (equipped[slot] && ITEMS[equipped[slot]] ? ITEMS[equipped[slot]].preview : null);
       // seen by everyone at the table: portrait, title, card back, chip set, turn marker
-      return { avatar: pick('avatar'), badge: pick('badge'), skin: { back: pick('cardback'), chips: pick('chips'), turn: pick('turn') } };
+      return { avatar: pick('avatar'), badge: pick('badge'), skin: { back: pick('cardback'), chips: pick('chips'), turn: pick('turn'), victory: pick('victory') } };
+    },
+
+    // Open a skin box, paid with coins or chips.
+    async openBox(userId, tier, pay = 'coins', rand = Math.random) {
+      const box = BOXES[tier];
+      if (!box) return { error: 'Pick a box' };
+      if (pay !== 'coins' && pay !== 'chips') return { error: 'Pay with coins or chips' };
+      return wallet(userId, (w, owned) => {
+        const price = box[pay];
+        if (w[pay] < price) return { result: { error: `The ${box.name} costs ${price.toLocaleString()} ${pay} — you have ${w[pay].toLocaleString()}` } };
+        const item = drawFromBox(box, owned, rand);
+        if (!item) return { result: { error: 'You already own everything this box can give' } };
+        return { update: { [pay]: w[pay] - price }, addItem: item.id, result: { item: item.id, rarity: rarityOf(item), paid: price, pay } };
+      }, `box:${tier}`);
+    },
+
+    // Send chips to a friend: taken from your bankroll, added to theirs, both on the statement.
+    async sendChips(fromId, toId, amount, fromName, toName, now = Date.now()) {
+      const n = int(amount);
+      if (!(n >= GIFT_MIN)) return { error: `Send at least ${GIFT_MIN} chips` };
+      const today = dayString(now);
+      const out = await wallet(fromId, (w) => {
+        const sent = w.sent_day === today ? w.sent_today : 0;
+        if (sent + n > GIFT_DAILY) return { result: { error: `You can send up to ${GIFT_DAILY.toLocaleString()} chips a day (${Math.max(0, GIFT_DAILY - sent).toLocaleString()} left today)` } };
+        if (w.chips < n) return { result: { error: `You only have ${w.chips.toLocaleString()} chips in your bankroll` } };
+        return { update: { chips: w.chips - n, sent_day: today, sent_today: sent + n }, result: { chips: w.chips - n, left: GIFT_DAILY - sent - n } };
+      }, `gift-out:${toName}`);
+      if (out.error) return out;
+      try {
+        await wallet(toId, (w) => ({ update: { chips: w.chips + n }, result: {} }), `gift-in:${fromName}`);
+      } catch (e) {
+        // could not deliver: give the chips back
+        await wallet(fromId, (w) => ({ update: { chips: w.chips + n, sent_today: Math.max(0, (w.sent_today || 0) - n) }, result: {} }), `gift-back:${toName}`);
+        throw e;
+      }
+      return { ok: true, sent: n, chips: out.chips, left: out.left };
     },
 
     // Owner tool: add or remove coins/chips (never below zero).
@@ -370,5 +441,5 @@ function rewardFor(r) {
 module.exports = {
   makeCoins, rewardFor, status, dailyAmount, dayString, CATALOG, ITEMS, SLOTS, SHOP_TABS, GESTURE_COOLDOWN,
   WELCOME_COINS, WELCOME_CHIPS, TABLE_DAILY_CAP, CHIPS_PER_COIN, EXCHANGE_FEE, CONVERT_RATE, COIN_TO_CHIPS, BUYCHIPS_MAX,
-  TOPUP_TO, BANKRUPT_GRANT, coinsForWin,
+  TOPUP_TO, BANKRUPT_GRANT, coinsForWin, BOXES, RARITIES, rarityOf, drawFromBox, boxPool, GIFT_MIN, GIFT_DAILY, GIFT_MIN_HANDS,
 };

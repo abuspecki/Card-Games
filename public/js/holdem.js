@@ -9,13 +9,18 @@
   const { card, back, chip, chipsFor, stack, fromCode, fmt, place } = CardUI;
   const PLAYING = ['preflop', 'flop', 'turn', 'river'];
   // Upright layout: keep side seats clear of the board row.
+  // Seat angles (k = 0 is you). On a computer the top centre stays free for the dealer;
+  // on a phone the dealer stands in the top-left corner instead.
   const PORT_ANGLES = [90, 140, 200, 238, 270, 302, 340, 40];
+  const LAND_ANGLES = [90, 140, 180, 215, 250, 290, 335, 20];
 
   const L = {
     land: { W: 1440, H: 780, table: [160, 96, 1120, 548], cx: 720, cy: 370, rx: 610, ry: 318, me: [720, 706],
-      board: { size: 96, gap: 12, y: 296 }, potY: 236, hole: 52, mine: { size: 104, y: 516 }, msgY: 468, label: [720, 660] },
+      board: { size: 96, gap: 12, y: 296 }, potY: 236, hole: 52, mine: { size: 104, y: 516 }, msgY: 468, label: [720, 660], angles: LAND_ANGLES,
+      dealer: { x: 720, y: -6, size: 132 } },
     port: { W: 440, H: 760, table: [28, 58, 384, 600], cx: 220, cy: 352, rx: 168, ry: 300, me: [220, 704],
-      board: { size: 54, gap: 6, y: 322 }, potY: 276, hole: 30, mine: { size: 82, y: 560 }, msgY: 432, label: [220, 532], angles: PORT_ANGLES },
+      board: { size: 54, gap: 6, y: 322 }, potY: 276, hole: 30, mine: { size: 82, y: 560 }, msgY: 432, label: [220, 532], angles: PORT_ANGLES,
+      dealer: { x: 40, y: 2, size: 62 } },
   };
 
   let raiseTouched = false;
@@ -34,6 +39,7 @@
     const fly = ctx.h('div', 'layer fly-layer');   // chips in flight; not cleared by each redraw
     fly.id = 'hFly';
     ctx.stage.append(t, layer, fly);
+    buildDealer(ctx, G);
 
     // Controls (design: action panel)
     ctx.controls.innerHTML = `
@@ -253,6 +259,9 @@
     }
 
     animateChips(st, G, port, betsNow, platesNow);
+    dealCards(st, G, port, platesNow);
+    const tipBtn = document.getElementById('hTip');
+    if (tipBtn) tipBtn.hidden = st.mySeat === -1 || !!(S && S.watching) || !!(S && S.tourney);
     renderControls(st, ctx);
   }
 
@@ -290,6 +299,127 @@
         if (to && w.amount > 0) flyTo(w.amount, potAt, to, start + n * 150, port ? 26 : 40);
       });
       if (window.Sound) setTimeout(() => Sound.play('chips'), start + 200);
+    }
+  }
+
+  // ---------- the dealer: an animated croupier at the top of the table ----------
+  const DEALER_SVG = `<svg viewBox="0 0 120 120" aria-hidden="true">
+    <defs><linearGradient id="dVest" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1F5C40"/><stop offset="1" stop-color="#0E3324"/></linearGradient>
+      <linearGradient id="dHair" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2B2F55"/><stop offset="1" stop-color="#151833"/></linearGradient></defs>
+    <g class="d-body">
+      <path d="M22 120 Q24 86 60 80 Q96 86 98 120 Z" fill="url(#dVest)"/>
+      <path d="M48 82 L60 104 L72 82 Z" fill="#F7F3EA"/>
+      <path d="M52 86 L60 92 L68 86 L68 94 L60 90 L52 94 Z" fill="#F2C14E" stroke="#9A7420" stroke-width=".8"/>
+      <circle cx="60" cy="100" r="1.6" fill="#C9A45C"/><circle cx="60" cy="108" r="1.6" fill="#C9A45C"/>
+      <g class="d-head">
+        <rect x="53" y="66" width="14" height="16" rx="6" fill="#F3CDB5"/>
+        <ellipse cx="60" cy="50" rx="21" ry="23" fill="#F8DCC8"/>
+        <path d="M37 50 Q34 24 58 22 Q86 20 84 50 Q80 36 72 33 Q70 42 62 38 Q58 44 50 38 Q44 44 37 50 Z" fill="url(#dHair)"/>
+        <path d="M38 48 Q36 60 40 66 Q39 56 42 48 Z M82 48 Q85 60 80 66 Q82 56 78 48 Z" fill="url(#dHair)"/>
+        <g class="d-eyes">
+          <ellipse cx="51" cy="53" rx="4.2" ry="5.4" fill="#2A2350"/><ellipse cx="69" cy="53" rx="4.2" ry="5.4" fill="#2A2350"/>
+          <circle cx="52.3" cy="51" r="1.6" fill="#fff"/><circle cx="70.3" cy="51" r="1.6" fill="#fff"/>
+        </g>
+        <path d="M46 46 Q51 43 56 46 M64 46 Q69 43 74 46" stroke="#1C1F3D" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+        <path class="d-mouth" d="M55 63 Q60 66.5 65 63" stroke="#B5525A" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+        <ellipse cx="45" cy="60" rx="3.5" ry="1.8" fill="#F4A7A7" opacity=".55"/><ellipse cx="75" cy="60" rx="3.5" ry="1.8" fill="#F4A7A7" opacity=".55"/>
+      </g>
+    </g>
+    <g class="d-arm d-arm-l"><path d="M30 106 Q18 112 22 120 L36 120 Z" fill="#163F2C"/><ellipse cx="26" cy="116" rx="7" ry="4.5" fill="#F8DCC8"/></g>
+    <g class="d-arm d-arm-r"><path d="M90 106 Q102 112 98 120 L84 120 Z" fill="#163F2C"/><ellipse cx="94" cy="116" rx="7" ry="4.5" fill="#F8DCC8"/></g>
+  </svg>`;
+  const THANKS = ['Thank you!', 'Much appreciated!', 'Good luck at the table!', 'May the river be kind!', 'You are too generous!'];
+  let lastDealtHand = 0;
+
+  function buildDealer(ctx, G) {
+    const D = G.dealer;
+    const d = ctx.h('div', 'dealer-figure');
+    d.id = 'hDealer';
+    d.innerHTML = DEALER_SVG + '<span class="d-bubble"></span>';
+    Object.assign(d.style, { left: D.x - D.size / 2 + 'px', top: D.y + 'px', width: D.size + 'px', height: D.size + 'px' });
+    // tipping: seated players only
+    const tip = ctx.h('button', 'tip-btn', '💰');
+    tip.id = 'hTip';
+    tip.title = 'Tip the dealer';
+    tip.setAttribute('aria-label', 'Tip the dealer');
+    Object.assign(tip.style, { left: D.x + D.size * 0.42 + 'px', top: D.y + D.size * 0.5 + 'px' });
+    tip.onclick = (e) => { e.stopPropagation(); tipMenu(ctx, tip); };
+    ctx.stage.append(d, tip);
+  }
+  function tipMenu(ctx, anchor) {
+    document.querySelectorAll('.tip-menu').forEach((x) => x.remove());
+    const st = ctx.st;
+    const bb = st.settings.bigBlind;
+    const menu = ctx.h('div', 'tip-menu');
+    menu.innerHTML = `<b>Tip the dealer</b>${[1, 5, 25].map((x) => `<button data-a="${bb * x}">${fmt(bb * x)}</button>`).join('')}`;
+    menu.querySelectorAll('button').forEach((b) => { b.onclick = () => { ctx.send({ t: 'tip', amount: Number(b.dataset.a) }); menu.remove(); }; });
+    const r = anchor.getBoundingClientRect();
+    menu.style.left = Math.max(8, Math.min(window.innerWidth - 220, r.left - 80)) + 'px';
+    menu.style.top = r.bottom + 8 + 'px';
+    document.body.appendChild(menu);
+    setTimeout(() => document.addEventListener('click', function close(ev) { if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', close); } }), 0);
+  }
+  function dealerSay(text, ms = 2600) {
+    const d = document.getElementById('hDealer');
+    if (!d) return;
+    const b = d.querySelector('.d-bubble');
+    b.textContent = text;
+    d.classList.add('talking');
+    clearTimeout(dealerSay.t);
+    dealerSay.t = setTimeout(() => d.classList.remove('talking'), ms);
+  }
+  // Someone tipped: their chip flies to the dealer, the dealer bows and says thank you.
+  function onTip(m, ctx) {
+    const G = L[ctx.layout];
+    const d = document.getElementById('hDealer');
+    const fly = document.getElementById('hFly');
+    const from = prevView && prevView.plates.get(m.seat);
+    if (fly && from && d) {
+      const f = document.createElement('div');
+      f.className = 'chip-fly';
+      f.append(stack(m.amount, { size: ctx.layout === 'port' ? 24 : 36, maxPer: 4, maxCols: 2, label: false }));
+      place(f, from[0], from[1]).style.transform = 'translate(-50%,-50%)';
+      fly.appendChild(f);
+      const to = [G.dealer.x, G.dealer.y + G.dealer.size * 0.75];
+      const a = f.animate([{ transform: 'translate(-50%,-50%)', opacity: 1 }, { transform: `translate(calc(-50% + ${to[0] - from[0]}px), calc(-50% + ${to[1] - from[1]}px)) scale(.7)`, opacity: 0 }],
+        { duration: 800, easing: 'cubic-bezier(.3,.7,.3,1)', fill: 'both' });
+      a.onfinish = () => f.remove();
+    }
+    if (d) {
+      d.classList.remove('bow'); void d.offsetWidth; d.classList.add('bow');
+      setTimeout(() => d.classList.remove('bow'), 1300);
+    }
+    setTimeout(() => dealerSay(`${THANKS[Math.floor(Math.random() * THANKS.length)]} ♥`), 500);
+  }
+  // A new hand: the dealer's hand moves and two cards fly to every player.
+  function dealCards(st, G, port, platesNow) {
+    if (st.handNo === lastDealtHand || st.stage !== 'preflop') return;
+    lastDealtHand = st.handNo;
+    const d = document.getElementById('hDealer');
+    const fly = document.getElementById('hFly');
+    if (!d || !fly || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+    d.classList.remove('dealing'); void d.offsetWidth; d.classList.add('dealing');
+    setTimeout(() => d.classList.remove('dealing'), 1600);
+    const from = [G.dealer.x, G.dealer.y + G.dealer.size * 0.85];
+    const meIdx = st.mySeat === -1 ? 0 : st.mySeat;
+    const order = [];
+    st.seats.forEach((s, i) => { if (s && s.inHand) order.push(i); });
+    let n = 0;
+    for (let round = 0; round < 2; round++) for (const i of order) {
+      const k = (i - meIdx + 8) % 8;
+      const to = k === 0 ? [G.cx, G.mine.y + G.mine.size * 0.5] : (slot(G, k).hole || platesNow.get(i));
+      if (!to) continue;
+      const c = back('holdem', { size: port ? 26 : 44, skin: (st.seats[i].skin && st.seats[i].skin.back) || '' });
+      c.classList.add('deal-fly');
+      place(c, from[0], from[1]).style.transform = 'translate(-50%,-50%)';
+      fly.appendChild(c);
+      const a = c.animate([
+        { transform: 'translate(-50%,-50%) rotate(0deg)', opacity: 1 },
+        { transform: `translate(calc(-50% + ${to[0] - from[0]}px), calc(-50% + ${to[1] - from[1]}px)) rotate(${360 + (k - 4) * 6}deg)`, opacity: 1, offset: 0.9 },
+        { transform: `translate(calc(-50% + ${to[0] - from[0]}px), calc(-50% + ${to[1] - from[1]}px)) rotate(${360 + (k - 4) * 6}deg)`, opacity: 0 },
+      ], { duration: 420, delay: n * 90, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'both' });
+      a.onfinish = () => c.remove();
+      n++;
     }
   }
 
@@ -368,5 +498,5 @@
     if (b && !document.getElementById(b).disabled) document.getElementById(b).click();
   });
 
-  window.TableUI.holdem = { size: { land: [1440, 780], port: [440, 760] }, build, render };
+  window.TableUI.holdem = { size: { land: [1440, 780], port: [440, 760] }, build, render, onTip };
 })();

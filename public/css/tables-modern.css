@@ -117,3 +117,8 @@ body.game.portrait .tbar .tb-center strong { font-size: 16px !important; max-wid
 body.roulette.portrait .r-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 100%; }
 body.roulette.portrait .r-buttons .pill { min-width: 0; padding: 10px 4px !important; font-size: 14px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 body.roulette.portrait .r-buttons .r-spin { grid-column: 1 / -1; padding: 12px !important; }
+
+/* watching a table */
+.spectate { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 16px; border-radius: 16px;
+  background: rgba(9, 16, 13, .9); border: 1px solid rgba(242, 193, 78, .5); color: #F1F4F0; font: 700 14px var(--m-font, 'Montserrat', sans-serif); box-shadow: 0 10px 30px rgba(0, 0, 0, .45); white-space: nowrap; }
+.spectate .btn { border-radius: 12px; padding: 9px 16px; min-height: 0; background: #F2C14E; color: #231A02; font-weight: 800; }

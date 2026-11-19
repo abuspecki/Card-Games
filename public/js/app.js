@@ -469,12 +469,11 @@
         btn.disabled = full;
         btn.onclick = () => joinTable(t.id);
         row.appendChild(btn);
-        if (App.account && App.account.isOwner) {
-          const wb = h('button', 'rt-watch', '👁 Watch');
-          wb.title = 'Watch this table without taking a seat';
-          wb.onclick = () => watchTable(t.id);
-          row.appendChild(wb);
-        }
+        // anyone can watch a table without taking a seat
+        const wb = h('button', 'rt-watch', '👁 Watch');
+        wb.title = 'Watch this table without taking a seat';
+        wb.onclick = () => watchTable(t.id);
+        row.appendChild(wb);
         list.appendChild(row);
       }
     }
@@ -769,6 +768,12 @@
       return;
     }
     if (m.t === 'sfx') { Sound.play(m.name); return; }
+    if (m.t === 'tip') {
+      const ui = window.TableUI[App.game];
+      if (ui && ui.onTip) ui.onTip(m, ctx);
+      Sound.play('chips');
+      return;
+    }
     if (m.t === 'gesture') {
       bubbles[m.seat] = { text: `${m.name} ${m.text}`, until: Date.now() + 4000, gesture: true };
       Sound.play('chat');
@@ -842,6 +847,7 @@
     App.tableId = null; App.S = null; App.game = null; App.watching = false;
     if ($('tourneyBar')) $('tourneyBar').remove();
     if ($('sitOut')) $('sitOut').remove();
+    if ($('spectate')) $('spectate').remove();
     if (App.ws) { App.ws.onclose = null; App.ws.close(); App.ws = null; }
     $('tableScreen').classList.add('hidden');
     $('hub').classList.remove('hidden');
@@ -910,6 +916,7 @@
     fit();
     ui.render(st, S, ctx);
     markTurn(st);
+    playVictory(st);
     renderChat(st);
     renderBubbles(st);
     renderLog(st);
@@ -917,6 +924,7 @@
     renderPrivateCode(S);
     renderTourney(S);
     renderSitOut(S, st);
+    renderSpectate(S);
     renderOdds(st);
     // Title: long on a computer; on a phone two short lines ("Hold'em · 5/10" over "Table 1").
     const title = document.querySelector('[data-tb-title]');
@@ -1035,6 +1043,22 @@
     }), 0);
   }
 
+  // A round is won: the winners' victory effects play over their seats (everyone sees them).
+  let lastVictoryKey = '';
+  function playVictory(st) {
+    if (st.stage !== 'showdown' || !st.results || !st.results.winners) return;
+    const key = `${App.tableId}:${st.handNo}`;
+    if (key === lastVictoryKey) return;
+    lastVictoryKey = key;
+    const scale = App.layout === 'port' ? 0.55 : 1;
+    st.results.winners.slice(0, 3).forEach((w, n) => {
+      const s = st.seats[w.seat];
+      const fx = s && s.skin && s.skin.victory;
+      const at = ctx.plates[w.seat];
+      if (fx && at && window.Effects) setTimeout(() => window.Effects.play(fx, ctx.stage, at[0], at[1], { scale }), 250 + n * 400);
+    });
+  }
+
   // The player whose turn it is shows *their* turn marker (everyone sees it).
   function markTurn(st) {
     const s = st.toAct >= 0 ? st.seats[st.toAct] : null;
@@ -1042,6 +1066,19 @@
     document.querySelectorAll('#stage :is(.seat, .plate, .spot-label, .r-plate).active').forEach((e) => {
       if (turn) e.dataset.turn = turn; else delete e.dataset.turn;
     });
+  }
+
+  // Watching: a clear note and a way to sit down.
+  function renderSpectate(S) {
+    let box = $('spectate');
+    if (!S.watching) { if (box) box.remove(); return; }
+    if (box) return;
+    box = h('div', 'spectate', '<span>👁 You are watching</span>');
+    box.id = 'spectate';
+    const sit = h('button', 'btn btn-navy', 'Take a seat');
+    sit.onclick = () => { const id = App.tableId; App.watching = false; joinTable(id); };
+    box.appendChild(sit);
+    $('stageWrap').appendChild(box);
   }
 
   // Sit out: keep the seat, skip the next hands until you come back.
@@ -1385,6 +1422,10 @@
     if (kind === 'quest') return two('Quest:', detail);
     if (kind === 'achievement') return two('Achievement:', detail);
     if (kind === 'tourney') return '<span>Sit & Go prize</span>';
+    if (kind === 'gift-out') return two('Chips sent to', detail);
+    if (kind === 'gift-in') return two('Chips from', detail);
+    if (kind === 'gift-back') return two('Gift returned:', detail);
+    if (kind === 'box') return two('Skin box:', ({ bronze: 'Bronze', silver: 'Silver', gold: 'Gold' })[detail] || detail);
     if (kind === 'weekly') return `<span>Weekly ranking</span> · <b>Place ${esc(detail)}</b>`;
     if (kind === 'gift') return '<span>Gift from the house</span>';
     if (kind === 'bonus') return '<span>Thank-you bonus for an update</span>';
@@ -1646,6 +1687,7 @@
 
   // ----- shop -----
   const SLOT_INFO = {
+    boxes: ['🎁 Boxes', 'A random skin you don\'t own yet — never a duplicate. Pay with coins, or with chips. The odds are shown on every box.'],
     cardback: ['Card backs', 'The back of your face-down cards — everyone at your table sees it.'],
     cardface: ['Card faces', 'How the faces of the cards are printed — on your screen.'],
     felt: ['Table felt', 'The cloth of every table you sit at — on your screen.'],
@@ -1653,10 +1695,72 @@
     chips: ['Chip sets', 'Your chips when you bet — everyone at your table sees them.'],
     avatar: ['Portraits', 'A frame around your initials on your nameplate — everyone at your table sees it.'],
     badge: ['Titles', 'A title written before your name — everyone at your table and on your profile sees it.'],
+    victory: ['Victory effects', 'A big moment over your seat when you win a round — everyone at your table sees it. Tap a preview to play it.'],
     turn: ['Turn markers', 'Your emblem when it is your turn — everyone at your table sees it.'],
     gesture: ['Gestures', 'Little courtesies for the table. Every gesture you own is yours to use — open the hat button at any table.'],
   };
   let shopSlot = 'cardback';
+
+  // ----- skin boxes -----
+  const RARITY = { common: ['Common', '#B8C4BE'], rare: ['Rare', '#4FA3FF'], epic: ['Epic', '#B36BFF'], legendary: ['Legendary', '#F2C14E'] };
+  function paintBoxes(body) {
+    const w = App.wallet;
+    const grid = h('div', 'box-grid');
+    for (const [tier, b] of Object.entries(App.shop.boxes)) {
+      const card = h('div', 'box-card tier-' + tier);
+      card.innerHTML = `
+        <div class="chest"><div class="chest-lid"></div><div class="chest-body"></div><div class="chest-glow"></div></div>
+        <b>${esc(b.name)}</b>
+        <ul class="odds">${['common', 'rare', 'epic', 'legendary'].filter((r) => b.odds[r]).map((r) => `<li><i style="background:${RARITY[r][1]}"></i><span>${RARITY[r][0]}</span><em>${b.odds[r]} %</em></li>`).join('')}</ul>`;
+      const pay = (kind) => {
+        const price = b[kind];
+        const btn = h('button', 'pill ' + (kind === 'coins' ? 'gold' : ''), `<i class="${kind === 'coins' ? 'ico-coin' : 'ico-chip'}"></i>${fmt(price)}`);
+        btn.disabled = w[kind] < price;
+        btn.onclick = () => openBox(body, tier, kind, btn);
+        return btn;
+      };
+      const row = h('div', 'box-pay');
+      row.append(pay('coins'), pay('chips'));
+      card.appendChild(row);
+      grid.appendChild(card);
+    }
+    body.appendChild(grid);
+    body.appendChild(h('p', 'fine', 'Play money only: coins and chips cannot be bought with real money or paid out. If a box has nothing new left for you, it cannot be opened.'));
+  }
+  async function openBox(body, tier, pay, btn) {
+    btn.disabled = true;
+    const r = await walletAction('/api/shop/box', { box: tier, pay });
+    btn.disabled = false;
+    if (!r) return;
+    const item = App.shop.items.find((i) => i.id === r.item);
+    const [rName, rColor] = RARITY[r.rarity];
+    const ov = h('div', 'box-reveal tier-' + tier);
+    ov.style.setProperty('--rc', rColor);
+    ov.innerHTML = `<div class="chest big shaking"><div class="chest-lid"></div><div class="chest-body"></div><div class="chest-glow"></div></div><div class="reveal hidden"></div>`;
+    document.body.appendChild(ov);
+    Sound.play('chips');
+    setTimeout(() => {
+      ov.querySelector('.chest').classList.replace('shaking', 'opening');
+      if (window.Effects && (r.rarity === 'legendary' || r.rarity === 'epic')) window.Effects.play(r.rarity === 'legendary' ? 'fireworks' : 'confetti', ov, window.innerWidth / 2, window.innerHeight / 2, { scale: 1 });
+    }, 1100);
+    setTimeout(() => {
+      const rev = ov.querySelector('.reveal');
+      rev.classList.remove('hidden');
+      rev.innerHTML = `<small style="color:${rColor}">${rName}</small><h3>${esc(item ? item.name : r.item)}</h3>`;
+      if (item) rev.insertBefore(shopPreview(item), rev.querySelector('h3'));
+      const row = h('div', 'row gap');
+      if (item && item.slot !== 'gesture') {
+        const eq = h('button', 'btn btn-navy', 'Use it now');
+        eq.onclick = async () => { await walletAction('/api/shop/equip', { slot: item.slot, item: item.id }); ov.remove(); paintLounge(body); };
+        row.appendChild(eq);
+      }
+      const ok = h('button', 'btn btn-outline', 'Great!');
+      ok.onclick = () => { ov.remove(); paintLounge(body); };
+      row.appendChild(ok);
+      rev.appendChild(row);
+      Sound.play('win');
+    }, 1700);
+  }
   function shopPreview(item) {
     const box = h('div', 'shop-preview');
     if (item.slot === 'cardback') {
@@ -1678,6 +1782,10 @@
       const plate = h('div', 'mini-turn', `<span class="mt-av">${avatarMarkup(null, App.account.username)}</span><span>Your turn</span>`);
       plate.dataset.turn = item.preview;
       box.appendChild(plate);
+    } else if (item.slot === 'victory') {
+      const fx = h('div', 'mini-fx', `<span class="mini-fx-play">${item.preview === 'classic' ? 'No effect' : '▶ Play'}</span>`);
+      if (item.preview !== 'classic') fx.onclick = (e) => { e.stopPropagation(); window.Effects.play(item.preview, fx, 60, 70, { scale: 0.32 }); };
+      box.appendChild(fx);
     } else if (item.slot === 'gesture') box.appendChild(h('span', 'mini-gesture', `<b>${esc(App.account.username)}</b> ${esc(item.preview)}`));
     else if (item.slot === 'avatar') box.appendChild(h('span', 'mini-avatar', avatarMarkup(item.preview === 'classic' ? null : item.preview, App.account.username)));
     else box.appendChild(h('span', 'mini-badge', `${item.preview === 'classic' ? '' : titleMarkup(item.preview)}${esc(App.account.username)}`));
@@ -1688,20 +1796,21 @@
     const head = h('div', 'shop-head', `<span>Your coins: <b><i class="ico-coin"></i>${fmt(w.coins)}</b></span>`);
     body.appendChild(head);
     const sub = h('div', 'subtabs');
-    for (const slot of App.shop.slots) {
-      const b = h('button', slot === shopSlot ? 'on' : '', SLOT_INFO[slot][0]);
+    for (const slot of ['boxes', ...App.shop.slots]) {
+      const b = h('button', (slot === shopSlot ? 'on' : '') + (slot === 'boxes' ? ' box-tab' : ''), SLOT_INFO[slot][0]);
       b.onclick = () => { shopSlot = slot; paintLounge(body); };
       sub.appendChild(b);
     }
     body.appendChild(sub);
     body.appendChild(h('p', 'fine', esc(SLOT_INFO[shopSlot][1])));
+    if (shopSlot === 'boxes') { paintBoxes(body); return; }
     const grid = h('div', 'shop-grid');
     const isGesture = shopSlot === 'gesture';
     const equipped = w.equipped[shopSlot];
     if (!isGesture) {
       const def = h('div', 'shop-item' + (!equipped ? ' on' : ''));
       def.appendChild(shopPreview({ slot: shopSlot, preview: 'classic' }));
-      def.appendChild(h('b', '', shopSlot === 'badge' ? 'No title' : shopSlot === 'avatar' ? 'Initials' : 'House classic'));
+      def.appendChild(h('b', '', shopSlot === 'badge' ? 'No title' : shopSlot === 'avatar' ? 'Initials' : shopSlot === 'victory' ? 'No effect' : 'House classic'));
       def.appendChild(h('em', '', 'Free'));
       const db = h('button', 'pill', equipped ? 'Use' : 'In use');
       db.disabled = !equipped;
@@ -1797,6 +1906,7 @@
       row.appendChild(who(f));
       if (f.where) row.appendChild(btn('Join', 'gold', () => { closeModal(); joinTable(f.where.table); }));
       if (App.tableId && f.online) row.appendChild(btn('Invite', '', () => inviteFriend(f.username)));
+      row.appendChild(btn('🎁 Chips', '', () => sendChipsModal(f.username)));
       row.appendChild(btn('Remove', 'quiet', () => { if (confirm(`Remove ${f.username} from your friends?`)) act('/api/friends/remove', f.username); }));
       return row;
     });
@@ -1831,6 +1941,34 @@
     });
   }
 
+  // ----- send chips to a friend -----
+  function sendChipsModal(username) {
+    openModal((card) => {
+      modalHead(card, 'A gift among friends', `Send chips to ${esc(username)}`);
+      const have = App.wallet ? App.wallet.chips : 0;
+      const form = h('form', 'mform');
+      form.innerHTML = `
+        <div class="gift-quick">${[500, 1000, 5000, 10000].map((v) => `<button type="button" class="pill" data-v="${v}">${fmt(v)}</button>`).join('')}</div>
+        <label>Chips<input name="n" type="number" min="100" step="100" value="1000" inputmode="numeric" required></label>
+        <p class="fine">From your bankroll (you have ${fmt(have)}). Up to 50,000 chips a day; you need 20 rounds played before you can send.</p>
+        <p class="merror" role="alert"></p>
+        <button class="btn btn-navy wide" type="submit">Send the chips</button>`;
+      card.appendChild(form);
+      form.querySelectorAll('[data-v]').forEach((b) => { b.onclick = () => { form.n.value = b.dataset.v; }; });
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        const amount = Math.floor(Number(form.n.value) || 0);
+        if (!confirm(`Send ${fmt(amount)} chips to ${username}?`)) return;
+        const r = await walletAction('/api/friends/chips', { username, amount });
+        if (!r) return;
+        closeModal();
+        coinPop(r.sent, `Sent to ${username}`, 'chip');
+        Sound.play('chips');
+      };
+    });
+  }
+  App.sendChipsModal = sendChipsModal;
+
   // ----- presence: heartbeat, invites, friend requests -----
   const seenInvites = new Set();
   async function pollPresence() {
@@ -1845,6 +1983,12 @@
       loadWallet();
     }
     if ((r.data.questNews || []).length) loadQuestSummary();
+    for (const g of r.data.gifts || []) {
+      coinPop(g.amount, `🎁 from ${g.from}`, 'chip');
+      toast(`${g.from} sent you ${fmt(g.amount)} chips!`, { kind: 'good', timeout: 8000 });
+      Sound.play('win');
+      loadWallet();
+    }
     renderMemberBar();
     for (const inv of r.data.invites) {
       if (seenInvites.has(inv.id)) continue;
@@ -1914,6 +2058,7 @@
         if (p.friendship === 'received') btn('Accept friend request', 'btn-navy', async () => { await api('/api/friends/respond', { username: p.username, accept: true }); toast(`You and ${p.username} are now friends.`, { kind: 'good' }); closeModal(); });
         if (p.friendship === 'sent') row.appendChild(h('span', 'muted', 'Friend request sent.'));
         if (p.friendship === 'friends' && App.tableId && p.online) btn('Invite to my table', 'btn-navy', () => { inviteFriend(p.username); closeModal(); });
+        if (p.friendship === 'friends') btn('🎁 Send chips', 'btn-outline', () => sendChipsModal(p.username));
         if (p.where && p.friendship === 'friends' && p.where.table !== App.tableId) btn(`Join at ${p.where.tableName}`, 'btn-outline', () => { closeModal(); joinTable(p.where.table); });
       }
       card.appendChild(row);

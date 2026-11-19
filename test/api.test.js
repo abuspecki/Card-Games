@@ -118,11 +118,15 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   assert.deepStrictEqual(fb.map((f) => [f.username, f.status]), [[A, 'received']]);
   assert.strictEqual((await call('GET', '/api/presence', tb)).data.requests, 1);
   assert.strictEqual((await call('POST', '/api/friends/invite', ta, { username: B, table: 'HOLDEM-1' })).status, 400, 'invite needs friendship');
+  assert.strictEqual((await call('POST', '/api/friends/chips', ta, { username: B, amount: 500 })).status, 400, 'chips only to friends');
   r = await call('POST', '/api/friends/respond', tb, { username: A, accept: true });
   assert.strictEqual(r.data.status, 'friend');
   const fa = (await call('GET', '/api/friends', ta)).data.friends;
   assert.strictEqual(fa[0].status, 'friend');
   assert.strictEqual(fa[0].online, true, 'B was just active');
+  r = await call('POST', '/api/friends/chips', ta, { username: B, amount: 500 });
+  assert.strictEqual(r.status, 400);
+  assert(/more rounds/.test(r.data.error), 'new accounts must play before they can send: ' + r.data.error);
   r = await call('POST', '/api/friends/invite', ta, { username: B, table: 'BLACKJACK-1' });
   assert.strictEqual(r.status, 200);
   const pres = (await call('GET', '/api/presence', tb)).data;
@@ -351,16 +355,21 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   assert.strictEqual(typeof st0.idle, 'boolean');
   assert.strictEqual(typeof st0.players, 'number');
 
-  // ----- owners can watch a table without a seat -----
+  // ----- anyone can watch a table without a seat (members, guests, the owner) -----
   const watch = (session) => new Promise((resolve) => {
     const ws = new WebSocket(`ws://localhost:${PORT}`);
     const got = [];
     ws.on('message', (d) => { const m = JSON.parse(d); got.push(m); if (m.t === 'error' || (m.t === 'state' && m.watching)) resolve({ ws, m, got }); });
     ws.on('open', () => ws.send(JSON.stringify({ t: 'watch', room: 'HOLDEM-1', session })));
   });
-  const notOwner = await watch(ta);
-  assert.strictEqual(notOwner.m.t, 'error', 'only owners may watch');
-  notOwner.ws.close();
+  const member = await watch(ta);
+  assert.strictEqual(member.m.t, 'state', 'members may watch');
+  assert.strictEqual(member.m.state.mySeat, -1);
+  member.ws.close();
+  const guestW = await watch(null);
+  assert.strictEqual(guestW.m.t, 'state', 'guests may watch');
+  assert(guestW.m.state.seats.every((x) => !x || !x.hole || x.hole.every((c) => !c)), 'onlookers see no hidden cards');
+  guestW.ws.close();
   const hum0 = (await call('GET', '/api/tables', null)).data.tables.find((x) => x.id === 'HOLDEM-1').humans;
   const w1 = await watch(to);
   assert.strictEqual(w1.m.state.mySeat, -1, 'watcher has no seat');

@@ -216,3 +216,6 @@ html[data-theme="dark"] .owner-tools :is(textarea, input[type=number], select), 
 .pw-box { margin-top: 10px; padding: 12px 14px; border: 1px solid var(--gold, #C9A45C); border-radius: 12px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .pw-box code { font: 700 20px ui-monospace, Menlo, monospace; letter-spacing: .08em; padding: 4px 10px; border-radius: 8px; background: rgba(201, 164, 92, .15); user-select: all; }
 .pw-box small { flex-basis: 100%; opacity: .75; }
+#economy .rich { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+#economy .rich span { color: var(--muted, #8FA39A); margin-left: 6px; }
+#economy tr.total td { border-top: 2px solid rgba(255,255,255,.15); }
