@@ -590,7 +590,7 @@
   const PRIV_STAKES = {
     holdem: { stakes: [10, 20, 50, 100, 200, 500, 1000, 2000, 5000], buyIns: [20, 50, 100, 200], def: [10, 100], minBuyIn: 10, label: "Hold'em" },
     draw: { stakes: [10, 20, 50, 100, 200, 500, 1000, 2000, 5000], buyIns: [20, 50, 100, 200], def: [10, 100], minBuyIn: 10, label: 'Five Card Draw' },
-    blackjack: { stakes: [5, 10, 25, 50, 100, 250, 500, 1000], buyIns: [20, 50, 100, 200], def: [10, 100], minBuyIn: 5, label: 'Blackjack' },
+    blackjack: { stakes: [5, 10, 25, 50, 100, 250, 500, 1000], buyIns: [20, 50, 100, 200, 500, 1000], def: [10, 100], minBuyIn: 5, label: 'Blackjack' },
     roulette: { stakes: [5, 10, 25, 50, 100, 250, 500], buyIns: [20, 50, 100, 200], def: [5, 200], minBuyIn: 5, label: 'Roulette' },
   };
   function privateSettings(card, game, create) {

@@ -75,7 +75,7 @@
         </div>
         <div class="row actions hidden" id="bBetting">
           <div class="row bet-chips" id="bChips"></div>
-          <div class="quick-bets"><button id="bMin">Min</button><button id="bRepeat">Repeat</button><button id="bX2">×2</button></div>
+          <div class="quick-bets"><button id="bMin">Min</button><button id="bRepeat">Repeat</button><button id="bX2">×2</button><button id="bMax">Max</button></div>
           <button class="plaque" id="bClear"><b>Clear</b><em>Remove bet</em></button>
           <button class="plaque gold" id="bDeal"><b>Deal</b><em>Place your bet</em></button>
         </div>
@@ -91,7 +91,10 @@
         <div class="col info right"><small>Your bet</small><strong id="bBet">0</strong><em id="bBalance"></em></div>
       </section>`;
     const $ = (id) => document.getElementById(id);
-    $('bChips').replaceChildren(...[5, 25, 100, 500].map((v) => {
+    // bigger chips at bigger tables
+    const minBet = (App.S && App.S.state && App.S.state.minBet) || 10;
+    const values = minBet >= 50 ? [25, 100, 500, 1000, 5000] : [5, 25, 100, 500, 1000];
+    $('bChips').replaceChildren(...values.map((v) => {
       const b = ctx.h('button');
       b.setAttribute('aria-label', `Add ${v} to your bet`);
       b.dataset.v = v;
@@ -104,6 +107,7 @@
     $('bMin').onclick = () => { const lim = ctx.st.limits; if (lim) { pending = lim.minBet; redraw(); } };
     $('bRepeat').onclick = () => { if (lastBet) { pending = lastBet; redraw(); } };
     $('bX2').onclick = () => { pending *= 2; redraw(); };
+    $('bMax').onclick = () => { const lim = ctx.st.limits; if (lim) { pending = lim.maxBet; redraw(); } };
     $('bDeal').onclick = () => { lastBet = pending; ctx.send({ t: 'action', action: 'bet', amount: pending }); };
     ['Hit', 'Stand', 'Double', 'Split'].forEach((a) => { $('b' + a).onclick = () => ctx.send({ t: 'action', action: a.toLowerCase() }); });
     $('bRebuy').onclick = () => ctx.send({ t: 'rebuy' });
@@ -266,6 +270,7 @@
       $('bMin').disabled = lim.minBet > lim.maxBet;
       $('bRepeat').disabled = !lastBet || lastBet > lim.maxBet || lastBet === pending;
       $('bX2').disabled = !pending || pending * 2 > lim.maxBet;
+      $('bMax').disabled = pending === lim.maxBet;
     }
     // moves chosen in advance
     const myHand = me && me.hands && me.hands.length ? me.hands[me.handIdx || 0] : null;

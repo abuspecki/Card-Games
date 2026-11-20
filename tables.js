@@ -26,8 +26,9 @@ const TABLES = [
   { id: 'HOLDEM-2', name: "Hold'em · High Roller", game: 'holdem', capacity: 8, highRoller: true, buyIn: 5000, minBuyIn: 2500, settings: { smallBlind: 25, bigBlind: 50 } },
   // The big one: 500 / 1,000 blinds. Buy-in 20,000 (20 big blinds), at least 10,000.
   { id: 'HOLDEM-3', name: "Hold'em · Diamond Room", game: 'holdem', capacity: 8, highRoller: true, buyIn: 20000, minBuyIn: 10000, settings: { smallBlind: 500, bigBlind: 1000 } },
-  { id: 'BLACKJACK-1', name: 'Blackjack · Table 1', game: 'blackjack', capacity: 7, buyIn: 1000, minBuyIn: 100, settings: { bigBlind: 10 } },
-  { id: 'BLACKJACK-2', name: 'Blackjack · High Roller', game: 'blackjack', capacity: 7, highRoller: true, buyIn: 5000, minBuyIn: 1000, settings: { bigBlind: 50 } },
+  // Blackjack: you can bet up to what you bring to the table (your bankroll, up to the buy-in).
+  { id: 'BLACKJACK-1', name: 'Blackjack · Table 1', game: 'blackjack', capacity: 7, buyIn: 10000, minBuyIn: 100, settings: { bigBlind: 10 } },
+  { id: 'BLACKJACK-2', name: 'Blackjack · High Roller', game: 'blackjack', capacity: 7, highRoller: true, buyIn: 100000, minBuyIn: 1000, settings: { bigBlind: 50 } },
   { id: 'DURAK-1', name: 'Durak · Table 1', game: 'durak', capacity: 6 },
   { id: 'DURAK-2', name: 'Durak · High Roller', game: 'durak', capacity: 6, highRoller: true, minBankroll: 10000 },
   { id: 'ROULETTE-1', name: 'Roulette · Table 1', game: 'roulette', capacity: 8, buyIn: 5000, minBuyIn: 100, settings: { bigBlind: 5 } },
@@ -72,7 +73,7 @@ function createLobby(ctx) {
   const PRIVATE_STAKES = {
     holdem: { stakes: [10, 20, 50, 100, 200, 500, 1000, 2000, 5000], buyIns: [20, 50, 100, 200], minBuyIn: 10 },
     draw: { stakes: [10, 20, 50, 100, 200, 500, 1000, 2000, 5000], buyIns: [20, 50, 100, 200], minBuyIn: 10 },
-    blackjack: { stakes: [5, 10, 25, 50, 100, 250, 500, 1000], buyIns: [20, 50, 100, 200], minBuyIn: 5 },
+    blackjack: { stakes: [5, 10, 25, 50, 100, 250, 500, 1000], buyIns: [20, 50, 100, 200, 500, 1000], minBuyIn: 5 },
     roulette: { stakes: [5, 10, 25, 50, 100, 250, 500], buyIns: [20, 50, 100, 200], minBuyIn: 5 },
   };
   function privateStakes(game, opts) {

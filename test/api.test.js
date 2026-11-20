@@ -186,7 +186,8 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const det = (await call('GET', `/api/admin/players/${bob.id}`, to)).data;
   assert.strictEqual(det.player.banned, true);
   assert.strictEqual(det.wallet.inPlay, 0, 'chips returned on ban');
-  assert.strictEqual(det.wallet.chips, 4900);
+  // Blackjack takes the whole bankroll (5,000 ≤ the 10,000 buy-in) to the table, so the owner's -100 found 0 chips to take
+  assert.strictEqual(det.wallet.chips, 5000);
   assert.strictEqual((await call('GET', `/api/players/${B}`, null)).status, 404, 'banned profile hidden');
   assert.strictEqual((await call('POST', `/api/admin/players/${bob.id}/unban`, to)).status, 200);
   const tb2 = (await call('POST', '/api/login', null, { username: B, password: 'secret123' })).data.token;
@@ -407,7 +408,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   assert.strictEqual(s2.first.t, 'joined');
   await wait(300);
   w = (await call('GET', '/api/wallet', tb2)).data;
-  assert.strictEqual(w.inPlay, 4900, 'high roller buy-in takes what you have');
+  assert.strictEqual(w.inPlay, 5000, 'high roller buy-in takes what you have');
   // bet in the middle of a hand, then the server restarts: the hand is called off, the bet comes back
   let lastBj = null;
   let stackBefore = 4900;
