@@ -365,6 +365,8 @@
 
   // ---------- patterns for texts with numbers or names ----------
   const P = [
+    [/^High Roller · Bets from ([\d,.]+)$/, 'High Roller · Einsätze ab $1'], [/^High Roller · Blinds (.+)$/, 'High Roller · Blinds $1'],
+    [/^Add (\d+) to your bet$/, '$1 zum Einsatz legen'],
     [/^Swap (\d+) cards?$/, (m0, n) => `${n} Karte${n === '1' ? '' : 'n'} tauschen`],
     [/^(.+) is drawing…$/, '$1 tauscht…'], [/^Draws (\d+)$/, 'Tauscht $1'], [/^(.+) draws (\d+)$/, '$1 tauscht $2'], [/^(.+) stands pat$/, '$1 behält alle Karten'],
     [/^— Hand #(\d+): Five Card Draw —$/, '— Hand #$1: Five Card Draw —'],

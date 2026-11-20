@@ -93,12 +93,12 @@
     const $ = (id) => document.getElementById(id);
     // bigger chips at bigger tables
     const minBet = (App.S && App.S.state && App.S.state.minBet) || 10;
-    const values = minBet >= 50 ? [25, 100, 500, 1000, 5000] : [5, 25, 100, 500, 1000];
+    const values = minBet >= 50 ? [100, 500, 1000, 5000, 10000, 25000, 100000] : [5, 25, 100, 500, 1000, 5000, 10000];
     $('bChips').replaceChildren(...values.map((v) => {
       const b = ctx.h('button');
       b.setAttribute('aria-label', `Add ${v} to your bet`);
       b.dataset.v = v;
-      b.appendChild(chip(v, { size: ctx.layout === 'port' ? 44 : 52 }));
+      b.appendChild(chip(v, { size: ctx.layout === 'port' ? 40 : 52 }));
       b.onclick = () => { pending += v; redraw(); };
       return b;
     }));

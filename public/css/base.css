@@ -180,6 +180,11 @@ svg { display: block; }
 .chip.v1000 { --bg: #C99A1E; --acc: #1A1208; }
 .chip.v5000 { --bg: #5B1F78; --acc: #F2C14E; }
 .chip.v1000::after { content: "1K"; } .chip.v5000::after { content: "5K"; }
+/* high-value chips */
+.chip.v10000  { --bg: #0E6E6E; --acc: #F4EFE3; }
+.chip.v25000  { --bg: #B4472A; --acc: #FFE9B8; }
+.chip.v100000 { --bg: #121216; --acc: #F2C14E; box-shadow: 0 4px 8px rgba(0, 0, 0, .45), 0 0 0 1px rgba(242, 193, 78, .6); }
+.chip.v10000::after { content: "10K"; } .chip.v25000::after { content: "25K"; } .chip.v100000::after { content: "100K"; font-size: calc(var(--s) * .22); }
 
 /* ---------- Game stage ----------
    Every table is designed on a 1440×900 canvas and scaled to
