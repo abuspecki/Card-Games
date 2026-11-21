@@ -335,7 +335,14 @@
     'Invite a friend or a bot': 'Lade einen Freund oder Bot ein', 'Bot · easy': 'Bot · leicht', 'Bot · medium': 'Bot · mittel', 'Bot · strong': 'Bot · stark', 'Declines': 'Lehnt ab', 'No draw': 'Kein Remis', 'Offers a draw': 'Bietet Remis an',
     'That move is not allowed': 'Dieser Zug ist nicht erlaubt', 'You cannot double now': 'Du kannst jetzt nicht verdoppeln', 'Only your opponent may double now': 'Jetzt darf nur dein Gegner verdoppeln',
     'Accept or decline the double first': 'Nimm die Verdopplung erst an oder lehne sie ab', 'Answer the draw offer first': 'Beantworte erst das Remis-Angebot', 'You already offered a draw this move': 'Du hast in diesem Zug schon Remis angeboten',
-    'Pick a time from the list': 'Wähle eine Zeit aus der Liste'
+    'Pick a time from the list': 'Wähle eine Zeit aus der Liste',
+    'Game for': 'Partie um', 'yours': 'deiner', 'theirs': 'seiner', 'Your move — tap or drag a piece.': 'Du bist am Zug – tippe oder ziehe eine Figur.', 'Your opponent is thinking…': 'Dein Gegner überlegt…',
+    'Answer the offer on the board.': 'Beantworte das Angebot auf dem Brett.', 'Waiting for your opponent…': 'Warte auf deinen Gegner…', 'You are watching.': 'Du schaust zu.',
+    'Waiting for an opponent': 'Warte auf einen Gegner', 'Invite a friend — or play a bot right away:': 'Lade einen Freund ein – oder spiel gleich gegen einen Bot:', 'Easy': 'Leicht', 'Medium': 'Mittel', 'Strong': 'Stark',
+    'Invite a friend': 'Freund einladen', 'Take': 'Annehmen', 'Decline': 'Ablehnen', 'Accept': 'Annehmen', 'A draw: nobody wins or loses chips.': 'Remis: Niemand gewinnt oder verliert Chips.',
+    'You win!': 'Du gewinnst!', 'You lose': 'Verloren', 'Draw': 'Remis', 'Next game in': 'Nächste Partie in', 'Promote to': 'Umwandeln in', 'No moves yet': 'Noch keine Züge',
+    'Waiting for an opponent ': 'Warte auf einen Gegner', 'checkmate': 'Schachmatt', 'stalemate': 'Patt', 'agreed': 'vereinbart', 'not enough material to mate': 'zu wenig Material zum Mattsetzen',
+    'threefold repetition': 'dreifache Wiederholung', 'fifty-move rule': '50-Züge-Regel'
   };
 
   Object.assign(DE, {
@@ -385,6 +392,10 @@
     return ({ stalemate: 'Patt', agreed: 'vereinbart', 'not enough material to mate': 'zu wenig Material zum Mattsetzen', 'threefold repetition': 'dreifache Wiederholung', 'fifty-move rule': '50-Züge-Regel' })[r] || r;
   };
   const P = [
+    [/^(checkmate \(.+\)|.+ resigns|.+ ran out of time.*|.+ declines the double|.+ left the table)$/, (m0) => CHESS_REASON(m0)],
+    [/^Game for \(cube ×(\d+)\)$/, 'Partie um (Würfel ×$1)'], [/^Stake ([\d,.]+) · (\d+) min each$/, 'Einsatz $1 · je $2 Min'],
+    [/^Sure\? Double to ([\d,.]+)$/, 'Sicher? Auf $1 verdoppeln'], [/^Sure\? Lose ([\d,.]+)$/, 'Sicher? $1 verlieren'],
+    [/^(.+) doubles$/, '$1 verdoppelt'], [/^Cube ×(\d+)$/, 'Würfel ×$1'], [/^(.+) wins$/, '$1 gewinnt'],
     [/^Table (\d+) · Stake ([\d,.]+) · (\d+) min$/, 'Tisch $1 · Einsatz $2 · $3 Min'], [/^High Roller · Stake ([\d,.]+) · (\d+) min$/, 'High Roller · Einsatz $1 · $2 Min'],
     [/^Chess · ([\d,.]+) · (\d+) min$/, 'Schach · $1 · $2 Min'], [/^Chess · The Chess Club$/, 'Schach · Der Schachklub'],
     [/^Chess · Stake ([\d,.]+) · (\d+) min$/, 'Schach · Einsatz $1 · $2 Min'], [/^Stake ([\d,.]+) · (\d+) min$/, 'Einsatz $1 · $2 Min'], [/^(.+) · Stake ([\d,.]+) · (\d+) min$/, '$1 · Einsatz $2 · $3 Min'],

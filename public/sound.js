@@ -77,6 +77,9 @@ const Sound = (() => {
     fold() { noise(0, 0.25, { freq: 2500, sweepTo: 400, q: 0.8, gain: 0.25 }); },
     // Check: two knuckle knocks on the felt.
     check() { tone(140, 0, 0.08, { gain: 0.5, slideTo: 80 }); tone(140, 0.11, 0.08, { gain: 0.5, slideTo: 80 }); },
+    // chess: a wooden piece set down, a capture, a check
+    move() { tone(220, 0, 0.06, { gain: 0.45, slideTo: 140 }); noise(0, 0.035, { freq: 2200, q: 1.5, gain: 0.22 }); },
+    capture() { tone(200, 0, 0.07, { gain: 0.5, slideTo: 110 }); noise(0, 0.05, { freq: 1600, q: 1.2, gain: 0.3 }); tone(170, 0.07, 0.06, { gain: 0.35, slideTo: 100 }); },
     // Chips: a few metallic clinks.
     chips() {
       [0, 0.05, 0.09, 0.16].forEach((s, i) => {

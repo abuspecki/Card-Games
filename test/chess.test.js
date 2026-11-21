@@ -94,6 +94,7 @@ function R_sq(n) { return require('../games/chess-rules').sq(n); }
 mv(t, 'w', 'a7a8n');
 assert.strictEqual(t.pos.b[R_sq('a8')], 'N');
 
+(async () => {
 // bots play whole games (the weakest level, to keep the test quick)
 let games = 0, decided = 0;
 const tb = new Chess({ bigBlind: 100, minutes: 60, startingStack: 5000 });
@@ -104,7 +105,7 @@ for (let g = 0; g < 4; g++) {
   assert(tb.startHand());
   for (let n = 0; tb.isPlaying() && n < 600; n++) {
     const i = tb.toAct;
-    const d = tb.botAction(i);
+    const d = await tb.botAction(i);
     const r = tb.act(tb.seats[i].id, d.action, d.amount);
     assert(!r.error, `${d.action} ${d.amount}: ${r.error}`);
   }
@@ -113,4 +114,10 @@ for (let g = 0; g < 4; g++) {
   if (!tb.results.draw) decided++;
   assert.strictEqual(total(tb), 10000, 'chips are kept');
 }
-console.log(`chess ok — rules, cube, draws, clock, leaving, ${games} bot games (${decided} decided)`);
+// the bot answers a double and a draw offer at once
+  const tq = table();
+  tq.seats[tq.seatOfColor('b')].isBot = true;
+  tq.act(idOf(tq, 'w'), 'double');
+  assert.strictEqual((await tq.botAction(tq.seatOfColor('b'))).action, 'take', 'an even position: take');
+  console.log(`chess ok — rules, cube, draws, clock, leaving, ${games} bot games (${decided} decided)`);
+})().catch((e) => { console.error(e); process.exit(1); });

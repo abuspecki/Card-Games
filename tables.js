@@ -352,7 +352,7 @@ function createLobby(ctx) {
         else if (hasHuman(room)) { rebuyBots(t); if (t.canStart()) t.startHand(); else t.stage = 'waiting'; }
         else t.stage = 'waiting';
         pushState(room);
-      }, t.game === 'durak' || t.game === 'flamingo' ? NEXT_HAND_DELAY + 2000 : NEXT_HAND_DELAY);
+      }, t.game === 'chess' ? NEXT_HAND_DELAY + 4000 : t.game === 'durak' || t.game === 'flamingo' ? NEXT_HAND_DELAY + 2000 : NEXT_HAND_DELAY);
     }
     // Games with a clock (roulette): move on when the betting / spinning time is up.
     clearTimeout(room.phaseTimer);
@@ -377,11 +377,14 @@ function createLobby(ctx) {
         const seat = t.toAct;
         const hand = t.handNo;
         const wait = BOT_THINK_MS[0] + Math.random() * (BOT_THINK_MS[1] - BOT_THINK_MS[0]);
-        room.turnTimer = setTimeout(() => {
+        room.turnTimer = setTimeout(async () => {
           room.turnTimer = null;
           if (t.toAct !== seat || t.handNo !== hand || !t.isPlaying()) return;
           let d;
-          try { d = t.botAction ? t.botAction(seat) : bots.decide(t, seat); } catch (e) { console.error('bot error', e); d = t.defaultAction(seat); }
+          // a bot may think on another thread (chess): check the table again afterwards
+          try { d = t.botAction ? await t.botAction(seat) : bots.decide(t, seat); } catch (e) { console.error('bot error', e); d = t.defaultAction(seat); }
+          if (t.toAct !== seat || t.handNo !== hand || !t.isPlaying() || t.seats[seat] !== p) return;
+          if (d.action === 'wait') { pushState(room); return; }
           const r = t.act(p.id, d.action, d.amount);
           if (r.error) { const f = t.defaultAction(seat); t.act(p.id, f.action, f.amount); }
           room.moveSeq = (room.moveSeq || 0) + 1;
@@ -537,10 +540,12 @@ function createLobby(ctx) {
     }
   }
 
-  function addBot(room) {
+  // level (chess): 1 easy · 2 medium · 3 strong
+  function addBot(room, level) {
     const t = room.table;
     const name = bots.pickBotName(t);
-    const idx = t.sit({ id: 'bot-' + crypto.randomUUID(), name, isBot: true, botStyle: bots.randomStyle() });
+    const style = room.game === 'chess' && [1, 2, 3].includes(level) ? require('./games/chess').LEVEL_STYLE[level] : bots.randomStyle();
+    const idx = t.sit({ id: 'bot-' + crypto.randomUUID(), name, isBot: true, botStyle: style });
     if (idx === -1) return false;
     t.addLog(`🤖 ${name} sat down`);
     return true;
@@ -710,7 +715,7 @@ function createLobby(ctx) {
           break;
         }
         case 'addBot':
-          if (seatedCount(t) >= room.capacity || !addBot(room)) return send(ws, { t: 'error', msg: 'The table is full' });
+          if (seatedCount(t) >= room.capacity || !addBot(room, Number(m.level) || undefined)) return send(ws, { t: 'error', msg: 'The table is full' });
           break;
         case 'removeBot':
           if (!removeBot(room)) return send(ws, { t: 'error', msg: 'No bots at the table' });

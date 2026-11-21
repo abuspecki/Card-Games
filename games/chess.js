@@ -12,12 +12,43 @@
 // repetition, fifty moves, or agreed. A draw moves no chips.
 // Chips change hands only when a game ends, so a game called off by a restart costs
 // nobody anything.
+const path = require('path');
+const { Worker } = require('worker_threads');
 const { BaseTable } = require('./base');
 const R = require('./chess-rules');
 
+// One shared worker thread thinks for every chess bot (started on first use).
+let worker = null;
+let seq = 0;
+const waiting = new Map();
+function think(pos, depth, noise, budget) {
+  if (!worker) {
+    worker = new Worker(path.join(__dirname, 'chess-worker.js'));
+    worker.on('message', ({ id, move }) => settle(id, move));
+    worker.on('error', (e) => { console.error('chess worker', e); worker = null; for (const id of [...waiting.keys()]) settle(id, null); });
+    worker.unref();
+  }
+  return new Promise((resolve) => {
+    const id = ++seq;
+    waiting.set(id, resolve);
+    worker.ref();   // keep running while a bot is thinking …
+    worker.postMessage({ id, pos, depth, noise, budget });
+    setTimeout(() => settle(id, null), 8000).unref();
+  });
+}
+function settle(id, move) {
+  const done = waiting.get(id);
+  if (!done) return;
+  waiting.delete(id);
+  if (!waiting.size && worker) worker.unref();   // … and never keep the process alive otherwise
+  done(move);
+}
+
 const MAX_CUBE = 64;
-const BOT_DEPTH = { tight: 3, normal: 2, wild: 1 };      // bot styles → strength
-const BOT_NOISE = { tight: 10, normal: 40, wild: 120 };
+// bot strength: 1 easy · 2 medium · 3 strong (search depth, and how much it may "blunder")
+const BOT_LEVEL = { wild: 1, normal: 2, tight: 3 };
+const LEVEL_STYLE = { 1: 'wild', 2: 'normal', 3: 'tight' };
+const BOT_NOISE = { 1: 140, 2: 40, 3: 8 };
 
 class Chess extends BaseTable {
   constructor(opts = {}) {
@@ -207,7 +238,7 @@ class Chess extends BaseTable {
     this.keys.push(R.key(next));
     s.lastAction = notation;
     this.passTurn(o, now);
-    this.onEvent(next.captured ? 'chips' : 'check');
+    this.onEvent(R.inCheck(next) ? 'check' : next.captured ? 'capture' : 'move');
     // the game ends?
     const replies = R.legal(next);
     if (!replies.length) {
@@ -239,19 +270,21 @@ class Chess extends BaseTable {
   leaveRecord() { return null; }   // a game left is settled (and recorded) by leave()
 
   // ----- the computer player -----
-  botAction(i) {
+  // Decisions about the cube and draws are instant; a move is searched on the
+  // worker thread (the table loop awaits it).
+  botLevel(s) { return s.botLevel || BOT_LEVEL[s.botStyle] || 2; }
+  async botAction(i) {
     const s = this.seats[i];
-    const style = s.botStyle || 'normal';
-    const eval0 = () => {
-      const sc = R.evaluate(this.pos.b);
-      return this.colorOfSeat(i) === 'w' ? sc : -sc;        // centipawns for the bot
-    };
-    if (this.offer && this.offer.kind === 'double') return { action: eval0() < -500 ? 'drop' : 'take' };
-    if (this.offer && this.offer.kind === 'draw') return { action: Math.abs(eval0()) < 80 || eval0() < -300 ? 'accept' : 'decline' };
-    if (this.canDouble(i) && eval0() > 450 && Math.random() < 0.5) return { action: 'double' };
-    const r = R.bestMove(this.pos, BOT_DEPTH[style] || 2, { noise: BOT_NOISE[style] || 40, budget: 40000 });
-    if (!r) return { action: 'resign' };
-    return { action: 'move', amount: R.nameOf(r.move.from) + R.nameOf(r.move.to) + (r.move.promo || '') };
+    const level = this.botLevel(s);
+    const mine = () => { const sc = R.evaluate(this.pos.b); return this.colorOfSeat(i) === 'w' ? sc : -sc; };   // centipawns for the bot
+    if (this.offer && this.offer.kind === 'double') return { action: mine() < -500 ? 'drop' : 'take' };
+    if (this.offer && this.offer.kind === 'draw') return { action: Math.abs(mine()) < 80 || mine() < -300 ? 'accept' : 'decline' };
+    if (this.canDouble(i) && mine() > 450 && Math.random() < 0.5) return { action: 'double' };
+    const hand = this.handNo, ply = this.moves.length;
+    const m = await think(this.pos, level, BOT_NOISE[level], level === 3 ? 40000 : 15000);
+    if (this.handNo !== hand || this.moves.length !== ply || !this.isPlaying()) return { action: 'wait' };   // the game moved on meanwhile
+    if (!m) { const any = R.legal(this.pos)[0]; return any ? { action: 'move', amount: R.nameOf(any.from) + R.nameOf(any.to) + (any.promo || '') } : { action: 'resign' }; }
+    return { action: 'move', amount: R.nameOf(m.from) + R.nameOf(m.to) + m.promo };
   }
 
   view(viewerId) {
@@ -279,9 +312,9 @@ class Chess extends BaseTable {
     v.nextAmount = this.amount() * 2;
     // the moves you may play (only to the player to move)
     v.legal = myTurn && !this.offer ? R.legal(this.pos).map((m) => R.nameOf(m.from) + R.nameOf(m.to) + (m.promo || '')) : [];
-    v.seats = this.seats.map((s, i) => s && { ...this.baseSeatView(s), botLevel: s.isBot ? ({ tight: 3, normal: 2, wild: 1 })[s.botStyle] || 2 : null, color: this.isPlaying() || this.stage === 'showdown' ? this.colorOfSeat(i) : null });
+    v.seats = this.seats.map((s, i) => s && { ...this.baseSeatView(s), botLevel: s.isBot ? this.botLevel(s) : null, color: this.isPlaying() || this.stage === 'showdown' ? this.colorOfSeat(i) : null });
     return v;
   }
 }
 
-module.exports = { Chess, MAX_CUBE };
+module.exports = { Chess, MAX_CUBE, LEVEL_STYLE };
