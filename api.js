@@ -304,7 +304,7 @@ function createApi(ctx) {
       if (!user) return json(res, 401, { error: 'Sign in to open a private table' });
       if (limited(`private:${user.id}`, 30, 10 * 60 * 1000)) return json(res, 429, { error: 'Slow down a little' });
       const body = await readBody(req);
-      const r = ctx.lobby.createPrivate(user.id, user.username, String(body.game || ''), { stake: body.stake, buyIn: body.buyIn });
+      const r = ctx.lobby.createPrivate(user.id, user.username, String(body.game || ''), { stake: body.stake, buyIn: body.buyIn, minutes: body.minutes });
       if (r.error) return json(res, 400, r);
       return json(res, 200, r);
     }

@@ -12,10 +12,11 @@
   const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
   window.TableUI = window.TableUI || {};
 
-  const GAME_NAMES = { holdem: "Texas Hold'em", draw: 'Five Card Draw', blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette', flamingo: 'Flamingo' };
+  const GAME_NAMES = { holdem: "Texas Hold'em", draw: 'Five Card Draw', chess: 'Chess', blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette', flamingo: 'Flamingo' };
   const ROOM_INFO = {
     holdem: { tag: 'The Club Room', desc: 'No-Limit poker · up to 8 players', cards: [['A', 'spade'], ['K', 'spade']] },
     draw: { tag: 'The Card Room', desc: 'Five cards, one draw · up to 6 players', cards: [['Q', 'heart'], ['Q', 'diamond']] },
+    chess: { tag: 'The Chess Club', desc: 'Play for chips · double the stake' },
     blackjack: { tag: 'Salon Privé', desc: 'Beat the dealer to 21', cards: [['A', 'heart'], ['K', 'club']] },
     durak: { tag: 'The Winter Palace', desc: 'Attack, defend — don\'t be the fool', cards: [['6', 'heart'], ['Q', 'spade']] },
     roulette: { tag: 'The Wheel Room', desc: 'Red, black or your lucky number' },
@@ -398,12 +399,13 @@
   function buildRooms() {
     const grid = $('roomGrid');
     grid.replaceChildren();
-    for (const game of ['holdem', 'blackjack', 'durak', 'roulette', 'flamingo']) {   // Five Card Draw ('draw') is built but not offered yet
+    for (const game of ['holdem', 'blackjack', 'durak', 'roulette', 'flamingo', 'chess']) {   // Five Card Draw ('draw') is built but not offered yet
       const info = ROOM_INFO[game];
       const art = h('article', `room room-${game}`);
       const vis = h('div', 'visual');
       if (game === 'blackjack') vis.appendChild(h('div', 'rays'));
       if (game === 'roulette') vis.appendChild(h('div', 'mini-wheel'));
+      else if (game === 'chess') vis.appendChild(h('div', 'chess-art', '<span class="ca-k">♚\uFE0E</span><span class="ca-q">♛\uFE0E</span><span class="ca-n">♞\uFE0E</span><span class="ca-cube">×2</span>'));
       else if (game === 'flamingo') {
         const fan = h('div', 'fan');
         [['xWa', 'f-left'], ['c7a', 'f-right'], ['vRa', 'f-mid']].forEach(([c, cls]) => { const e = CardUI.flamingo(c, 86); e.style.position = 'absolute'; e.classList.add(cls); fan.appendChild(e); });
@@ -546,7 +548,7 @@
   App.openQuests = () => { loungeTab = 'quests'; openLounge('quests'); };
 
   // ================= PRIVATE TABLES =================
-  const PRIV_GAMES = [['holdem', "Hold'em", '♠'], ['blackjack', 'Blackjack', '🂡'], ['roulette', 'Roulette', '◉'], ['durak', 'Durak', '♦'], ['flamingo', 'Flamingo', '🦩']];
+  const PRIV_GAMES = [['holdem', "Hold'em", '♠'], ['chess', 'Chess', '♞'], ['blackjack', 'Blackjack', '🂡'], ['roulette', 'Roulette', '◉'], ['durak', 'Durak', '♦'], ['flamingo', 'Flamingo', '🦩']];
   function openPrivate() {
     openModal((card) => {
       modalHead(card, 'Friends only', 'Private table');
@@ -592,6 +594,7 @@
     draw: { stakes: [10, 20, 50, 100, 200, 500, 1000, 2000, 5000], buyIns: [20, 50, 100, 200], def: [10, 100], minBuyIn: 10, label: 'Five Card Draw' },
     blackjack: { stakes: [5, 10, 25, 50, 100, 250, 500, 1000], buyIns: [20, 50, 100, 200, 500, 1000], def: [10, 100], minBuyIn: 5, label: 'Blackjack' },
     roulette: { stakes: [5, 10, 25, 50, 100, 250, 500], buyIns: [20, 50, 100, 200], def: [5, 200], minBuyIn: 5, label: 'Roulette' },
+    chess: { stakes: [50, 100, 250, 500, 1000, 2500, 5000, 10000], buyIns: [4, 8, 16, 32, 64], def: [100, 16], minBuyIn: 1, label: 'Chess', minutes: [3, 5, 10] },
   };
   function privateSettings(card, game, create) {
     const P = PRIV_STAKES[game];
@@ -599,7 +602,8 @@
     const body = card.querySelector('.priv');
     body.innerHTML = `
       <section class="priv-set"><h4>${P.label} · your table</h4>
-        <label>${holdem ? 'Blinds' : 'Minimum bet'}<select name="stake">${P.stakes.map((v) => `<option value="${v}"${v === P.def[0] ? ' selected' : ''}>${holdem ? `${fmt(v / 2)} / ${fmt(v)}` : fmt(v)}</option>`).join('')}</select></label>
+        ${P.minutes ? `<label>Time per player<select name="minutes">${P.minutes.map((m) => `<option value="${m}"${m === 5 ? ' selected' : ''}>${m} min</option>`).join('')}</select></label>` : ''}
+        <label>${holdem ? 'Blinds' : game === 'chess' ? 'Stake per game' : 'Minimum bet'}<select name="stake">${P.stakes.map((v) => `<option value="${v}"${v === P.def[0] ? ' selected' : ''}>${holdem ? `${fmt(v / 2)} / ${fmt(v)}` : fmt(v)}</option>`).join('')}</select></label>
         <label>Buy-in<select name="buyIn"></select></label>
         <p class="priv-note"></p>
         <p class="merror" role="alert"></p>
@@ -608,7 +612,7 @@
     const stakeSel = body.querySelector('[name=stake]'), buySel = body.querySelector('[name=buyIn]'), note = body.querySelector('.priv-note');
     const paintBuyIns = (keep) => {
       const stake = Number(stakeSel.value);
-      buySel.innerHTML = P.buyIns.map((x) => `<option value="${stake * x}"${x === keep ? ' selected' : ''}>${fmt(stake * x)} ${holdem ? `(${x} big blinds)` : `(${x}× the minimum)`}</option>`).join('');
+      buySel.innerHTML = P.buyIns.map((x) => `<option value="${stake * x}"${x === keep ? ' selected' : ''}>${fmt(stake * x)} ${holdem ? `(${x} big blinds)` : game === 'chess' ? `(${x}× the stake)` : `(${x}× the minimum)`}</option>`).join('');
       paintNote();
     };
     const paintNote = () => {
@@ -626,7 +630,8 @@
     const go = body.querySelector('[data-go]');
     go.onclick = () => {
       body.querySelector('.merror').textContent = '';
-      create({ game, stake: Number(stakeSel.value), buyIn: Number(buySel.value) }, go);
+      const mins = body.querySelector('[name=minutes]');
+      create({ game, stake: Number(stakeSel.value), buyIn: Number(buySel.value), ...(mins ? { minutes: Number(mins.value) } : {}) }, go);
     };
   }
   App.openPrivate = openPrivate;
@@ -971,12 +976,12 @@
       const name = S.tableName.replace(/^[^·]*·\s*/, '');
       const game = st.game;
       if (layout === 'port') {
-        const SHORT = { holdem: "Hold'em", draw: 'Draw', blackjack: 'Blackjack', roulette: 'Roulette', durak: 'Durak', flamingo: 'Flamingo' };
-        const stake = game === 'holdem' || game === 'draw' ? `${st.settings.smallBlind}/${st.settings.bigBlind}` : game === 'blackjack' || game === 'roulette' ? `from ${st.minBet}` : st.stage !== 'waiting' ? `Game ${st.handNo}` : '';
+        const SHORT = { holdem: "Hold'em", draw: 'Draw', chess: 'Chess', blackjack: 'Blackjack', roulette: 'Roulette', durak: 'Durak', flamingo: 'Flamingo' };
+        const stake = game === 'chess' ? `${st.stake} · ${st.minutes} min` : game === 'holdem' || game === 'draw' ? `${st.settings.smallBlind}/${st.settings.bigBlind}` : game === 'blackjack' || game === 'roulette' ? `from ${st.minBet}` : st.stage !== 'waiting' ? `Game ${st.handNo}` : '';
         title.textContent = name;
         if (sub) sub.textContent = SHORT[game] + (stake ? ` · ${stake}` : '');
       } else {
-        title.textContent = name + (game === 'holdem' || game === 'draw' ? ` · Blinds ${st.settings.smallBlind} / ${st.settings.bigBlind}` : game === 'blackjack' || game === 'roulette' ? ` · Bets from ${st.minBet}` : st.stage !== 'waiting' ? ` · Game ${st.handNo}` : '');
+        title.textContent = name + (game === 'chess' ? ` · Stake ${st.stake} · ${st.minutes} min` : game === 'holdem' || game === 'draw' ? ` · Blinds ${st.settings.smallBlind} / ${st.settings.bigBlind}` : game === 'blackjack' || game === 'roulette' ? ` · Bets from ${st.minBet}` : st.stage !== 'waiting' ? ` · Game ${st.handNo}` : '');
         if (sub) sub.textContent = sub.dataset.full;
       }
     }
@@ -1009,6 +1014,7 @@
     const box = document.querySelector('[data-turn-clock]');
     clearInterval(turnClock);
     if (!box) return;
+    if (st.game === 'chess') { box.classList.add('hidden'); return; }   // chess shows its own clocks
     if (!mine) { box.classList.add('hidden'); return; }
     const ends = Date.now() + turn.msLeft;
     const paint = () => {
@@ -1022,7 +1028,7 @@
   }
 
   // Top bar shared by every room (styled per room by its CSS).
-  const ROOM_TITLES = { holdem: ["Texas Hold'em", 'The Club Room'], draw: ['Five Card Draw', 'The Card Room'], blackjack: ['Blackjack', 'Salon Privé'], durak: ['Дурак', 'The Winter Palace'], roulette: ['Roulette', 'The Wheel Room'], flamingo: ['Flamingo', 'The Flamingo Lounge'] };
+  const ROOM_TITLES = { holdem: ["Texas Hold'em", 'The Club Room'], draw: ['Five Card Draw', 'The Card Room'], chess: ['Chess', 'The Chess Club'], blackjack: ['Blackjack', 'Salon Privé'], durak: ['Дурак', 'The Winter Palace'], roulette: ['Roulette', 'The Wheel Room'], flamingo: ['Flamingo', 'The Flamingo Lounge'] };
   function buildTopbar(game) {
     const tb = ctx.topbar;
     const [title, room] = ROOM_TITLES[game];
@@ -1123,7 +1129,7 @@
   function renderSitOut(S, st) {
     let box = $('sitOut');
     const me = st.mySeat !== -1 ? st.seats[st.mySeat] : null;
-    const show = me && !S.watching && !S.tourney && st.game !== 'roulette';
+    const show = me && !S.watching && !S.tourney && st.game !== 'roulette' && st.game !== 'chess';
     if (!show) { if (box) box.remove(); return; }
     if (!box) { box = h('div', 'sitout'); box.id = 'sitOut'; $('stageWrap').appendChild(box); }
     const out = !!me.sitOut;
@@ -1275,7 +1281,7 @@
   function renderTableInfo(S, st) {
     const g = st.game;
     const s = st.settings || {};
-    const info = g === 'holdem' || g === 'draw' ? `Blinds ${s.smallBlind} / ${s.bigBlind}` : g === 'blackjack' || g === 'roulette' ? `Bets from ${st.minBet}` : g === 'flamingo' ? 'Two to six players · 108 pink cards' : 'Two to six players · 36 cards';
+    const info = g === 'chess' ? `Stake ${st.stake} per game · ${st.minutes} min each · doubling cube` : g === 'holdem' || g === 'draw' ? `Blinds ${s.smallBlind} / ${s.bigBlind}` : g === 'blackjack' || g === 'roulette' ? `Bets from ${st.minBet}` : g === 'flamingo' ? 'Two to six players · 108 pink cards' : 'Two to six players · 36 cards';
     $('tableInfo').innerHTML = `<b>${esc(S.tableName)}</b><span>${esc(info)} · cards are dealt automatically once enough players are seated.</span>
       ${S.usesChips && App.account ? '<span>Your chips come from your bankroll and return to it when you leave.</span>' : S.usesChips ? '<span>As a guest you play with free table chips.</span>' : ''}`;
     const seated = st.seats.filter(Boolean).length;
@@ -1495,7 +1501,7 @@
   }
 
   // ----- the statement: where coins and chips came from and went -----
-  const GAME_NAME = { friends: "Hold'em", bots: "Hold'em", draw: 'Five Card Draw', blackjack: 'Blackjack', roulette: 'Roulette', durak: 'Durak', flamingo: 'Flamingo', goldrush: 'Gold Rush', tourney: 'Sit & Go' };
+  const GAME_NAME = { friends: "Hold'em", bots: "Hold'em", draw: 'Five Card Draw', chess: 'Chess', blackjack: 'Blackjack', roulette: 'Roulette', durak: 'Durak', flamingo: 'Flamingo', goldrush: 'Gold Rush', tourney: 'Sit & Go' };
   function bookingLabel(e) {
     const [kind, ...rest] = String(e.reason || '').split(':');
     const detail = rest.join(':');
@@ -2188,7 +2194,7 @@
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pollPresence(); });
 
   // ----- profiles -----
-  const MODE_NAMES = { friends: "Hold'em with friends", bots: "Hold'em with bots", draw: 'Five Card Draw', blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette', flamingo: 'Flamingo', goldrush: 'Gold Rush' };
+  const MODE_NAMES = { friends: "Hold'em with friends", bots: "Hold'em with bots", draw: 'Five Card Draw', chess: 'Chess', blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette', flamingo: 'Flamingo', goldrush: 'Gold Rush' };
   function statsTable(stats) {
     if (!stats.length) return '<p class="muted">No hands played yet.</p>';
     return `<table class="stats"><thead><tr><th>Game</th><th>Hands</th><th>Won</th><th>${'Result'}</th></tr></thead><tbody>
@@ -2343,6 +2349,13 @@
 
   // ================= HOW TO PLAY =================
   const RULES = {
+    chess: `<ol class="rules-list">
+      <li>Normal chess rules: checkmate wins. Stalemate, too little material, threefold repetition, fifty moves without a capture or pawn move, or an agreed draw end in a <b>draw</b> — then no chips change hands.</li>
+      <li><b>The stake:</b> every game is played for the table's stake. The winner takes it from the loser's table chips.</li>
+      <li><b>The doubling cube:</b> on your turn, before you move, you may <b>double</b>. Your opponent <b>takes</b> (the game is now for twice as much, and only they may double next) or <b>declines</b> and loses the current stake right away. A double needs both players to have the doubled stake.</li>
+      <li><b>The clock:</b> each player has a few minutes for the whole game. Out of time = lost (a draw if the opponent can no longer mate).</li>
+      <li>You can offer a draw or resign at any time. Leaving the table during a game loses it.</li>
+      <li>Tap a piece to see where it can go, then tap the square. Play a friend, anyone at the table, or a bot (three strengths).</li></ol>`,
     draw: `<ol class="rules-list">
       <li>Everyone receives <b>five private cards</b> — there are no shared cards.</li>
       <li><b>First betting round:</b> fold, check, call or raise, as in Hold'em (No-Limit, with blinds).</li>
@@ -2388,6 +2401,13 @@
       <li>A cave-in loses the stake. Every dig is decided by the server; the house keeps 3 % on average.</li></ol>`;
   // German rules (shown when the site is in German).
   const RULES_DE = {
+    chess: `<ol class="rules-list">
+      <li>Normale Schachregeln: Schachmatt gewinnt. Patt, zu wenig Material, dreifache Stellungswiederholung, 50 Züge ohne Schlagen oder Bauernzug oder ein vereinbartes Remis sind ein <b>Remis</b> – dann wandern keine Chips.</li>
+      <li><b>Der Einsatz:</b> Jede Partie wird um den Einsatz des Tisches gespielt. Der Sieger bekommt ihn aus den Tisch-Chips des Verlierers.</li>
+      <li><b>Der Verdopplungswürfel:</b> Wenn du am Zug bist, darfst du vor deinem Zug <b>verdoppeln</b>. Dein Gegner <b>nimmt an</b> (die Partie geht jetzt um das Doppelte, und nur er darf als Nächstes verdoppeln) oder <b>lehnt ab</b> und verliert sofort den aktuellen Einsatz. Verdoppeln geht nur, wenn beide den doppelten Einsatz haben.</li>
+      <li><b>Die Uhr:</b> Jeder hat ein paar Minuten für die ganze Partie. Zeit abgelaufen = verloren (Remis, wenn der Gegner nicht mehr mattsetzen kann).</li>
+      <li>Du kannst jederzeit Remis anbieten oder aufgeben. Wer während einer Partie den Tisch verlässt, verliert sie.</li>
+      <li>Tippe eine Figur an, um zu sehen, wohin sie ziehen kann, und dann das Feld. Spiel gegen einen Freund, jeden am Tisch oder einen Bot (drei Stärken).</li></ol>`,
     draw: `<ol class="rules-list">
       <li>Jeder bekommt <b>fünf eigene Karten</b> – es gibt keine gemeinsamen Karten in der Mitte.</li>
       <li><b>Erste Setzrunde:</b> passen, schieben, mitgehen oder erhöhen, wie bei Hold'em (No-Limit, mit Blinds).</li>
@@ -2453,7 +2473,7 @@
           });
         }
       };
-      tabs(card, [['holdem', "Hold'em"], ['blackjack', 'Blackjack'], ['durak', 'Durak'], ['roulette', 'Roulette'], ['flamingo', 'Flamingo'], ['goldrush', 'Gold Rush']], paint, game);
+      tabs(card, [['holdem', "Hold'em"], ['blackjack', 'Blackjack'], ['durak', 'Durak'], ['roulette', 'Roulette'], ['flamingo', 'Flamingo'], ['chess', 'Chess'], ['goldrush', 'Gold Rush']], paint, game);
       card.appendChild(body);
       paint(game);
     }, { wide: true });

@@ -1,0 +1,100 @@
+/* =========================================================
+   Chess: a walnut board in a pool of lamp light.
+   ========================================================= */
+.chess-room { position: absolute; inset: 0; }
+.chess-lamp { position: absolute; inset: 0; background: radial-gradient(ellipse 45% 55% at 50% 48%, rgba(255, 238, 200, .12), transparent 70%); pointer-events: none; }
+.chess-table { position: absolute; border-radius: 18px;
+  background: linear-gradient(135deg, #5A3A22, #3A2414 45%, #2A190D);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, .6), inset 0 2px 2px rgba(255, 220, 170, .25), inset 0 -6px 12px rgba(0, 0, 0, .5), 0 0 0 2px #1A0E06, 0 0 0 4px rgba(201, 164, 92, .5); }
+.chess-board { position: absolute; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); border-radius: 4px; overflow: hidden;
+  box-shadow: 0 0 0 2px #C9A45C, 0 0 0 4px #2A190D; }
+.chess-board .sq { position: relative; display: grid; place-items: center; cursor: default; user-select: none; -webkit-tap-highlight-color: transparent; }
+.chess-board .sq.light { background: #EBD9B4; }
+.chess-board .sq.dark { background: #A87B4F; }
+.chess-board.my-turn .sq { cursor: pointer; }
+.chess-board .sq.last.light { background: #E4D07A; }
+.chess-board .sq.last.dark { background: #B9994A; }
+.chess-board .sq.sel { box-shadow: inset 0 0 0 4px rgba(242, 193, 78, .95); }
+.chess-board .sq.check { background: radial-gradient(circle, #FF5A4A 0%, #D63A2E 45%, transparent 75%), #A87B4F; }
+.chess-board .sq.target::after { content: ''; position: absolute; width: 28%; height: 28%; border-radius: 50%; background: rgba(20, 30, 20, .35); pointer-events: none; }
+.chess-board .sq.target.capture::after { width: 86%; height: 86%; background: none; box-shadow: inset 0 0 0 calc(var(--cell) * .07) rgba(20, 30, 20, .38); }
+.chess-board .coord { position: absolute; font: 700 calc(var(--cell) * .16) 'Montserrat', system-ui, sans-serif; opacity: .7; pointer-events: none; }
+.chess-board .coord.rank { left: 4%; top: 3%; }
+.chess-board .coord.file { right: 5%; bottom: 2%; }
+.chess-board .sq.light .coord { color: #8A6038; }
+.chess-board .sq.dark .coord { color: #F3E4C4; }
+/* pieces: one glyph, coloured with a contrasting outline and a soft shadow */
+.pc { font-family: 'DejaVu Sans', 'Segoe UI Symbol', 'Apple Symbols', 'Noto Sans Symbols 2', 'Arial Unicode MS', serif; line-height: 1; pointer-events: none; }
+.chess-board .pc { font-size: calc(var(--cell) * .82); transform: translateY(2%); transition: transform .12s; }
+.pc.w { color: #FFFDF6; -webkit-text-stroke: 1.4px #2A1C10; paint-order: stroke fill; text-shadow: 0 3px 4px rgba(0, 0, 0, .45); }
+.pc.b { color: #1E1712; -webkit-text-stroke: 1px #E8D7B4; paint-order: stroke fill; text-shadow: 0 3px 4px rgba(0, 0, 0, .55); }
+.chess-board .sq.sel .pc { transform: translateY(-4%) scale(1.08); }
+/* players */
+.cplate { position: absolute; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-radius: 16px;
+  background: rgba(10, 16, 13, .82); border: 1px solid rgba(255, 255, 255, .1); color: #F1F4F0; font-family: 'Montserrat', system-ui, sans-serif; box-sizing: border-box; }
+.cplate.running { border-color: #F2C14E; box-shadow: 0 0 0 1px #F2C14E, 0 0 22px rgba(242, 193, 78, .25); }
+.cplate.winner { border-color: #4CD08A; box-shadow: 0 0 0 1px #4CD08A, 0 0 22px rgba(76, 208, 138, .3); }
+.cplate .avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: #1E4632; font: 700 15px 'Montserrat', sans-serif; flex: none; }
+.cplate .col { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.cplate .name { font-weight: 700; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cplate .sub { font-size: 13px; color: #9DB0A6; display: flex; align-items: center; gap: 6px; }
+.cplate .dot { width: 11px; height: 11px; border-radius: 50%; border: 1px solid #888; }
+.cplate .dot.w { background: #FFFDF6; } .cplate .dot.b { background: #1E1712; }
+.cplate .clock { font: 700 26px 'Montserrat', system-ui, monospace; font-variant-numeric: tabular-nums; padding: 6px 12px; border-radius: 10px; background: rgba(255, 255, 255, .06); color: #C9D3CD; }
+.cplate .clock.on { background: #F2C14E; color: #231A02; }
+.cplate .clock.on.low { background: #E04A3A; color: #fff; animation: c-low 1s steps(2) infinite; }
+@keyframes c-low { 50% { opacity: .75; } }
+.cplate .caps { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 0 1px; font-size: 20px; min-height: 0; }
+.cplate.clickable { cursor: pointer; }
+/* the doubling cube */
+.cube { position: absolute; width: 64px; height: 64px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: linear-gradient(145deg, #FFFDF6, #E3D7BE); color: #2A1C10; box-shadow: 0 8px 18px rgba(0, 0, 0, .5), inset 0 -3px 0 rgba(0, 0, 0, .12); font-family: 'Montserrat', sans-serif; transition: top .5s ease; }
+.cube b { font-size: 22px; line-height: 1; }
+.cube small { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; opacity: .6; }
+.cube.offered { background: linear-gradient(145deg, #FFE9A8, #F2C14E); animation: c-cube 1.2s ease-in-out infinite; }
+@keyframes c-cube { 50% { transform: rotate(-8deg) scale(1.08); } }
+/* move list */
+.cmoves { position: absolute; padding: 14px 16px; border-radius: 16px; background: rgba(10, 16, 13, .82); border: 1px solid rgba(255, 255, 255, .1); color: #F1F4F0;
+  font-family: 'Montserrat', system-ui, sans-serif; display: flex; flex-direction: column; box-sizing: border-box; }
+.cmoves h5 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: #9DB0A6; }
+.cmoves ol { margin: 0; padding: 0 0 0 30px; overflow-y: auto; flex: 1; font-size: 15px; }
+.cmoves li { padding: 3px 0; color: #9DB0A6; }
+.cmoves li span { display: inline-block; width: 46%; color: #F1F4F0; font-weight: 600; }
+/* messages and the promotion choice */
+.chess-msg { position: absolute; transform: translate(-50%, -50%); z-index: 5; max-width: 80%; text-align: center; }
+.promo { position: absolute; transform: translate(-50%, -50%); z-index: 6; display: flex; gap: 8px; padding: 10px; border-radius: 16px; background: #13201A; border: 1px solid #F2C14E; box-shadow: 0 16px 40px rgba(0, 0, 0, .6); }
+.promo button { width: 72px; height: 72px; border-radius: 12px; border: 0; background: #EBD9B4; cursor: pointer; display: grid; place-items: center; }
+.promo .pc { font-size: 56px; }
+/* the bar below */
+.chess-bar { display: flex; align-items: center; gap: 16px; padding: 12px 18px; width: 100%; box-sizing: border-box; }
+.chess-bar .cb-info { display: flex; flex-direction: column; min-width: 150px; }
+.chess-bar .cb-info small { font: 700 11px 'Montserrat', sans-serif; text-transform: uppercase; letter-spacing: .1em; color: #9DB0A6; }
+.chess-bar .cb-info strong { font: 800 24px 'Montserrat', sans-serif; color: #F1F4F0; }
+.chess-bar .cb-info em { font: 500 13px 'Montserrat', sans-serif; color: #9DB0A6; font-style: normal; }
+.chess-bar .cb-actions { display: flex; gap: 10px; flex: 1; justify-content: flex-end; flex-wrap: wrap; }
+.chess-bar .cbtn { min-height: 50px; padding: 0 20px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, .12); background: rgba(255, 255, 255, .06); color: #F1F4F0; font: 700 15px 'Montserrat', sans-serif; cursor: pointer; }
+.chess-bar .cbtn.gold { background: #F2C14E; color: #231A02; border-color: transparent; }
+.chess-bar .cbtn:disabled { opacity: .4; cursor: default; }
+.chess-bar.my-turn { box-shadow: inset 0 2px 0 #F2C14E; }
+body.portrait .chess-bar { flex-direction: column; align-items: stretch; gap: 10px; padding: 10px 12px; }
+body.portrait .chess-bar .cb-info { flex-direction: row; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
+body.portrait .chess-bar .cb-actions { justify-content: stretch; }
+body.portrait .chess-bar .cbtn { flex: 1; min-height: 46px; padding: 0 10px; font-size: 14px; }
+body.portrait .cplate { padding: 8px 10px; gap: 8px; }
+body.portrait .cplate .avatar { width: 34px; height: 34px; font-size: 12px; }
+body.portrait .cplate .name { font-size: 14px; }
+body.portrait .cplate .clock { font-size: 20px; padding: 4px 9px; }
+body.portrait .cplate .caps { font-size: 15px; }
+body.portrait .cube { width: 46px; height: 46px; border-radius: 10px; }
+body.portrait .cube b { font-size: 16px; }
+body.portrait .promo button { width: 60px; height: 60px; }
+body.portrait .promo .pc { font-size: 46px; }
+/* lobby card */
+.room-chess { background: radial-gradient(circle at 50% 35%, #4A3424, #2A190D 65%, #170D06); border: 10px solid #5C4416; }
+.room-chess h3 { font-family: 'Cormorant Garamond', serif; }
+.room-chess .room-btn { background: linear-gradient(90deg, #DCC07A, #A07C45); color: #1A1208; }
+.chess-art { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 4px; font-family: 'DejaVu Sans', 'Segoe UI Symbol', serif; }
+.chess-art span { font-size: 78px; line-height: 1; color: #FFFDF6; -webkit-text-stroke: 1.5px #2A1C10; paint-order: stroke fill; text-shadow: 0 6px 10px rgba(0, 0, 0, .5); transition: transform .3s; }
+.chess-art .ca-q { color: #1E1712; -webkit-text-stroke: 2px #F0DFB8; font-size: 92px; text-shadow: 0 0 14px rgba(255, 230, 180, .35), 0 6px 10px rgba(0, 0, 0, .5); }
+.chess-art .ca-cube { position: absolute; right: 18%; bottom: 10%; font: 800 18px 'Montserrat', sans-serif; color: #2A1C10; -webkit-text-stroke: 0; background: #FFFDF6; border-radius: 9px; padding: 8px 9px; box-shadow: 0 6px 12px rgba(0, 0, 0, .5); transform: rotate(-12deg); }
+.room:hover .chess-art .ca-n { transform: translateY(-6px) rotate(-6deg); }

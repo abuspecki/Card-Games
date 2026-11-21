@@ -106,13 +106,21 @@ async function checkScreen(page, where) {
 
       // every table, with bots
       if (lang === 'de') {
-        for (const t of ['HOLDEM-1', 'BLACKJACK-1', 'ROULETTE-1', 'DURAK-1', 'FLAMINGO-1']) {
+        for (const t of ['HOLDEM-1', 'CHESS-1', 'BLACKJACK-1', 'ROULETTE-1', 'DURAK-1', 'FLAMINGO-1']) {
           await page.evaluate((x) => App.joinTable(x), t);
           try { await page.waitForFunction(() => App.tableId && App.S, null, { timeout: 8000 }); } catch { fail(where(t), 'could not sit down'); continue; }
           for (let i = 0; i < 2; i++) { await page.evaluate(() => { const b = document.getElementById('addBotBtn'); if (b) b.click(); }); await page.waitForTimeout(200); }
           await page.waitForTimeout(3500);
           const drawn = await page.evaluate(() => document.querySelectorAll('#stage *').length);
           if (drawn < 20) fail(where(t), `the table looks empty (${drawn} elements)`);
+          if (t === 'CHESS-1') {
+            // chess: a board with 64 squares, two players, the clock running
+            if ((await page.$$('.chess-board .sq')).length !== 64) fail(where(t), 'no chess board');
+            if (!(await page.$('.cplate .clock'))) fail(where(t), 'no chess clock');
+            await checkScreen(page, where(t));
+            await page.evaluate(() => App.leaveTable()); await page.waitForTimeout(800);
+            continue;
+          }
           if (!(await page.$('#tDealer'))) fail(where(t), 'no dealer at the table');
           // the tip menu (any amount)
           if (!(await page.$('#tTip:not([hidden])'))) fail(where(t), 'no tip button');

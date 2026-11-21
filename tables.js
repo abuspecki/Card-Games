@@ -8,6 +8,7 @@ const { Durak } = require('./games/durak');
 const { Roulette } = require('./games/roulette');
 const { Flamingo } = require('./games/flamingo');
 const { Draw } = require('./games/draw');
+const { Chess } = require('./games/chess');
 const { rewardFor, dayString, GESTURE_COOLDOWN } = require('./coins');
 
 const GAMES = {
@@ -17,6 +18,7 @@ const GAMES = {
   roulette: { name: 'Roulette', make: (settings) => new Roulette(settings) },
   flamingo: { name: 'Flamingo', make: (settings) => new Flamingo(settings) },
   draw: { name: 'Five Card Draw', make: (settings) => new Draw(settings) },
+  chess: { name: 'Chess', make: (settings) => new Chess(settings) },
 };
 
 // Two tables per game. `buyIn` is the stack you bring (from your bankroll if
@@ -34,6 +36,9 @@ const TABLES = [
   { id: 'ROULETTE-1', name: 'Roulette · Table 1', game: 'roulette', capacity: 8, buyIn: 5000, minBuyIn: 100, settings: { bigBlind: 5 } },
   { id: 'TOURNEY-1', name: "Hold'em · Sit & Go", game: 'holdem', capacity: 6, accountsOnly: true, tourney: { entry: 500, stack: 1500, handsPerLevel: 6 }, settings: { smallBlind: 10, bigBlind: 20 }, buyIn: 1500 },
   { id: 'FLAMINGO-1', name: 'Flamingo · Table 1', game: 'flamingo', capacity: 6 },
+  // Chess: the stake per game (doubled with the cube), a clock per player
+  { id: 'CHESS-1', name: 'Chess · Table 1', game: 'chess', capacity: 2, buyIn: 5000, minBuyIn: 100, settings: { bigBlind: 100, minutes: 5 } },
+  { id: 'CHESS-2', name: 'Chess · High Roller', game: 'chess', capacity: 2, highRoller: true, buyIn: 100000, minBuyIn: 1000, settings: { bigBlind: 1000, minutes: 10 } },
   { id: 'ROULETTE-2', name: 'Roulette · High Roller', game: 'roulette', capacity: 8, highRoller: true, buyIn: 50000, minBuyIn: 1000, settings: { bigBlind: 25 } },
 ];
 
@@ -67,6 +72,7 @@ function createLobby(ctx) {
     roulette: { capacity: 8, buyIn: 1000, minBuyIn: 100, settings: { bigBlind: 5 }, label: 'Roulette' },
     durak: { capacity: 6, label: 'Durak' },
     flamingo: { capacity: 6, label: 'Flamingo' },
+    chess: { capacity: 2, buyIn: 5000, minBuyIn: 100, settings: { bigBlind: 100, minutes: 5 }, label: 'Chess' },
   };
   // Stakes the owner of a private table may choose (blind / minimum bet), and the
   // buy-in as a multiple of it. Validated here, whatever the browser sends.
@@ -75,6 +81,8 @@ function createLobby(ctx) {
     draw: { stakes: [10, 20, 50, 100, 200, 500, 1000, 2000, 5000], buyIns: [20, 50, 100, 200], minBuyIn: 10 },
     blackjack: { stakes: [5, 10, 25, 50, 100, 250, 500, 1000], buyIns: [20, 50, 100, 200, 500, 1000], minBuyIn: 5 },
     roulette: { stakes: [5, 10, 25, 50, 100, 250, 500], buyIns: [20, 50, 100, 200], minBuyIn: 5 },
+    // chess: stake per game; the buy-in leaves room for the cube (×64 at most)
+    chess: { stakes: [50, 100, 250, 500, 1000, 2500, 5000, 10000], buyIns: [4, 8, 16, 32, 64], minBuyIn: 1, minutes: [3, 5, 10] },
   };
   function privateStakes(game, opts) {
     const P = PRIVATE[game];
@@ -84,7 +92,12 @@ function createLobby(ctx) {
     const times = opts.buyIn === undefined ? P.buyIn / P.settings.bigBlind : Number(opts.buyIn) / stake;
     if (!R.stakes.includes(stake)) return { error: 'Pick blinds from the list' };
     if (!R.buyIns.includes(times)) return { error: 'Pick a buy-in from the list' };
-    const settings = game === 'holdem' || game === 'draw' ? { smallBlind: stake / 2, bigBlind: stake } : { bigBlind: stake };
+    let settings = game === 'holdem' || game === 'draw' ? { smallBlind: stake / 2, bigBlind: stake } : { bigBlind: stake };
+    if (game === 'chess') {
+      const minutes = opts.minutes === undefined ? P.settings.minutes : Number(opts.minutes);
+      if (!R.minutes.includes(minutes)) return { error: 'Pick a time from the list' };
+      settings = { bigBlind: stake, minutes };
+    }
     return { settings, buyIn: stake * times, minBuyIn: stake * R.minBuyIn };
   }
   const PRIVATE_MAX = 30;
@@ -98,7 +111,7 @@ function createLobby(ctx) {
     // one private table per member: reuse it (same game and stakes), else replace it while it is empty
     for (const r of rooms.values()) if (r.private && r.ownerId === userId) {
       const stake = (st.settings && st.settings.bigBlind) || null;
-      const same = r.game === game && r.buyIn === st.buyIn && r.stake === stake;
+      const same = r.game === game && r.buyIn === st.buyIn && r.stake === stake && (r.table.settings.minutes || 0) === ((st.settings && st.settings.minutes) || (r.table.settings.minutes || 0));
       if (same) return { ok: true, id: r.id, reused: true };
       if (r.table.seats.some((s) => s && !s.isBot)) return { error: `You already have a private ${PRIVATE[r.game].label} table (${r.id}) — close it first by leaving it` };
       closeRoom(r);
@@ -255,7 +268,8 @@ function createLobby(ctx) {
       minBankroll: room.minBankroll || 0,
       tourney: tourneyInfo(room),
       stakes: room.tourney ? `Sit & Go · entry ${room.tourney.entry}` : room.game === 'holdem' || room.game === 'draw' ? `Blinds ${s.smallBlind} / ${s.bigBlind}`
-        : room.game === 'blackjack' || room.game === 'roulette' ? `Bets from ${s.bigBlind}` : '2–6 players',
+        : room.game === 'blackjack' || room.game === 'roulette' ? `Bets from ${s.bigBlind}`
+          : room.game === 'chess' ? `Stake ${s.bigBlind} · ${s.minutes} min` : '2–6 players',
     };
   }
 
@@ -265,7 +279,7 @@ function createLobby(ctx) {
     const t = room.table;
     if (!t.isPlaying() || t.toAct === -1 || !t.seats[t.toAct]) return null;
     const key = `${t.handNo}:${t.toAct}:${room.moveSeq || 0}`;
-    if (!room.turn || room.turn.key !== key) room.turn = { key, seat: t.toAct, endsAt: Date.now() + TURN_TIMEOUT };
+    if (!room.turn || room.turn.key !== key) room.turn = { key, seat: t.toAct, endsAt: t.game === 'chess' ? t.deadline : Date.now() + TURN_TIMEOUT };
     return room.turn;
   }
 
@@ -384,7 +398,7 @@ function createLobby(ctx) {
           const d = t.defaultAction(t.toAct);
           const r = t.act(seat.id, d.action, d.amount);
           if (r && r.error && d.action !== 'pass') t.act(seat.id, 'pass');
-          if (seat.connected) t.addLog(`${seat.name} ran out of time`);
+          if (seat.connected && t.game !== 'chess') t.addLog(`${seat.name} ran out of time`);
           room.moveSeq = (room.moveSeq || 0) + 1;
           pushState(room);
         }, wait);
@@ -519,7 +533,7 @@ function createLobby(ctx) {
   function rebuyBots(t) {
     if ([...rooms.values()].some((r) => r.table === t && r.tourney)) return;
     for (const s of t.seats) {
-      if (s && s.isBot && s.chips === 0) { s.chips = t.settings.startingStack; t.addLog(`${s.name} rebuys for ${s.chips}`); }
+      if (s && s.isBot && (s.chips === 0 || (t.game === 'chess' && s.chips < t.stake()))) { s.chips = t.settings.startingStack; t.addLog(`${s.name} rebuys for ${s.chips}`); }
     }
   }
 
@@ -626,7 +640,8 @@ function createLobby(ctx) {
             }
           }
           if (target.tourney && target.T.state !== 'open') return send(ws, { t: 'error', msg: 'This tournament is already running — watch it or join the next one' });
-          if (seatedCount(table) >= target.capacity) removeBot(target); // make room for a human
+          // make room for a human (but never end a running chess game for it)
+          if (seatedCount(table) >= target.capacity && !(target.game === 'chess' && table.isPlaying())) removeBot(target);
           if (seatedCount(table) >= target.capacity) return send(ws, { t: 'error', msg: 'This table is full — try the other one' });
           // Accounts bring chips from their bankroll; guests get a free table stack.
           let stack = null;

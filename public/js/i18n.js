@@ -326,7 +326,16 @@
     'Swap up to 3 cards — or 4 if you keep an ace.': 'Tausche bis zu 3 Karten – oder 4, wenn du ein Ass behältst.', 'Swap up to 3 cards, or stand pat.': 'Tausche bis zu 3 Karten oder behalte alle.',
     'The Card Room': 'Der Kartensalon', 'Five cards, one draw · up to 6 players': 'Fünf Karten, ein Tausch · bis zu 6 Spieler', 'The draw': 'Der Tausch', 'Second betting round': 'Zweite Setzrunde',
     'Choose the cards to swap (or none)': 'Wähle die Karten zum Tauschen (oder keine)', 'Not the time to draw': 'Jetzt wird nicht getauscht', 'You may swap four cards only when you keep an ace': 'Vier Karten darfst du nur tauschen, wenn du ein Ass behältst',
-    'You may swap up to 3 cards': 'Du darfst bis zu 3 Karten tauschen'
+    'You may swap up to 3 cards': 'Du darfst bis zu 3 Karten tauschen',
+    'Chess': 'Schach', 'The Chess Club': 'Der Schachklub', 'Play for chips · double the stake': 'Um Chips spielen · Einsatz verdoppeln', 'Time per player': 'Bedenkzeit pro Spieler', 'Stake per game': 'Einsatz pro Partie',
+    'Stake': 'Einsatz', 'Moves': 'Züge', 'cube': 'Würfel', 'offered': 'angeboten', 'Offer a draw': 'Remis anbieten', 'Resign': 'Aufgeben', 'Accept the draw': 'Remis annehmen', 'Play on': 'Weiterspielen',
+    'Your move — tap a piece.': 'Du bist am Zug – tippe eine Figur an.', 'Check! Your move.': 'Schach! Du bist am Zug.', 'Stake per game · cube at 1': 'Einsatz pro Partie · Würfel auf 1',
+    'The game starts as soon as two players sit down.': 'Die Partie beginnt, sobald zwei Spieler sitzen.', 'Waiting for an opponent — invite a friend or a bot': 'Warte auf einen Gegner – lade einen Freund oder Bot ein',
+    'The next game starts in a moment…': 'Die nächste Partie beginnt gleich…', 'Waiting for the answer to the double…': 'Warte auf die Antwort zur Verdopplung…', 'Waiting for the answer to the draw offer…': 'Warte auf die Antwort zum Remis-Angebot…',
+    'Invite a friend or a bot': 'Lade einen Freund oder Bot ein', 'Bot · easy': 'Bot · leicht', 'Bot · medium': 'Bot · mittel', 'Bot · strong': 'Bot · stark', 'Declines': 'Lehnt ab', 'No draw': 'Kein Remis', 'Offers a draw': 'Bietet Remis an',
+    'That move is not allowed': 'Dieser Zug ist nicht erlaubt', 'You cannot double now': 'Du kannst jetzt nicht verdoppeln', 'Only your opponent may double now': 'Jetzt darf nur dein Gegner verdoppeln',
+    'Accept or decline the double first': 'Nimm die Verdopplung erst an oder lehne sie ab', 'Answer the draw offer first': 'Beantworte erst das Remis-Angebot', 'You already offered a draw this move': 'Du hast in diesem Zug schon Remis angeboten',
+    'Pick a time from the list': 'Wähle eine Zeit aus der Liste'
   };
 
   Object.assign(DE, {
@@ -364,7 +373,32 @@
   });
 
   // ---------- patterns for texts with numbers or names ----------
+  // chess: why a game ended
+  const CHESS_REASON = (r) => {
+    const m = r.match(/^checkmate \((.+)\)$/); if (m) return `Schachmatt (${m[1]})`;
+    let x;
+    if ((x = r.match(/^(.+) resigns$/))) return `${x[1]} gibt auf`;
+    if ((x = r.match(/^(.+) ran out of time — a draw \(no mating material\)$/))) return `${x[1]} hat keine Zeit mehr – Remis (kein Mattmaterial)`;
+    if ((x = r.match(/^(.+) ran out of time$/))) return `${x[1]} hat keine Zeit mehr`;
+    if ((x = r.match(/^(.+) declines the double$/))) return `${x[1]} lehnt die Verdopplung ab`;
+    if ((x = r.match(/^(.+) left the table$/))) return `${x[1]} hat den Tisch verlassen`;
+    return ({ stalemate: 'Patt', agreed: 'vereinbart', 'not enough material to mate': 'zu wenig Material zum Mattsetzen', 'threefold repetition': 'dreifache Wiederholung', 'fifty-move rule': '50-Züge-Regel' })[r] || r;
+  };
   const P = [
+    [/^Table (\d+) · Stake ([\d,.]+) · (\d+) min$/, 'Tisch $1 · Einsatz $2 · $3 Min'], [/^High Roller · Stake ([\d,.]+) · (\d+) min$/, 'High Roller · Einsatz $1 · $2 Min'],
+    [/^Chess · ([\d,.]+) · (\d+) min$/, 'Schach · $1 · $2 Min'], [/^Chess · The Chess Club$/, 'Schach · Der Schachklub'],
+    [/^Chess · Stake ([\d,.]+) · (\d+) min$/, 'Schach · Einsatz $1 · $2 Min'], [/^Stake ([\d,.]+) · (\d+) min$/, 'Einsatz $1 · $2 Min'], [/^(.+) · Stake ([\d,.]+) · (\d+) min$/, '$1 · Einsatz $2 · $3 Min'],
+    [/^([\d,.]+) · (\d+) min$/, '$1 · $2 Min'], [/^(\d+) min$/, '$1 Min'],
+    [/^Stake ([\d,.]+) per game · (\d+) min each · doubling cube$/, 'Einsatz $1 pro Partie · je $2 Min · Verdopplungswürfel'],
+    [/^Double to ([\d,.]+)$/, 'Verdoppeln auf $1'], [/^Take · play for ([\d,.]+)$/, 'Annehmen · um $1 spielen'], [/^Decline · lose ([\d,.]+)$/, 'Ablehnen · $1 verlieren'],
+    [/^Doubled to ×(\d+)$/, 'Verdoppelt auf ×$1'], [/^Takes ×(\d+)$/, 'Nimmt an · ×$1'], [/^Doubles to ([\d,.]+)$/, 'Verdoppelt auf $1'],
+    [/^(.+) doubles: play on for ([\d,.]+), or give up ([\d,.]+) now$/, '$1 verdoppelt: weiterspielen um $2 oder jetzt $3 abgeben'],
+    [/^(.+) offers a draw$/, '$1 bietet Remis an'], [/^(.+) declines the draw$/, '$1 lehnt das Remis ab'],
+    [/^(.+) offers to double to ([\d,.]+)$/, '$1 bietet an, auf $2 zu verdoppeln'],
+    [/^(.+) accepts the double — the game is now for ([\d,.]+)$/, '$1 nimmt an – die Partie geht jetzt um $2'],
+    [/^Offer to double the stake to ([\d,.]+)\?$/, 'Den Einsatz auf $1 verdoppeln?'], [/^Resign and lose ([\d,.]+)\?$/, 'Aufgeben und $1 verlieren?'],
+    [/^(.+) wins ([\d,.]+) — (.+)$/, (m0, w, a, r) => `${w} gewinnt ${a} – ${CHESS_REASON(r)}`], [/^Draw — (.+)$/, (m0, r) => `Remis – ${CHESS_REASON(r)}`],
+    [/^— Game (\d+): (.+) \(white\) v (.+) \(black\) · stake ([\d,.]+) —$/, '— Partie $1: $2 (Weiß) gegen $3 (Schwarz) · Einsatz $4 —'],
     [/^High Roller · Bets from ([\d,.]+)$/, 'High Roller · Einsätze ab $1'], [/^High Roller · Blinds (.+)$/, 'High Roller · Blinds $1'],
     [/^Add (\d+) to your bet$/, '$1 zum Einsatz legen'],
     [/^Swap (\d+) cards?$/, (m0, n) => `${n} Karte${n === '1' ? '' : 'n'} tauschen`],
