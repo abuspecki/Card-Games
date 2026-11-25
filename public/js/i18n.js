@@ -342,7 +342,20 @@
     'Invite a friend': 'Freund einladen', 'Take': 'Annehmen', 'Decline': 'Ablehnen', 'Accept': 'Annehmen', 'A draw: nobody wins or loses chips.': 'Remis: Niemand gewinnt oder verliert Chips.',
     'You win!': 'Du gewinnst!', 'You lose': 'Verloren', 'Draw': 'Remis', 'Next game in': 'Nächste Partie in', 'Promote to': 'Umwandeln in', 'No moves yet': 'Noch keine Züge',
     'Waiting for an opponent ': 'Warte auf einen Gegner', 'checkmate': 'Schachmatt', 'stalemate': 'Patt', 'agreed': 'vereinbart', 'not enough material to mate': 'zu wenig Material zum Mattsetzen',
-    'threefold repetition': 'dreifache Wiederholung', 'fifty-move rule': '50-Züge-Regel'
+    'threefold repetition': 'dreifache Wiederholung', 'fifty-move rule': '50-Züge-Regel',
+    'Chess box': 'Schach-Box', 'Chess pieces': 'Schachfiguren', 'Chess boards': 'Schachbretter',
+    'Your chess set — your opponent sees your pieces too. From the Chess box.': 'Dein Schachspiel – auch dein Gegner sieht deine Figuren. Aus der Schach-Box.',
+    'The board you play chess on — on your screen. From the Chess box.': 'Das Brett, auf dem du Schach spielst – auf deinem Bildschirm. Aus der Schach-Box.',
+    'Ebony & Boxwood': 'Ebenholz & Buchsbaum', 'Marble': 'Marmor', 'Glass': 'Glas', 'Gold & Silver': 'Gold & Silber', 'Crystal': 'Kristall',
+    'Tournament': 'Turnier', 'Maple & Walnut': 'Ahorn & Walnuss', 'Marble Hall': 'Marmorsaal', 'Ice': 'Eis', 'Midnight': 'Mitternacht', 'Emerald & Gold': 'Smaragd & Gold',
+    '8-Ball Pool': '8-Ball-Billard', 'Pool': 'Billard', 'The Pool Hall': 'Der Billardsalon', '8-ball for chips · one on one': '8-Ball um Chips · eins gegen eins', '8-Ball Pool · The Pool Hall': '8-Ball-Billard · Der Billardsalon',
+    'Strength': 'Stärke', 'Shoot': 'Stoßen', 'Concede': 'Aufgeben', 'Solids': 'Volle', 'Stripes': 'Halbe', 'Open table': 'Offener Tisch', 'Ball in hand': 'Ball in Hand',
+    'The balls are rolling…': 'Die Kugeln rollen…', 'Your break — place the cue ball behind the line, aim, shoot.': 'Dein Anstoß – leg die Weiße hinter die Linie, ziele, stoß.',
+    'Ball in hand: drag the cue ball, then aim and shoot.': 'Ball in Hand: verschieb die Weiße, dann zielen und stoßen.', 'Your shot — drag on the table to aim.': 'Du bist dran – zieh auf dem Tisch, um zu zielen.',
+    'The next game starts shortly': 'Die nächste Partie beginnt gleich', 'Place the cue ball behind the line': 'Leg die Weiße hinter die Linie', 'Place the cue ball on a free spot': 'Leg die Weiße auf einen freien Platz',
+    'Place the cue ball behind the line, free of other balls': 'Leg die Weiße hinter die Linie, ohne andere Kugeln zu berühren', 'Place the cue ball first': 'Leg zuerst die Weiße hin', 'Aim and choose a strength': 'Ziele und wähle eine Stärke',
+    'Misses': 'Daneben', 'Shoots': 'Stößt', 'Foul': 'Foul', 'Out of time': 'Zeit abgelaufen', 'Aim left': 'Weiter links zielen', 'Aim right': 'Weiter rechts zielen', 'Pool · Table 1': 'Billard · Tisch 1',
+    'Leave in the middle of a game? You lose the game and the stake.': 'Mitten in der Partie gehen? Du verlierst die Partie und den Einsatz.'
   };
 
   Object.assign(DE, {
@@ -380,6 +393,9 @@
   });
 
   // ---------- patterns for texts with numbers or names ----------
+  // pool: the fouls
+  const POOL_FOUL = { 'the cue ball went in': 'die Weiße ist gefallen', 'no ball was hit': 'keine Kugel getroffen', 'the 8 was hit first': 'zuerst die 8 getroffen',
+    'the wrong ball was hit first': 'zuerst die falsche Kugel getroffen', 'no ball reached a cushion': 'keine Kugel hat eine Bande erreicht', 'out of time': 'Zeit abgelaufen' };
   // chess: why a game ended
   const CHESS_REASON = (r) => {
     const m = r.match(/^checkmate \((.+)\)$/); if (m) return `Schachmatt (${m[1]})`;
@@ -392,6 +408,14 @@
     return ({ stalemate: 'Patt', agreed: 'vereinbart', 'not enough material to mate': 'zu wenig Material zum Mattsetzen', 'threefold repetition': 'dreifache Wiederholung', 'fifty-move rule': '50-Züge-Regel' })[r] || r;
   };
   const P = [
+    [/^Table (\d+) · Stake ([\d,.]+)$/, 'Tisch $1 · Einsatz $2'], [/^High Roller · Stake ([\d,.]+)$/, 'High Roller · Einsatz $1'],
+    [/^Stake ([\d,.]+) per game$/, 'Einsatz $1 pro Partie'], [/^Stake ([\d,.]+) per game · 8-ball$/, 'Einsatz $1 pro Partie · 8-Ball'], [/^(.+) · Stake ([\d,.]+)$/, '$1 · Einsatz $2'],
+    [/^Pool · ([\d,.]+)$/, 'Billard · $1'], [/^Pockets ([\d, ]+)$/, 'Versenkt $1'], [/^(.+) pockets ([\d, ]+)$/, '$1 versenkt $2'], [/^(.+) is at the table…$/, '$1 ist am Tisch…'],
+    [/^Foul: (.+)$/, (m0, r) => 'Foul: ' + (POOL_FOUL[r] || r)], [/^Foul by (.+): (.+) — ball in hand for (.+)$/, (m0, a, r, b) => `Foul von ${a}: ${POOL_FOUL[r] || r} – Ball in Hand für ${b}`],
+    [/^(.+) shoots again$/, '$1 bleibt dran'], [/^(.+) breaks$/, '$1 stößt an'], [/^— Game (\d+): (.+) breaks · stake ([\d,.]+) —$/, '— Partie $1: $2 stößt an · Einsatz $3 —'],
+    [/^(.+) plays the (solids|stripes), (.+) the (solids|stripes)$/, (m0, a, g1, b, g2) => `${a} spielt die ${g1 === 'solids' ? 'Vollen' : 'Halben'}, ${b} die ${g2 === 'solids' ? 'Vollen' : 'Halben'}`],
+    [/^(.+) pockets the 8$/, '$1 versenkt die 8'], [/^(.+) pockets the 8 too early$/, '$1 versenkt die 8 zu früh'], [/^(.+) pockets the 8 with a foul$/, '$1 versenkt die 8 mit einem Foul'], [/^(.+) concedes$/, '$1 gibt auf'],
+    [/^(.+) ran out of time — ball in hand for (.+)$/, '$1 hat keine Zeit mehr – Ball in Hand für $2'],
     [/^(checkmate \(.+\)|.+ resigns|.+ ran out of time.*|.+ declines the double|.+ left the table)$/, (m0) => CHESS_REASON(m0)],
     [/^Game for \(cube ×(\d+)\)$/, 'Partie um (Würfel ×$1)'], [/^Stake ([\d,.]+) · (\d+) min each$/, 'Einsatz $1 · je $2 Min'],
     [/^Sure\? Double to ([\d,.]+)$/, 'Sicher? Auf $1 verdoppeln'], [/^Sure\? Lose ([\d,.]+)$/, 'Sicher? $1 verlieren'],

@@ -106,13 +106,21 @@ async function checkScreen(page, where) {
 
       // every table, with bots
       if (lang === 'de') {
-        for (const t of ['HOLDEM-1', 'CHESS-1', 'BLACKJACK-1', 'ROULETTE-1', 'DURAK-1', 'FLAMINGO-1']) {
+        for (const t of ['HOLDEM-1', 'CHESS-1', 'POOL-1', 'BLACKJACK-1', 'ROULETTE-1', 'DURAK-1', 'FLAMINGO-1']) {
           await page.evaluate((x) => App.joinTable(x), t);
           try { await page.waitForFunction(() => App.tableId && App.S, null, { timeout: 8000 }); } catch { fail(where(t), 'could not sit down'); continue; }
           for (let i = 0; i < 2; i++) { await page.evaluate(() => { const b = document.getElementById('addBotBtn'); if (b) b.click(); }); await page.waitForTimeout(200); }
           await page.waitForTimeout(3500);
           const drawn = await page.evaluate(() => document.querySelectorAll('#stage *').length);
           if (drawn < 20) fail(where(t), `the table looks empty (${drawn} elements)`);
+          if (t === 'POOL-1') {
+            // pool: the table is drawn and a bot can be invited from the card on the table
+            if (!(await page.$('.pool-canvas'))) fail(where(t), 'no pool table');
+            if (!(await page.$('.pcard .levels button')) && !(await page.evaluate(() => App.S.state.stage === 'playing'))) fail(where(t), 'neither a game nor the bot choice');
+            await checkScreen(page, where(t));
+            await page.evaluate(() => App.leaveTable()); await page.waitForTimeout(800);
+            continue;
+          }
           if (t === 'CHESS-1') {
             // chess: a board with 64 squares, two players, the clock running
             if ((await page.$$('.chess-board .sq')).length !== 64) fail(where(t), 'no chess board');

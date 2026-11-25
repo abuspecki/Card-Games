@@ -123,14 +123,14 @@ const C = require('../coins');
   assert.ok((await coins.equip(s, 'avatar', 'pf-crest')).ok);
   assert.ok((await coins.buy(s, 'title-baron')).item);
   assert.ok((await coins.equip(s, 'badge', 'title-baron')).ok);
-  assert.deepStrictEqual(await coins.lookOf(s), { avatar: 'pf:crest', badge: 't:Baron', tag: null, skin: { back: null, chips: null, turn: null, victory: null } });
+  assert.deepStrictEqual(await coins.lookOf(s), { avatar: 'pf:crest', badge: 't:Baron', tag: null, skin: { back: null, chips: null, turn: null, victory: null, chess: null } });
   // what others see also includes the card back, chip set and turn marker
   await coins.adjust(s, 5000, 0, 'owner');
   for (const id of ['back-aurora', 'chips-holo', 'turn-lightning']) assert.ok((await coins.buy(s, id)).item, id);
   assert.ok((await coins.equip(s, 'cardback', 'back-aurora')).ok);
   assert.ok((await coins.equip(s, 'chips', 'chips-holo')).ok);
   assert.ok((await coins.equip(s, 'turn', 'turn-lightning')).ok);
-  assert.deepStrictEqual((await coins.lookOf(s)).skin, { back: 'aurora', chips: 'holo', turn: 'lightning', victory: null });
+  assert.deepStrictEqual((await coins.lookOf(s)).skin, { back: 'aurora', chips: 'holo', turn: 'lightning', victory: null, chess: null });
   assert(C.CATALOG.filter((i) => i.animated).length >= 8, 'animated skins for sale');
   // retired items can't be bought any more…
   assert((await coins.buy(s, 'avatar-lion')).error, 'retired items are not sold');
@@ -138,6 +138,12 @@ const C = require('../coins');
   await store.updateWallet(s, { coins: 0, chips: 0 }, () => ({ addItem: 'avatar-lion', result: true }));
   assert.ok((await coins.equip(s, 'avatar', 'avatar-lion')).ok, 'owned retired item still usable');
   assert.strictEqual((await coins.lookOf(s)).avatar, '🦁');
+  // the Chess box holds piece sets and boards (and no separate boxes for them)
+  assert(C.BOXES.chess && !C.BOXES.chesspieces && !C.BOXES.chessboard);
+  assert(C.boxItems('chess').length >= 10 && C.boxItems('chess').every((i) => i.slot === 'chesspieces' || i.slot === 'chessboard'));
+  assert.ok((await coins.grantItem(s, 'chessset-neon')) !== undefined);
+  assert.ok((await coins.equip(s, 'chesspieces', 'chessset-neon')).ok);
+  assert.strictEqual((await coins.lookOf(s)).skin.chess, 'neon', 'your opponent sees your pieces');
   // player tags: box tags can be drawn, earned tags never; earned tags are given once
   assert(C.boxItems('tag').length >= 5 && C.boxItems('tag').every((i) => !i.earned));
   assert(C.boxItems('mystery').every((i) => !i.earned));
@@ -204,7 +210,7 @@ const C = require('../coins');
   assert.strictEqual((await coins.history(g1))[0].reason, 'gift-out:G2');
 
   // ----- skin boxes: one per category + Mystery; chance ∝ 1 / price; never a duplicate -----
-  assert.deepStrictEqual(Object.keys(C.BOXES), ['mystery', ...C.SHOP_TABS], 'a box for every category');
+  assert.deepStrictEqual(Object.keys(C.BOXES), ['mystery', ...C.SHOP_TABS.filter((t) => t !== 'chesspieces' && t !== 'chessboard'), 'chess'], 'a box for every category (one Chess box for both chess categories)');
   for (const b of Object.values(C.BOXES)) {
     assert(b.coins >= 150 && b.chips === b.coins * C.CHIPS_PER_BOX_COIN, b.id + ' price');
     const ch = C.boxChances(b.id, []);

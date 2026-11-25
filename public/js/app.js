@@ -12,11 +12,12 @@
   const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
   window.TableUI = window.TableUI || {};
 
-  const GAME_NAMES = { holdem: "Texas Hold'em", draw: 'Five Card Draw', chess: 'Chess', blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette', flamingo: 'Flamingo' };
+  const GAME_NAMES = { holdem: "Texas Hold'em", draw: 'Five Card Draw', chess: 'Chess', billiards: '8-Ball Pool', blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette', flamingo: 'Flamingo' };
   const ROOM_INFO = {
     holdem: { tag: 'The Club Room', desc: 'No-Limit poker · up to 8 players', cards: [['A', 'spade'], ['K', 'spade']] },
     draw: { tag: 'The Card Room', desc: 'Five cards, one draw · up to 6 players', cards: [['Q', 'heart'], ['Q', 'diamond']] },
     chess: { tag: 'The Chess Club', desc: 'Play for chips · double the stake' },
+    billiards: { tag: 'The Pool Hall', desc: '8-ball for chips · one on one' },
     blackjack: { tag: 'Salon Privé', desc: 'Beat the dealer to 21', cards: [['A', 'heart'], ['K', 'club']] },
     durak: { tag: 'The Winter Palace', desc: 'Attack, defend — don\'t be the fool', cards: [['6', 'heart'], ['Q', 'spade']] },
     roulette: { tag: 'The Wheel Room', desc: 'Red, black or your lucky number' },
@@ -381,6 +382,7 @@
     document.body.dataset.bg = pick('background');
     CardUI.chipSet = pick('chips') || null;
     document.body.dataset.turn = pick('turn');
+    document.body.dataset.chessboard = pick('chessboard');
     if (App.S) renderTable();
   }
 
@@ -399,12 +401,13 @@
   function buildRooms() {
     const grid = $('roomGrid');
     grid.replaceChildren();
-    for (const game of ['holdem', 'blackjack', 'durak', 'roulette', 'flamingo', 'chess']) {   // Five Card Draw ('draw') is built but not offered yet
+    for (const game of ['holdem', 'blackjack', 'durak', 'roulette', 'flamingo', 'chess', 'billiards']) {   // Five Card Draw ('draw') is built but not offered yet
       const info = ROOM_INFO[game];
       const art = h('article', `room room-${game}`);
       const vis = h('div', 'visual');
       if (game === 'blackjack') vis.appendChild(h('div', 'rays'));
       if (game === 'roulette') vis.appendChild(h('div', 'mini-wheel'));
+      else if (game === 'billiards') vis.appendChild(h('div', 'pool-art', [[1, '#F2C200', 46, 30], [11, '#D42A1E', 54, 52], [8, '#111111', 38, 52], [6, '#13894A', 62, 28], [0, '', 22, 44]].map(([n, c, x, y]) => `<i class="${n === 0 ? 'cue' : n > 8 ? 'st' : ''}" data-n="${n}" style="--c:${c};left:${x}%;top:${y}%"></i>`).join('')));
       else if (game === 'chess') vis.appendChild(h('div', 'chess-art', '<span class="ca-k">♚\uFE0E</span><span class="ca-q">♛\uFE0E</span><span class="ca-n">♞\uFE0E</span><span class="ca-cube">×2</span>'));
       else if (game === 'flamingo') {
         const fan = h('div', 'fan');
@@ -548,7 +551,7 @@
   App.openQuests = () => { loungeTab = 'quests'; openLounge('quests'); };
 
   // ================= PRIVATE TABLES =================
-  const PRIV_GAMES = [['holdem', "Hold'em", '♠'], ['chess', 'Chess', '♞'], ['blackjack', 'Blackjack', '🂡'], ['roulette', 'Roulette', '◉'], ['durak', 'Durak', '♦'], ['flamingo', 'Flamingo', '🦩']];
+  const PRIV_GAMES = [['holdem', "Hold'em", '♠'], ['chess', 'Chess', '♞'], ['billiards', 'Pool', '🎱'], ['blackjack', 'Blackjack', '🂡'], ['roulette', 'Roulette', '◉'], ['durak', 'Durak', '♦'], ['flamingo', 'Flamingo', '🦩']];
   function openPrivate() {
     openModal((card) => {
       modalHead(card, 'Friends only', 'Private table');
@@ -595,6 +598,7 @@
     blackjack: { stakes: [5, 10, 25, 50, 100, 250, 500, 1000], buyIns: [20, 50, 100, 200, 500, 1000], def: [10, 100], minBuyIn: 5, label: 'Blackjack' },
     roulette: { stakes: [5, 10, 25, 50, 100, 250, 500], buyIns: [20, 50, 100, 200], def: [5, 200], minBuyIn: 5, label: 'Roulette' },
     chess: { stakes: [50, 100, 250, 500, 1000, 2500, 5000, 10000], buyIns: [4, 8, 16, 32, 64], def: [100, 16], minBuyIn: 1, label: 'Chess', minutes: [3, 5, 10] },
+    billiards: { stakes: [50, 100, 250, 500, 1000, 2500, 5000, 10000], buyIns: [1, 2, 5, 10, 20], def: [100, 10], minBuyIn: 1, label: 'Pool' },
   };
   function privateSettings(card, game, create) {
     const P = PRIV_STAKES[game];
@@ -603,7 +607,7 @@
     body.innerHTML = `
       <section class="priv-set"><h4>${P.label} · your table</h4>
         ${P.minutes ? `<label>Time per player<select name="minutes">${P.minutes.map((m) => `<option value="${m}"${m === 5 ? ' selected' : ''}>${m} min</option>`).join('')}</select></label>` : ''}
-        <label>${holdem ? 'Blinds' : game === 'chess' ? 'Stake per game' : 'Minimum bet'}<select name="stake">${P.stakes.map((v) => `<option value="${v}"${v === P.def[0] ? ' selected' : ''}>${holdem ? `${fmt(v / 2)} / ${fmt(v)}` : fmt(v)}</option>`).join('')}</select></label>
+        <label>${holdem ? 'Blinds' : game === 'chess' || game === 'billiards' ? 'Stake per game' : 'Minimum bet'}<select name="stake">${P.stakes.map((v) => `<option value="${v}"${v === P.def[0] ? ' selected' : ''}>${holdem ? `${fmt(v / 2)} / ${fmt(v)}` : fmt(v)}</option>`).join('')}</select></label>
         <label>Buy-in<select name="buyIn"></select></label>
         <p class="priv-note"></p>
         <p class="merror" role="alert"></p>
@@ -612,7 +616,7 @@
     const stakeSel = body.querySelector('[name=stake]'), buySel = body.querySelector('[name=buyIn]'), note = body.querySelector('.priv-note');
     const paintBuyIns = (keep) => {
       const stake = Number(stakeSel.value);
-      buySel.innerHTML = P.buyIns.map((x) => `<option value="${stake * x}"${x === keep ? ' selected' : ''}>${fmt(stake * x)} ${holdem ? `(${x} big blinds)` : game === 'chess' ? `(${x}× the stake)` : `(${x}× the minimum)`}</option>`).join('');
+      buySel.innerHTML = P.buyIns.map((x) => `<option value="${stake * x}"${x === keep ? ' selected' : ''}>${fmt(stake * x)} ${holdem ? `(${x} big blinds)` : game === 'chess' || game === 'billiards' ? `(${x}× the stake)` : `(${x}× the minimum)`}</option>`).join('');
       paintNote();
     };
     const paintNote = () => {
@@ -857,7 +861,7 @@
     if (App.watching) { send({ t: 'leave' }); backToHub(); return; }
     const me = st && st.mySeat !== -1 ? st.seats[st.mySeat] : null;
     const playing = st && me && me.inHand && ['preflop', 'flop', 'turn', 'river', 'betting', 'playing', 'spinning'].includes(st.stage);
-    if (playing && !confirm(st.game === 'durak' ? 'Leave in the middle of a game? You will be the durak.' : st.game === 'flamingo' ? 'Leave in the middle of a game? You give up this round.' : 'Leave in the middle of a hand? You lose what you have bet.')) return;
+    if (playing && !confirm(st.game === 'chess' || st.game === 'billiards' ? 'Leave in the middle of a game? You lose the game and the stake.' : st.game === 'durak' ? 'Leave in the middle of a game? You will be the durak.' : st.game === 'flamingo' ? 'Leave in the middle of a game? You give up this round.' : 'Leave in the middle of a hand? You lose what you have bet.')) return;
     const id = App.tableId;
     send({ t: 'leave' });                                       // over the game connection, if it is up
     apiLeave(id, id && localStorage.getItem('cg.seat.' + id));  // and over HTTP, which works even when it is not
@@ -976,12 +980,12 @@
       const name = S.tableName.replace(/^[^·]*·\s*/, '');
       const game = st.game;
       if (layout === 'port') {
-        const SHORT = { holdem: "Hold'em", draw: 'Draw', chess: 'Chess', blackjack: 'Blackjack', roulette: 'Roulette', durak: 'Durak', flamingo: 'Flamingo' };
-        const stake = game === 'chess' ? `${st.stake} · ${st.minutes} min` : game === 'holdem' || game === 'draw' ? `${st.settings.smallBlind}/${st.settings.bigBlind}` : game === 'blackjack' || game === 'roulette' ? `from ${st.minBet}` : st.stage !== 'waiting' ? `Game ${st.handNo}` : '';
+        const SHORT = { holdem: "Hold'em", draw: 'Draw', chess: 'Chess', billiards: 'Pool', blackjack: 'Blackjack', roulette: 'Roulette', durak: 'Durak', flamingo: 'Flamingo' };
+        const stake = game === 'billiards' ? `${st.stake}` : game === 'chess' ? `${st.stake} · ${st.minutes} min` : game === 'holdem' || game === 'draw' ? `${st.settings.smallBlind}/${st.settings.bigBlind}` : game === 'blackjack' || game === 'roulette' ? `from ${st.minBet}` : st.stage !== 'waiting' ? `Game ${st.handNo}` : '';
         title.textContent = name;
         if (sub) sub.textContent = SHORT[game] + (stake ? ` · ${stake}` : '');
       } else {
-        title.textContent = name + (game === 'chess' ? ` · Stake ${st.stake} · ${st.minutes} min` : game === 'holdem' || game === 'draw' ? ` · Blinds ${st.settings.smallBlind} / ${st.settings.bigBlind}` : game === 'blackjack' || game === 'roulette' ? ` · Bets from ${st.minBet}` : st.stage !== 'waiting' ? ` · Game ${st.handNo}` : '');
+        title.textContent = name + (game === 'billiards' ? ` · Stake ${st.stake}` : game === 'chess' ? ` · Stake ${st.stake} · ${st.minutes} min` : game === 'holdem' || game === 'draw' ? ` · Blinds ${st.settings.smallBlind} / ${st.settings.bigBlind}` : game === 'blackjack' || game === 'roulette' ? ` · Bets from ${st.minBet}` : st.stage !== 'waiting' ? ` · Game ${st.handNo}` : '');
         if (sub) sub.textContent = sub.dataset.full;
       }
     }
@@ -1028,7 +1032,7 @@
   }
 
   // Top bar shared by every room (styled per room by its CSS).
-  const ROOM_TITLES = { holdem: ["Texas Hold'em", 'The Club Room'], draw: ['Five Card Draw', 'The Card Room'], chess: ['Chess', 'The Chess Club'], blackjack: ['Blackjack', 'Salon Privé'], durak: ['Дурак', 'The Winter Palace'], roulette: ['Roulette', 'The Wheel Room'], flamingo: ['Flamingo', 'The Flamingo Lounge'] };
+  const ROOM_TITLES = { holdem: ["Texas Hold'em", 'The Club Room'], draw: ['Five Card Draw', 'The Card Room'], chess: ['Chess', 'The Chess Club'], billiards: ['8-Ball Pool', 'The Pool Hall'], blackjack: ['Blackjack', 'Salon Privé'], durak: ['Дурак', 'The Winter Palace'], roulette: ['Roulette', 'The Wheel Room'], flamingo: ['Flamingo', 'The Flamingo Lounge'] };
   function buildTopbar(game) {
     const tb = ctx.topbar;
     const [title, room] = ROOM_TITLES[game];
@@ -1129,7 +1133,7 @@
   function renderSitOut(S, st) {
     let box = $('sitOut');
     const me = st.mySeat !== -1 ? st.seats[st.mySeat] : null;
-    const show = me && !S.watching && !S.tourney && st.game !== 'roulette' && st.game !== 'chess';
+    const show = me && !S.watching && !S.tourney && st.game !== 'roulette' && st.game !== 'chess' && st.game !== 'billiards';
     if (!show) { if (box) box.remove(); return; }
     if (!box) { box = h('div', 'sitout'); box.id = 'sitOut'; $('stageWrap').appendChild(box); }
     const out = !!me.sitOut;
@@ -1281,7 +1285,7 @@
   function renderTableInfo(S, st) {
     const g = st.game;
     const s = st.settings || {};
-    const info = g === 'chess' ? `Stake ${st.stake} per game · ${st.minutes} min each · doubling cube` : g === 'holdem' || g === 'draw' ? `Blinds ${s.smallBlind} / ${s.bigBlind}` : g === 'blackjack' || g === 'roulette' ? `Bets from ${st.minBet}` : g === 'flamingo' ? 'Two to six players · 108 pink cards' : 'Two to six players · 36 cards';
+    const info = g === 'billiards' ? `Stake ${st.stake} per game · 8-ball` : g === 'chess' ? `Stake ${st.stake} per game · ${st.minutes} min each · doubling cube` : g === 'holdem' || g === 'draw' ? `Blinds ${s.smallBlind} / ${s.bigBlind}` : g === 'blackjack' || g === 'roulette' ? `Bets from ${st.minBet}` : g === 'flamingo' ? 'Two to six players · 108 pink cards' : 'Two to six players · 36 cards';
     $('tableInfo').innerHTML = `<b>${esc(S.tableName)}</b><span>${esc(info)} · cards are dealt automatically once enough players are seated.</span>
       ${S.usesChips && App.account ? '<span>Your chips come from your bankroll and return to it when you leave.</span>' : S.usesChips ? '<span>As a guest you play with free table chips.</span>' : ''}`;
     const seated = st.seats.filter(Boolean).length;
@@ -1501,7 +1505,7 @@
   }
 
   // ----- the statement: where coins and chips came from and went -----
-  const GAME_NAME = { friends: "Hold'em", bots: "Hold'em", draw: 'Five Card Draw', chess: 'Chess', blackjack: 'Blackjack', roulette: 'Roulette', durak: 'Durak', flamingo: 'Flamingo', goldrush: 'Gold Rush', tourney: 'Sit & Go' };
+  const GAME_NAME = { friends: "Hold'em", bots: "Hold'em", draw: 'Five Card Draw', chess: 'Chess', billiards: 'Pool', blackjack: 'Blackjack', roulette: 'Roulette', durak: 'Durak', flamingo: 'Flamingo', goldrush: 'Gold Rush', tourney: 'Sit & Go' };
   function bookingLabel(e) {
     const [kind, ...rest] = String(e.reason || '').split(':');
     const detail = rest.join(':');
@@ -1803,6 +1807,8 @@
     chips: ['Chip sets', 'Your chips when you bet — everyone at your table sees them.'],
     avatar: ['Portraits', 'A frame around your initials on your nameplate — everyone at your table sees it.'],
     badge: ['Titles', 'A title written before your name — everyone at your table and on your profile sees it.'],
+    chesspieces: ['Chess pieces', 'Your chess set — your opponent sees your pieces too. From the Chess box.'],
+    chessboard: ['Chess boards', 'The board you play chess on — on your screen. From the Chess box.'],
     tag: ['Tags', 'A small label next to your name — everyone at your table and on your profile sees it. Rare tags come from the Tag box, the others you earn with achievements.'],
     victory: ['Victory effects', 'A big moment over your seat when you win a round — everyone at your table sees it. Tap a preview to play it.'],
     turn: ['Turn markers', 'Your emblem when it is your turn — everyone at your table sees it.'],
@@ -1813,13 +1819,13 @@
   const RARITY = { common: ['Common', '#B8C4BE'], rare: ['Rare', '#4FA3FF'], epic: ['Epic', '#B36BFF'], legendary: ['Legendary', '#F2C14E'] };
   let boxFocus = null;   // a box whose preview to open right away
   const BOX_LOOK = { mystery: ['🎲', 'Mystery Box'], cardback: ['🂠', 'Card back box'], cardface: ['🃏', 'Card face box'], felt: ['🟩', 'Table felt box'], chips: ['🪙', 'Chip set box'],
-    background: ['🖼️', 'Background box'], avatar: ['👤', 'Portrait box'], badge: ['🎩', 'Title box'], tag: ['🏷️', 'Tag box'], turn: ['⏳', 'Turn marker box'], victory: ['🎆', 'Victory effect box'], gesture: ['👋', 'Gesture box'] };
+    background: ['🖼️', 'Background box'], avatar: ['👤', 'Portrait box'], badge: ['🎩', 'Title box'], tag: ['🏷️', 'Tag box'], turn: ['⏳', 'Turn marker box'], victory: ['🎆', 'Victory effect box'], gesture: ['👋', 'Gesture box'], chess: ['♞', 'Chess box'] };
   function paintBoxes(body) {
     const w = App.wallet;
     const grid = h('div', 'box-grid');
     for (const b of Object.values(App.shop.boxes)) {
       const [icon, name] = BOX_LOOK[b.id] || ['🎁', b.id];
-      const inside = App.shop.items.filter((i) => !i.retired && !i.earned && (b.id === 'mystery' || i.slot === b.id));
+      const inside = App.shop.items.filter((i) => !i.retired && !i.earned && (b.id === 'mystery' || i.slot === b.id || (b.id === 'chess' && (i.slot === 'chesspieces' || i.slot === 'chessboard'))));
       const have = inside.filter((i) => w.owned.includes(i.id)).length;
       const card = h('div', 'box-card box-' + b.id + (have === inside.length ? ' complete' : ''));
       card.innerHTML = `
@@ -1902,6 +1908,8 @@
       Sound.play('win');
     }, 1700);
   }
+  // board colours for the shop preview (the board itself is styled in chess.css)
+  const CHESS_BOARDS = { classic: ['#EEDDB9', '#B0835A'], tournament: ['#EEEEDC', '#5E8C59'], maple: ['#F4DCAA', '#7E4E2A'], marble: ['#F4F2EE', '#8C979F'], ice: ['#EAF7FF', '#7DB2D8'], midnight: ['#3B4670', '#1A2140'], emerald: ['#EDE2B8', '#1D6A4D'] };
   function shopPreview(item) {
     const box = h('div', 'shop-preview');
     if (item.slot === 'cardback') {
@@ -1929,6 +1937,13 @@
       box.appendChild(fx);
     } else if (item.slot === 'gesture') box.appendChild(h('span', 'mini-gesture', `<b>${esc(App.account.username)}</b> ${esc(item.preview)}`));
     else if (item.slot === 'avatar') box.appendChild(h('span', 'mini-avatar', avatarMarkup(item.preview === 'classic' ? null : item.preview, App.account.username)));
+    else if (item.slot === 'chesspieces' && window.ChessUI) box.appendChild(h('div', 'mini-pieces', ChessUI.pieceSvg('K', item.preview) + ChessUI.pieceSvg('q', item.preview)));
+    else if (item.slot === 'chessboard') {
+      const [l, d] = CHESS_BOARDS[item.preview] || CHESS_BOARDS.classic;
+      const m = h('div', 'mini-chess', Array.from({ length: 16 }, (_, k) => `<i class="${(Math.floor(k / 4) + k) % 2 ? 'd' : ''}"></i>`).join(''));
+      m.style.setProperty('--sq-light', l); m.style.setProperty('--sq-dark', d);
+      box.appendChild(m);
+    }
     else if (item.slot === 'tag') box.appendChild(h('span', 'mini-badge', `${esc(App.account.username)}${item.preview === 'classic' ? '' : tagMarkup(item.preview)}`));
     else box.appendChild(h('span', 'mini-badge', `${item.preview === 'classic' ? '' : titleMarkup(item.preview)}${esc(App.account.username)}`));
     return box;
@@ -2194,7 +2209,7 @@
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pollPresence(); });
 
   // ----- profiles -----
-  const MODE_NAMES = { friends: "Hold'em with friends", bots: "Hold'em with bots", draw: 'Five Card Draw', chess: 'Chess', blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette', flamingo: 'Flamingo', goldrush: 'Gold Rush' };
+  const MODE_NAMES = { friends: "Hold'em with friends", bots: "Hold'em with bots", draw: 'Five Card Draw', chess: 'Chess', billiards: 'Pool', blackjack: 'Blackjack', durak: 'Durak', roulette: 'Roulette', flamingo: 'Flamingo', goldrush: 'Gold Rush' };
   function statsTable(stats) {
     if (!stats.length) return '<p class="muted">No hands played yet.</p>';
     return `<table class="stats"><thead><tr><th>Game</th><th>Hands</th><th>Won</th><th>${'Result'}</th></tr></thead><tbody>
@@ -2349,6 +2364,13 @@
 
   // ================= HOW TO PLAY =================
   const RULES = {
+    billiards: `<ol class="rules-list">
+      <li><b>8-ball:</b> one player has the solids (1–7), the other the stripes (9–15). Pocket all of yours, then the 8 — and you win the stake.</li>
+      <li><b>The break:</b> place the cue ball behind the line and break the rack. The table is open until someone pockets a ball after the break — that ball's group is theirs.</li>
+      <li><b>Aiming:</b> drag on the table — the cue ball goes towards your finger. The guide shows which ball you hit and where it goes (green: one of yours, red: not allowed). Choose the strength, then shoot. ◀ ▶ fine-tune the aim.</li>
+      <li><b>Your turn goes on</b> as long as you pocket your own balls.</li>
+      <li><b>Fouls:</b> the cue ball goes in, no ball is hit, the wrong ball is hit first, or nothing reaches a cushion afterwards. Then your opponent gets <b>ball in hand</b> and may put the cue ball anywhere.</li>
+      <li><b>The 8:</b> pocketing it before your group is cleared — or with a foul — loses the game.</li></ol>`,
     chess: `<ol class="rules-list">
       <li>Normal chess rules: checkmate wins. Stalemate, too little material, threefold repetition, fifty moves without a capture or pawn move, or an agreed draw end in a <b>draw</b> — then no chips change hands.</li>
       <li><b>The stake:</b> every game is played for the table's stake. The winner takes it from the loser's table chips.</li>
@@ -2401,6 +2423,13 @@
       <li>A cave-in loses the stake. Every dig is decided by the server; the house keeps 3 % on average.</li></ol>`;
   // German rules (shown when the site is in German).
   const RULES_DE = {
+    billiards: `<ol class="rules-list">
+      <li><b>8-Ball:</b> Ein Spieler hat die Vollen (1–7), der andere die Halben (9–15). Versenke alle deine Kugeln, dann die 8 – und du gewinnst den Einsatz.</li>
+      <li><b>Der Anstoß:</b> Lege die weiße Kugel hinter die Linie und stoße an. Der Tisch ist offen, bis jemand nach dem Anstoß eine Kugel versenkt – deren Gruppe gehört dann ihm.</li>
+      <li><b>Zielen:</b> Ziehe auf dem Tisch – die Weiße rollt in Richtung deines Fingers. Die Hilfslinie zeigt, welche Kugel du triffst und wohin sie läuft (grün: eine deiner Kugeln, rot: nicht erlaubt). Stärke wählen, stoßen. ◀ ▶ zum Feinjustieren.</li>
+      <li><b>Du bleibst dran,</b> solange du eigene Kugeln versenkst.</li>
+      <li><b>Fouls:</b> Die Weiße fällt, keine Kugel wird getroffen, zuerst die falsche Kugel getroffen oder danach erreicht keine Kugel eine Bande. Dann bekommt dein Gegner <b>Ball in Hand</b> und darf die Weiße frei hinlegen.</li>
+      <li><b>Die 8:</b> Wer sie versenkt, bevor seine Gruppe abgeräumt ist – oder mit einem Foul –, verliert die Partie.</li></ol>`,
     chess: `<ol class="rules-list">
       <li>Normale Schachregeln: Schachmatt gewinnt. Patt, zu wenig Material, dreifache Stellungswiederholung, 50 Züge ohne Schlagen oder Bauernzug oder ein vereinbartes Remis sind ein <b>Remis</b> – dann wandern keine Chips.</li>
       <li><b>Der Einsatz:</b> Jede Partie wird um den Einsatz des Tisches gespielt. Der Sieger bekommt ihn aus den Tisch-Chips des Verlierers.</li>
@@ -2473,7 +2502,7 @@
           });
         }
       };
-      tabs(card, [['holdem', "Hold'em"], ['blackjack', 'Blackjack'], ['durak', 'Durak'], ['roulette', 'Roulette'], ['flamingo', 'Flamingo'], ['chess', 'Chess'], ['goldrush', 'Gold Rush']], paint, game);
+      tabs(card, [['holdem', "Hold'em"], ['blackjack', 'Blackjack'], ['durak', 'Durak'], ['roulette', 'Roulette'], ['flamingo', 'Flamingo'], ['chess', 'Chess'], ['billiards', 'Pool'], ['goldrush', 'Gold Rush']], paint, game);
       card.appendChild(body);
       paint(game);
     }, { wide: true });

@@ -79,6 +79,10 @@ const Sound = (() => {
     check() { tone(140, 0, 0.08, { gain: 0.5, slideTo: 80 }); tone(140, 0.11, 0.08, { gain: 0.5, slideTo: 80 }); },
     // chess: a wooden piece set down, a capture, a check
     move() { tone(220, 0, 0.06, { gain: 0.45, slideTo: 140 }); noise(0, 0.035, { freq: 2200, q: 1.5, gain: 0.22 }); },
+    // pool: the cue strikes, balls click, a ball drops into a pocket
+    cue() { tone(320, 0, 0.05, { gain: 0.5, slideTo: 180 }); noise(0, 0.03, { freq: 3000, q: 2, gain: 0.25 }); },
+    click() { tone(1900, 0, 0.025, { type: 'triangle', gain: 0.18 }); },
+    pot() { tone(130, 0, 0.18, { gain: 0.5, slideTo: 70 }); noise(0.02, 0.12, { freq: 600, q: 0.8, gain: 0.25 }); },
     capture() { tone(200, 0, 0.07, { gain: 0.5, slideTo: 110 }); noise(0, 0.05, { freq: 1600, q: 1.2, gain: 0.3 }); tone(170, 0.07, 0.06, { gain: 0.35, slideTo: 100 }); },
     // Chips: a few metallic clinks.
     chips() {

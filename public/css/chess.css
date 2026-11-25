@@ -14,15 +14,16 @@
 .chess-board .pcs, .chess-board .fx { position: absolute; inset: 0; pointer-events: none; }
 .chess-board.my-turn { cursor: pointer; }
 .sq { position: relative; }
-.sq.light { background: #EEDDB9; }
-.sq.dark { background: #B0835A; }
-.sq.light::before, .sq.dark::before { content: ''; position: absolute; inset: 0; opacity: .14; mix-blend-mode: multiply; pointer-events: none;
+.chess-board { --sq-light: #EEDDB9; --sq-dark: #B0835A; --sq-last-light: #EAD681; --sq-last-dark: #C0A04E; --coord-light: #8E643B; --coord-dark: #F6E8CB; --grain: .14; }
+.sq.light { background: var(--sq-light); }
+.sq.dark { background: var(--sq-dark); }
+.sq.light::before, .sq.dark::before { content: ''; position: absolute; inset: 0; opacity: var(--grain); mix-blend-mode: multiply; pointer-events: none;
   background: repeating-linear-gradient(80deg, transparent 0 5px, rgba(90, 50, 20, .5) 5px 6px, transparent 6px 11px); }
-.sq.last.light { background: #EAD681; } .sq.last.dark { background: #C0A04E; }
+.sq.last.light { background: var(--sq-last-light); } .sq.last.dark { background: var(--sq-last-dark); }
 .sq.check { background: radial-gradient(circle, #FF6A55 0%, #E0412F 42%, transparent 72%), #B0835A !important; }
 .sq .coord { position: absolute; font: 700 calc(var(--cell) * .15) 'Montserrat', sans-serif; pointer-events: none; opacity: .75; }
 .sq .coord.rank { left: 5%; top: 4%; } .sq .coord.file { right: 6%; bottom: 3%; }
-.sq.light .coord { color: #8E643B; } .sq.dark .coord { color: #F6E8CB; }
+.sq.light .coord { color: var(--coord-light); } .sq.dark .coord { color: var(--coord-dark); }
 /* marks: the picked piece, where it can go */
 .mark { position: absolute; left: 0; top: 0; width: var(--cell); height: var(--cell); display: grid; place-items: center; }
 .mark.sel { background: rgba(242, 193, 78, .42); box-shadow: inset 0 0 0 3px rgba(242, 193, 78, .95); }
@@ -34,11 +35,44 @@
 .piece.dragging { z-index: 5; filter: drop-shadow(0 14px 12px rgba(0, 0, 0, .5)); }
 .piece.taken { opacity: 0; }
 .pz { width: 100%; height: 100%; display: block; overflow: visible; filter: drop-shadow(0 3px 2px rgba(0, 0, 0, .38)); }
-.pz.w g { stroke: #2B1D12; stroke-width: 3.2; stroke-linejoin: round; }
-.pz.b g { stroke: #0A0705; stroke-width: 3.2; stroke-linejoin: round; }
+.pz g { stroke-width: 3.2; stroke-linejoin: round; }
+.pz.w g { stroke: #2B1D12; } .pz.b g { stroke: #0A0705; }
 .pz .line { fill: none; stroke-width: 2.4; }
 .pz.w .line { stroke: #8B7253; } .pz.b .line { stroke: #C9A45C; }
 .pz .eye { fill: #2B1D12; stroke: none; } .pz.b .eye { fill: #E8D7B4; }
+/* ----- piece sets (skins) ----- */
+.pz.set-ebony.w g { stroke: #5A3D16; } .pz.set-ebony.w .line { stroke: #8E6528; } .pz.set-ebony.b .line { stroke: #B08640; }
+.pz.set-marble.w g { stroke: #6E6A64; } .pz.set-marble.w .line { stroke: #A39C92; } .pz.set-marble.b g { stroke: #0B100E; } .pz.set-marble.b .line { stroke: #8FA69B; } .pz.set-marble.b .eye { fill: #A9BDB2; }
+.pz.set-glass g { stroke-width: 2.4; } .pz.set-glass.w g { stroke: rgba(255, 255, 255, .95); } .pz.set-glass.b g { stroke: rgba(160, 200, 255, .85); }
+.pz.set-glass { filter: drop-shadow(0 3px 2px rgba(0, 0, 0, .3)) drop-shadow(0 0 3px rgba(190, 225, 255, .5)); }
+.pz.set-glass .line { stroke: rgba(255, 255, 255, .8) !important; } .pz.set-glass .eye { fill: #fff !important; }
+.pz.set-gold.w g { stroke: #5C430B; } .pz.set-gold.w .line { stroke: #8A6510; } .pz.set-gold.b g { stroke: #3A4048; } .pz.set-gold.b .line { stroke: #5E6670; } .pz.set-gold.b .eye { fill: #3A4048; }
+.pz.set-gold { filter: drop-shadow(0 3px 2px rgba(0, 0, 0, .4)) drop-shadow(0 0 2px rgba(255, 240, 190, .45)); }
+.pz.set-neon g { stroke-width: 3.6; } .pz.set-neon.w g { stroke: #3FF3FF; } .pz.set-neon.b g { stroke: #FF4FD8; }
+.pz.set-neon.w .line { stroke: #9BFAFF; } .pz.set-neon.b .line { stroke: #FF9BEA; } .pz.set-neon.w .eye { fill: #3FF3FF; } .pz.set-neon.b .eye { fill: #FF4FD8; }
+.pz.set-neon.w { animation: cs-neon-w 2.4s ease-in-out infinite; } .pz.set-neon.b { animation: cs-neon-b 2.4s ease-in-out infinite; }
+@keyframes cs-neon-w { 0%, 100% { filter: drop-shadow(0 0 2px #3FF3FF) drop-shadow(0 0 6px rgba(63, 243, 255, .6)); } 50% { filter: drop-shadow(0 0 4px #3FF3FF) drop-shadow(0 0 12px rgba(63, 243, 255, .9)); } }
+@keyframes cs-neon-b { 0%, 100% { filter: drop-shadow(0 0 2px #FF4FD8) drop-shadow(0 0 6px rgba(255, 79, 216, .6)); } 50% { filter: drop-shadow(0 0 4px #FF4FD8) drop-shadow(0 0 12px rgba(255, 79, 216, .9)); } }
+.pz.set-crystal g { stroke-width: 2.6; } .pz.set-crystal.w g { stroke: #5C8FB5; } .pz.set-crystal.b g { stroke: #2A0A48; } .pz.set-crystal .line { stroke: #fff !important; opacity: .8; }
+.pz.set-crystal { animation: cs-crystal 3.2s ease-in-out infinite; }
+@keyframes cs-crystal { 0%, 100% { filter: drop-shadow(0 3px 2px rgba(0, 0, 0, .35)) brightness(1); } 45% { filter: drop-shadow(0 3px 2px rgba(0, 0, 0, .35)) drop-shadow(0 0 7px rgba(255, 255, 255, .85)) brightness(1.18); } 55% { filter: drop-shadow(0 3px 2px rgba(0, 0, 0, .35)) brightness(1.05); } }
+@media (prefers-reduced-motion: reduce) { .pz.set-neon, .pz.set-crystal { animation: none; } }
+/* ----- boards (skins, on your own screen) ----- */
+body[data-chessboard="tournament"] .chess-board { --sq-light: #EEEEDC; --sq-dark: #5E8C59; --sq-last-light: #F4F38A; --sq-last-dark: #A5BB4B; --coord-light: #5E8C59; --coord-dark: #EEEEDC; --grain: 0; }
+body[data-chessboard="maple"] .chess-board { --sq-light: #F4DCAA; --sq-dark: #7E4E2A; --sq-last-light: #F2D26A; --sq-last-dark: #A57A32; --coord-light: #7E4E2A; --coord-dark: #F4DCAA; --grain: .22; }
+body[data-chessboard="marble"] .chess-board { --sq-light: #F4F2EE; --sq-dark: #8C979F; --sq-last-light: #EDE3B4; --sq-last-dark: #A9A67A; --coord-light: #6E7880; --coord-dark: #F4F2EE; --grain: .06; }
+body[data-chessboard="marble"] .sq::before { background: repeating-linear-gradient(125deg, transparent 0 9px, rgba(60, 70, 80, .45) 9px 10px, transparent 10px 23px) !important; }
+body[data-chessboard="ice"] .chess-board { --sq-light: #EAF7FF; --sq-dark: #7DB2D8; --sq-last-light: #CFF3FF; --sq-last-dark: #4FA0D0; --coord-light: #4C88B5; --coord-dark: #EAF7FF; --grain: .05; }
+body[data-chessboard="midnight"] .chess-board { --sq-light: #3B4670; --sq-dark: #1A2140; --sq-last-light: #5B5FA0; --sq-last-dark: #3A3D78; --coord-light: #9EA8D8; --coord-dark: #6E79B0; --grain: 0; }
+body[data-chessboard="emerald"] .chess-board { --sq-light: #EDE2B8; --sq-dark: #1D6A4D; --sq-last-light: #F3DC7A; --sq-last-dark: #3E8E5A; --coord-light: #1D6A4D; --coord-dark: #EDE2B8; --grain: .05; }
+body[data-chessboard="emerald"] .chess-board { box-shadow: 0 0 0 3px #E2B84A, 0 0 0 5px #24150B; }
+body[data-chessboard="midnight"] .chess-board, body[data-chessboard="ice"] .chess-board { box-shadow: 0 0 0 2px #9EB8E8, 0 0 0 4px #10162A; }
+/* shop previews */
+.mini-chess { display: grid; grid-template-columns: repeat(4, 18px); grid-template-rows: repeat(4, 18px); border-radius: 4px; overflow: hidden; box-shadow: 0 0 0 2px #C9A45C; }
+.mini-chess i { background: var(--sq-light); } .mini-chess i.d { background: var(--sq-dark); }
+.mini-pieces { display: flex; align-items: flex-end; gap: 0; }
+.mini-pieces .pz { width: 46px; height: 46px; }
+.mini-pieces .pz:first-child { width: 54px; height: 54px; }
 .pz .base { opacity: .98; }
 @media (prefers-reduced-motion: reduce) { .piece { transition: none; } }
 /* players */

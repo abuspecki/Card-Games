@@ -283,7 +283,7 @@ function createApi(ctx) {
       else if (url === '/api/shop/box') r = await coins.openBox(user.id, String(body.box || ''), String(body.pay || 'coins'));
       else if (url === '/api/shop/equip') {
         r = await coins.equip(user.id, String(body.slot || ''), body.item ? String(body.item) : null);
-        if (r.ok && ['badge', 'avatar', 'tag', 'cardback', 'chips', 'turn', 'victory'].includes(body.slot)) ctx.lobby.refreshLook(user.id);
+        if (r.ok && ['badge', 'avatar', 'tag', 'cardback', 'chips', 'turn', 'victory', 'chesspieces'].includes(body.slot)) ctx.lobby.refreshLook(user.id);
       } else return json(res, 404, { error: 'Not found' });
       if (r.error) return json(res, 400, r);
       const wallet = await coins.getStatus(user.id);

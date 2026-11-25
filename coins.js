@@ -146,6 +146,19 @@ const CATALOG = [
   { id: 'gesture-eyebrow', slot: 'gesture', name: 'A Raised Eyebrow', price: 300, preview: 'raises an eyebrow' },
   { id: 'gesture-watch', slot: 'gesture', name: 'Checks the Watch', price: 300, preview: 'checks the pocket watch' },
   { id: 'gesture-monocle', slot: 'gesture', name: 'The Monocle Drop', price: 500, preview: 'drops the monocle' },
+  // ----- chess: piece sets (both players see your pieces) and boards (your screen) -----
+  { id: 'chessset-ebony', slot: 'chesspieces', name: 'Ebony & Boxwood', price: 450, preview: 'ebony' },
+  { id: 'chessset-marble', slot: 'chesspieces', name: 'Marble', price: 700, preview: 'marble' },
+  { id: 'chessset-glass', slot: 'chesspieces', name: 'Glass', price: 1200, preview: 'glass' },
+  { id: 'chessset-gold', slot: 'chesspieces', name: 'Gold & Silver', price: 1600, preview: 'gold' },
+  { id: 'chessset-neon', slot: 'chesspieces', name: 'Neon', price: 2200, preview: 'neon', animated: true },
+  { id: 'chessset-crystal', slot: 'chesspieces', name: 'Crystal', price: 3000, preview: 'crystal', animated: true },
+  { id: 'chessboard-tournament', slot: 'chessboard', name: 'Tournament', price: 300, preview: 'tournament' },
+  { id: 'chessboard-maple', slot: 'chessboard', name: 'Maple & Walnut', price: 450, preview: 'maple' },
+  { id: 'chessboard-marble', slot: 'chessboard', name: 'Marble Hall', price: 800, preview: 'marble' },
+  { id: 'chessboard-ice', slot: 'chessboard', name: 'Ice', price: 900, preview: 'ice' },
+  { id: 'chessboard-midnight', slot: 'chessboard', name: 'Midnight', price: 1300, preview: 'midnight' },
+  { id: 'chessboard-emerald', slot: 'chessboard', name: 'Emerald & Gold', price: 1800, preview: 'emerald' },
   // ----- player tags: a small label next to your name (everyone sees it) -----
   // From the Tag box …
   { id: 'tag-nightowl', slot: 'tag', name: 'Night Owl', price: 300, preview: '🦉 Night Owl' },
@@ -185,8 +198,9 @@ const CATALOG = [
 const ITEMS = Object.fromEntries(CATALOG.map((i) => [i.id, i]));
 
 
-const SLOTS = ['cardback', 'cardface', 'felt', 'chips', 'background', 'turn', 'avatar', 'badge', 'victory', 'tag'];
-const SHOP_TABS = ['cardback', 'cardface', 'felt', 'chips', 'background', 'avatar', 'badge', 'tag', 'turn', 'victory', 'gesture'];
+const SLOTS = ['cardback', 'cardface', 'felt', 'chips', 'background', 'turn', 'avatar', 'badge', 'victory', 'tag', 'chesspieces', 'chessboard'];
+const SHOP_TABS = ['cardback', 'cardface', 'felt', 'chips', 'background', 'avatar', 'badge', 'tag', 'turn', 'victory', 'gesture', 'chesspieces', 'chessboard'];
+const CHESS_SLOTS = ['chesspieces', 'chessboard'];   // one Chess box holds both
 const GESTURE_COOLDOWN = 4000;   // ms between gestures per player
 
 // ----- skin boxes: the only way to get skins -----
@@ -197,7 +211,7 @@ const GESTURE_COOLDOWN = 4000;   // ms between gestures per player
 const rarityOf = (item) => (item.price >= 2500 ? 'legendary' : item.price >= 1200 ? 'epic' : item.price >= 500 ? 'rare' : 'common');
 const RARITIES = ['common', 'rare', 'epic', 'legendary'];
 const CHIPS_PER_BOX_COIN = 150;          // paying with chips: 150 chips per coin of the price
-const boxItems = (boxId) => CATALOG.filter((i) => !i.retired && !i.earned && (boxId === 'mystery' || i.slot === boxId));
+const boxItems = (boxId) => CATALOG.filter((i) => !i.retired && !i.earned && (boxId === 'mystery' || i.slot === boxId || (boxId === 'chess' && CHESS_SLOTS.includes(i.slot))));
 // Everything that can be collected in a category (box skins and earned tags).
 const collectable = (slot) => CATALOG.filter((i) => !i.retired && i.slot === slot);
 const weight = (i) => 1 / i.price;
@@ -207,8 +221,8 @@ function boxPrice(boxId) {
   const coins = Math.max(150, Math.ceil((avg * 1.1) / 50) * 50);
   return { coins, chips: coins * CHIPS_PER_BOX_COIN };
 }
-const BOX_IDS = ['mystery', ...SHOP_TABS];
-const BOXES = Object.fromEntries(BOX_IDS.map((id) => [id, { id, slot: id === 'mystery' ? null : id, ...boxPrice(id), size: boxItems(id).length }]));
+const BOX_IDS = ['mystery', ...SHOP_TABS.filter((t) => !CHESS_SLOTS.includes(t)), 'chess'];
+const BOXES = Object.fromEntries(BOX_IDS.map((id) => [id, { id, slot: id === 'mystery' || id === 'chess' ? null : id, ...boxPrice(id), size: boxItems(id).length }]));
 // Each skin's chance for this player (0 for skins already owned).
 function boxChances(boxId, owned) {
   const items = boxItems(boxId);
@@ -431,7 +445,7 @@ function makeCoins(store) {
       const { equipped } = await store.getItems(userId);
       const pick = (slot) => (equipped[slot] && ITEMS[equipped[slot]] ? ITEMS[equipped[slot]].preview : null);
       // seen by everyone at the table: portrait, title, card back, chip set, turn marker
-      return { avatar: pick('avatar'), badge: pick('badge'), tag: pick('tag'), skin: { back: pick('cardback'), chips: pick('chips'), turn: pick('turn'), victory: pick('victory') } };
+      return { avatar: pick('avatar'), badge: pick('badge'), tag: pick('tag'), skin: { back: pick('cardback'), chips: pick('chips'), turn: pick('turn'), victory: pick('victory'), chess: pick('chesspieces') } };
     },
 
     // Open a skin box, paid with coins or chips.

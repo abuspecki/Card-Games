@@ -7,7 +7,7 @@
 // presence poll (news) and sees everything in the lounge.
 const { dayString } = require('./coins');
 
-const CHIP_GAMES = ['friends', 'bots', 'blackjack', 'roulette', 'goldrush', 'draw', 'chess'];
+const CHIP_GAMES = ['friends', 'bots', 'blackjack', 'roulette', 'goldrush', 'draw', 'chess', 'billiards'];
 const CARD_GAMES = ['friends', 'bots', 'blackjack', 'durak', 'flamingo'];
 const HOLDEM = (r) => r.mode === 'friends' || r.mode === 'bots';
 

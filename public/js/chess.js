@@ -25,21 +25,35 @@
     q: `${BASE}<path d="M34 74c2-14 6-22 8-28h16c2 6 6 14 8 28z"/><path d="M36 48h28a3 3 0 0 0 0-6H36a3 3 0 0 0 0 6z"/><path d="M27 20l9 22h28l9-22-12 13-11-19-11 19z"/><circle cx="27" cy="18" r="4.5"/><circle cx="50" cy="11" r="4.5"/><circle cx="73" cy="18" r="4.5"/><circle cx="38.5" cy="29" r="3.2"/><circle cx="61.5" cy="29" r="3.2"/>`,
     k: `${BASE}<path d="M34 74c2-14 6-22 8-28h16c2 6 6 14 8 28z"/><path d="M36 48h28a3 3 0 0 0 0-6H36a3 3 0 0 0 0 6z"/><path d="M31 25c0 10 4 15 7 17h24c3-2 7-7 7-17-8 4-14 3-19-1-5 4-11 5-19 1z"/><path d="M47 4h6v8h7v6h-7v9h-6v-9h-7v-6h7z"/>`,
   };
-  const pieceSvg = (p) => {
+  // Piece sets (skins). Each set is a pair of gradients plus its own outline and effects (CSS: .pz.set-…).
+  const G2 = (stops) => stops.map(([o, c, a]) => `<stop offset="${o}" stop-color="${c}"${a !== undefined ? ` stop-opacity="${a}"` : ''}/>`).join('');
+  const SETS = {
+    classic: [[[0, '#FFFFFF'], [0.55, '#F1E7D2'], [1, '#CDBB98']], [[0, '#5A4A3E'], [0.45, '#2A211B'], [1, '#110D0A']]],
+    ebony: [[[0, '#F6E3B0'], [0.5, '#DDBB72'], [1, '#B08640']], [[0, '#4A2E1E'], [0.5, '#24140B'], [1, '#0E0704']]],
+    marble: [[[0, '#FFFFFF'], [0.3, '#ECE9E4'], [0.33, '#CFC9C0'], [0.36, '#F7F5F1'], [0.68, '#E2DDD5'], [0.71, '#C4BDB2'], [1, '#F1EEE9']],
+      [[0, '#52645C'], [0.3, '#26322D'], [0.34, '#62766C'], [0.38, '#1C2522'], [0.7, '#2E3C36'], [0.73, '#53665D'], [1, '#121815']]],
+    glass: [[[0, '#FFFFFF', 0.85], [0.5, '#DDEBF5', 0.55], [1, '#A9C4D8', 0.7]], [[0, '#7A93B8', 0.8], [0.5, '#2E3E5E', 0.6], [1, '#101A2C', 0.85]]],
+    gold: [[[0, '#FFF6C4'], [0.35, '#F0CB55'], [0.7, '#C99A22'], [1, '#8A6510']], [[0, '#FFFFFF'], [0.35, '#D6DCE2'], [0.7, '#9AA3AD'], [1, '#5E6670']]],
+    neon: [[[0, '#123048'], [1, '#05101A']], [[0, '#3A1240'], [1, '#12041A']]],
+    crystal: [[[0, '#FFFFFF'], [0.3, '#D9F1FF'], [0.55, '#9FD4F5'], [0.8, '#E8F8FF'], [1, '#7FB8DE']], [[0, '#F2D9FF'], [0.3, '#B57AE0'], [0.55, '#6C2DA0'], [0.8, '#C895F0'], [1, '#3E1266']]],
+  };
+  const setOf = (name) => (SETS[name] ? name : 'classic');
+  const pieceSvg = (p, set) => {
     const w = p === p.toUpperCase();
-    return `<svg viewBox="0 0 100 100" class="pz ${w ? 'w' : 'b'}" aria-hidden="true"><g fill="url(#cg${w ? 'W' : 'B'})">${SHAPES[p.toLowerCase()]}</g></svg>`;
+    const s = setOf(set);
+    return `<svg viewBox="0 0 100 100" class="pz ${w ? 'w' : 'b'} set-${s}" aria-hidden="true"><g fill="url(#cg-${s}-${w ? 'W' : 'B'})">${SHAPES[p.toLowerCase()]}</g></svg>`;
   };
   function ensureDefs() {
     if (document.getElementById('chessDefs')) return;
     const d = document.createElement('div');
     d.id = 'chessDefs';
     d.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
-    d.innerHTML = `<svg width="0" height="0"><defs>
-      <linearGradient id="cgW" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".55" stop-color="#F1E7D2"/><stop offset="1" stop-color="#CDBB98"/></linearGradient>
-      <linearGradient id="cgB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5A4A3E"/><stop offset=".45" stop-color="#2A211B"/><stop offset="1" stop-color="#110D0A"/></linearGradient>
-    </defs></svg>`;
+    d.innerHTML = `<svg width="0" height="0"><defs>${Object.entries(SETS).map(([name, [wS, bS]]) =>
+      `<linearGradient id="cg-${name}-W" x1="0" y1="0" x2="1" y2="1">${G2(wS)}</linearGradient><linearGradient id="cg-${name}-B" x1="0" y1="0" x2="1" y2="1">${G2(bS)}</linearGradient>`).join('')}</defs></svg>`;
     document.body.appendChild(d);
   }
+  // for the shop and the collection
+  window.ChessUI = { pieceSvg: (p, set) => { ensureDefs(); return pieceSvg(p, set); } };
 
   // ---------- state kept between updates ----------
   let G = null;          // layout
@@ -183,6 +197,13 @@
   }
 
   // Reuse piece elements: the piece that moved slides from its old square.
+  // the set of the player who plays this colour (both players see each other's pieces)
+  function setFor(state, white) {
+    const s = state.seats.find((x) => x && x.color === (white ? 'w' : 'b'));
+    return (s && s.skin && s.skin.chess) || 'classic';
+  }
+  const svgFor = (state, p) => pieceSvg(p, setFor(state, p === p.toUpperCase()));
+
   function paintPieces(state) {
     const layer = document.getElementById('cPcs');
     const want = new Map();
@@ -193,7 +214,7 @@
       const el = pieces.get(from);
       if (!el) return false;
       pieces.delete(from);
-      if (el.dataset.p !== want.get(to)) { el.dataset.p = want.get(to); el.innerHTML = pieceSvg(want.get(to)); }   // promotion
+      if (el.dataset.p !== want.get(to)) { el.dataset.p = want.get(to); el.innerHTML = svgFor(state, want.get(to)); }   // promotion
       next.set(to, el);
       place(el, to, true);
       return true;
@@ -215,11 +236,13 @@
     for (const [n, p] of want) {
       if (next.has(n)) continue;
       const el = pieces.get(n);
-      if (el && el.dataset.p === p) { pieces.delete(n); next.set(n, el); continue; }
+      const look = svgFor(state, p);
+      if (el && el.dataset.p === p) { if (el.dataset.look !== look) { el.dataset.look = look; el.innerHTML = look; } pieces.delete(n); next.set(n, el); continue; }
       const fresh = document.createElement('div');
       fresh.className = 'piece';
       fresh.dataset.p = p;
-      fresh.innerHTML = pieceSvg(p);
+      fresh.innerHTML = look;
+      fresh.dataset.look = look;
       place(fresh, n, false);
       layer.appendChild(fresh);
       next.set(n, fresh);
@@ -288,7 +311,7 @@
         el.innerHTML = `<span class="avatar">${ctx.avatarHtml(s)}</span>
           <span class="col"><span class="name">${ctx.nameHtml(s)}</span>
             <span class="sub">${color ? `<i class="dot ${color}"></i>` : ''}<span>${ctx.fmt(s.chips)}</span>${level ? `<span class="lvl">${level}</span>` : ''}</span>
-            <span class="caps">${caps.map((p) => `<span class="cap">${pieceSvg(p)}</span>`).join('')}${adv > 0 ? `<b class="adv">+${adv}</b>` : ''}</span></span>
+            <span class="caps">${caps.map((p) => `<span class="cap">${svgFor(state, p)}</span>`).join('')}${adv > 0 ? `<b class="adv">+${adv}</b>` : ''}</span></span>
           <span class="clock${running ? ' on' : ''}" data-clock="${i}">${fmtClock(state.clocks ? state.clocks[i] : state.minutes * 60000)}</span>`;
         if (s.hasAccount && !s.isBot) { el.classList.add('clickable'); el.onclick = () => App.openProfile(s.name); }
       } else el.innerHTML = '<span class="avatar">+</span><span class="col"><span class="name">Open seat</span><span class="sub">Waiting for an opponent</span></span>';
@@ -362,7 +385,7 @@
       const color = state.seats[me] && state.seats[me].color === 'b' ? 'b' : 'w';
       const c = card('promo', '<p>Promote to</p><div class="row"></div>');
       for (const k of ['q', 'r', 'b', 'n']) {
-        const b = ctx.h('button', '', pieceSvg(color === 'w' ? k.toUpperCase() : k));
+        const b = ctx.h('button', '', svgFor(state, color === 'w' ? k.toUpperCase() : k));
         b.onclick = () => { ctx.send({ t: 'action', action: 'move', amount: promo.from + promo.to + k }); promo = null; selected = null; paintMarks(); paintUi(); };
         c.querySelector('.row').appendChild(b);
       }
