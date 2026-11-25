@@ -79,3 +79,77 @@ body.portrait .pcard { min-width: 0; width: 86%; }
 .pool-art i.st { background: linear-gradient(#FBF8EE 0 26%, var(--c) 26% 74%, #FBF8EE 74%); }
 .pool-art i.cue { background: #FBF8EE; } .pool-art i.cue::after { display: none; }
 .room:hover .pool-art i.cue { transform: translateX(26px); }
+
+/* ===== which balls must go in ===== */
+.ptarget { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 6; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 8px 18px 9px; border-radius: 16px; background: rgba(10, 16, 13, .92); border: 1px solid rgba(255, 255, 255, .14); color: #F1F4F0; white-space: nowrap; }
+.ptarget.mine { border-color: #F2C14E; box-shadow: 0 0 0 1px rgba(242, 193, 78, .6), 0 0 26px rgba(242, 193, 78, .25); }
+.ptarget .tt, .pb-target .tt { font: 700 14px 'Montserrat', sans-serif; text-transform: uppercase; letter-spacing: .06em; color: #C9D3CD; }
+.ptarget .tt b, .pb-target .tt b { color: #F2C14E; text-transform: none; letter-spacing: 0; }
+.ptarget .tsub, .pb-target .tsub { font: 600 12px 'Montserrat', sans-serif; color: #9DB0A6; }
+.tballs { display: flex; gap: 5px; }
+.tb { position: relative; width: 28px; height: 28px; border-radius: 50%; background: var(--c); box-shadow: inset -4px -5px 7px rgba(0, 0, 0, .4), inset 3px 3px 6px rgba(255, 255, 255, .35), 0 3px 5px rgba(0, 0, 0, .4); }
+.tb.st { background: linear-gradient(#FBF8EE 0 24%, var(--c) 24% 76%, #FBF8EE 76%); }
+.tb b { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 15px; height: 15px; border-radius: 50%; background: #FBF8EE; color: #111; font: 800 9px/15px 'Montserrat', sans-serif; text-align: center; }
+.tb.gone { opacity: .22; filter: grayscale(.6); }
+.tb.gone::after { content: '✓'; position: absolute; inset: 0; display: grid; place-items: center; color: #4CD08A; font: 900 16px 'Montserrat', sans-serif; text-shadow: 0 1px 2px #000; }
+.tb.eight { width: 34px; height: 34px; box-shadow: 0 0 0 2px #F2C14E, 0 0 16px rgba(242, 193, 78, .6), inset -4px -5px 7px rgba(255, 255, 255, .1); animation: tb-8 1.4s ease-in-out infinite; }
+@keyframes tb-8 { 50% { box-shadow: 0 0 0 3px #F2C14E, 0 0 26px rgba(242, 193, 78, .9); } }
+.pplate .mini i { width: 16px !important; height: 16px !important; }
+.pb-target { display: none; }
+body.portrait .pb-target { display: flex; grid-column: 1 / -1; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 10px; padding: 6px 8px; border-radius: 12px; background: rgba(255, 255, 255, .04); }
+body.portrait .pb-target:empty { display: none; }
+body.portrait .pb-target.mine { box-shadow: inset 0 0 0 1px rgba(242, 193, 78, .6); }
+body.portrait .pb-target .tb { width: 24px; height: 24px; }
+body.portrait .pb-target .tb b { width: 13px; height: 13px; font-size: 8px; line-height: 13px; }
+
+/* ===== strength: a cue you pull back ===== */
+.cue-power { position: relative; width: 300px; height: 54px; flex: none; cursor: ew-resize; touch-action: none; user-select: none; border-radius: 14px; background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .1); overflow: hidden; }
+.cue-power:focus-visible { outline: 2px solid #F2C14E; }
+.cue-power .cp-meter { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(255, 255, 255, .06); }
+.cue-power .cp-meter i { display: block; height: 100%; width: 55%; background: linear-gradient(90deg, #4CD08A, #F2C14E 60%, #E0604F); border-radius: 0 4px 4px 0; transition: width .08s; }
+/* the cue: tip, ferrule, maple shaft, joint, ebony butt with a wrap */
+.cue-power .cp-stick { position: absolute; top: 20px; right: 30px; width: 380px; height: 9px; border-radius: 3px 5px 5px 3px; transition: transform .08s;
+  background: linear-gradient(90deg, #2A160A 0 9%, #1A0D05 9% 24%, #3B2414 24% 26%, #C9A04F 26% 27%, #3B2414 27% 33%, #E8C98C 33% 34%, #E9D3A6 34% 92%, #FBF6EA 92% 97.5%, #3E7BC1 97.5% 100%);
+  box-shadow: 0 3px 4px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .35); }
+.cue-power .cp-stick::after { content: ''; position: absolute; left: 10%; top: 0; width: 13%; height: 100%; background: repeating-linear-gradient(90deg, rgba(0, 0, 0, .35) 0 2px, transparent 2px 4px); }
+.cue-power .cp-ball { position: absolute; top: 15px; right: 8px; width: 19px; height: 19px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #E6E1D3 60%, #B8B2A2); box-shadow: 0 2px 3px rgba(0, 0, 0, .5); }
+.cue-power .cp-label { position: absolute; left: 10px; top: 3px; font: 700 11px 'Montserrat', sans-serif; color: #C9D3CD; pointer-events: none; }
+.cue-power.hot .cp-label b { color: #FF8A7A; }
+.cue-power.pulling { background: rgba(242, 193, 78, .07); }
+/* spin: where the cue hits the cue ball */
+.pb-spin { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.pb-spin small { font: 700 10px 'Montserrat', sans-serif; color: #9DB0A6; text-transform: uppercase; letter-spacing: .08em; }
+.spin-ball { position: relative; width: 48px; height: 48px; border-radius: 50%; cursor: crosshair; touch-action: none;
+  background: radial-gradient(circle at 38% 32%, #fff, #EAE5D7 55%, #B9B3A3); box-shadow: 0 3px 6px rgba(0, 0, 0, .5), inset 0 0 0 1px rgba(0, 0, 0, .15); }
+.spin-ball::before { content: ''; position: absolute; inset: 22%; border-radius: 50%; border: 1px dashed rgba(0, 0, 0, .15); }
+.spin-ball i { position: absolute; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; background: #D42A1E; box-shadow: 0 0 0 2px rgba(255, 255, 255, .8); left: 50%; top: 50%; }
+.spin-ball span { position: absolute; left: 50%; bottom: -15px; transform: translateX(-50%); font: 700 9px 'Montserrat', sans-serif; color: #F2C14E; white-space: nowrap; }
+body.portrait .cue-power { width: auto; min-width: 0; grid-column: 1 / -1; }
+body.portrait .cue-power .cp-stick { width: 330px; }
+body.portrait .pool-bar { grid-template-columns: auto auto 1fr; }
+body.portrait .pb-spin { grid-row: auto; }
+body.portrait .spin-ball { width: 44px; height: 44px; }
+/* phone: a clear order for the bar */
+body.portrait .pool-bar { grid-template-columns: auto auto 1fr; grid-template-areas: "info info info" "target target target" "spin aim shoot" "power power power" "resign resign resign"; align-items: center; }
+body.portrait .pool-bar .pb-info { grid-area: info; }
+body.portrait .pool-bar .pb-target { grid-area: target; }
+body.portrait .pool-bar .pb-spin { grid-area: spin; }
+body.portrait .pool-bar .pb-aim { grid-area: aim; }
+body.portrait .pool-bar .shoot { grid-area: shoot; }
+body.portrait .pool-bar .cue-power { grid-area: power; width: 100%; }
+body.portrait .pool-bar #pResign { grid-area: resign; }
+/* phone: compact — the target on top, then spin · cue · shoot, then aim and concede */
+body.portrait .pool-bar { grid-template-columns: auto 1fr auto; grid-template-areas: "target target target" "spin power shoot" "aim aim resign"; gap: 8px; padding: 8px 10px; }
+body.portrait .pool-bar .pb-info { display: none; }
+body.portrait .pool-bar .cue-power { height: 48px; }
+body.portrait .pool-bar .cue-power .cp-stick { width: calc(100% + 70px); top: 18px; }
+body.portrait .pool-bar .cue-power .cp-ball { top: 13px; }
+body.portrait .pool-bar .shoot { min-height: 48px; padding: 0 14px; font-size: 15px; }
+body.portrait .pool-bar .pb-aim { justify-self: start; }
+body.portrait .pool-bar .pb-aim .pbtn { min-height: 36px; width: 44px; }
+body.portrait .pool-bar #pResign { justify-self: end; min-height: 36px; padding: 0 14px; font-size: 13px; width: auto; }
+body.portrait .pb-spin small { display: none; }
+body.portrait .spin-ball { width: 42px; height: 42px; }
+body.portrait .pb-target { padding: 5px 8px; }
+body.portrait .pb-target .tt { font-size: 12px; }

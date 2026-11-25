@@ -355,7 +355,10 @@
     'The next game starts shortly': 'Die nächste Partie beginnt gleich', 'Place the cue ball behind the line': 'Leg die Weiße hinter die Linie', 'Place the cue ball on a free spot': 'Leg die Weiße auf einen freien Platz',
     'Place the cue ball behind the line, free of other balls': 'Leg die Weiße hinter die Linie, ohne andere Kugeln zu berühren', 'Place the cue ball first': 'Leg zuerst die Weiße hin', 'Aim and choose a strength': 'Ziele und wähle eine Stärke',
     'Misses': 'Daneben', 'Shoots': 'Stößt', 'Foul': 'Foul', 'Out of time': 'Zeit abgelaufen', 'Aim left': 'Weiter links zielen', 'Aim right': 'Weiter rechts zielen', 'Pool · Table 1': 'Billard · Tisch 1',
-    'Leave in the middle of a game? You lose the game and the stake.': 'Mitten in der Partie gehen? Du verlierst die Partie und den Einsatz.'
+    'Leave in the middle of a game? You lose the game and the stake.': 'Mitten in der Partie gehen? Du verlierst die Partie und den Einsatz.',
+    'You': 'Du', ': open table': ': offener Tisch', 'any ball except the 8': 'jede Kugel außer der 8', ': now the 8!': ': jetzt die 8!', ': Solids': ': Volle', ': Stripes': ': Halbe',
+    'Spin': 'Effet', 'Follow': 'Nachläufer', 'Draw back': 'Rückzieher', 'Right': 'Rechts', 'Left': 'Links',
+    'Spin: tap where the cue hits the cue ball (top: follow, bottom: draw, sides: english). Double-tap to reset.': 'Effet: tippe, wo der Queue die Weiße trifft (oben: Nachläufer, unten: Rückzieher, seitlich: Effet). Doppeltippen setzt zurück.'
   };
 
   Object.assign(DE, {
@@ -408,6 +411,7 @@
     return ({ stalemate: 'Patt', agreed: 'vereinbart', 'not enough material to mate': 'zu wenig Material zum Mattsetzen', 'threefold repetition': 'dreifache Wiederholung', 'fifty-move rule': '50-Züge-Regel' })[r] || r;
   };
   const P = [
+    [/^(.+) left, then the 8$/, 'noch $1, dann die 8'],
     [/^Table (\d+) · Stake ([\d,.]+)$/, 'Tisch $1 · Einsatz $2'], [/^High Roller · Stake ([\d,.]+)$/, 'High Roller · Einsatz $1'],
     [/^Stake ([\d,.]+) per game$/, 'Einsatz $1 pro Partie'], [/^Stake ([\d,.]+) per game · 8-ball$/, 'Einsatz $1 pro Partie · 8-Ball'], [/^(.+) · Stake ([\d,.]+)$/, '$1 · Einsatz $2'],
     [/^Pool · ([\d,.]+)$/, 'Billard · $1'], [/^Pockets ([\d, ]+)$/, 'Versenkt $1'], [/^(.+) pockets ([\d, ]+)$/, '$1 versenkt $2'], [/^(.+) is at the table…$/, '$1 ist am Tisch…'],

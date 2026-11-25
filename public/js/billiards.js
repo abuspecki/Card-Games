@@ -14,7 +14,7 @@
   const colorOf = (n) => COLORS[n > 8 ? n - 8 : n] || '#fff';
   const L = {
     land: { W: 1440, H: 780, k: 5.3, rail: 46, fx: 190, fy: 128, rot: false },
-    port: { W: 440, H: 920, k: 3.9, rail: 22, fx: 25, fy: 110, rot: true },
+    port: { W: 440, H: 872, k: 3.7, rail: 22, fx: 35, fy: 104, rot: true },
   };
   let G = null, ctxRef = null, canvas = null, c2 = null;
   let aim = Math.PI;             // radians, physics space
@@ -26,6 +26,8 @@
   let lastShot = 0;
   let raf = 0;
   let confirmResign = false;
+  let spin = { x: 0, y: 0 };      // where the cue hits the cue ball: y > 0 follow, y < 0 draw, x side
+  const orient = new Map();      // n → { p: pole, s: number spot, at: [x, y] } — how each ball has rolled
 
   // physics ↔ stage pixels
   const toS = (x, y) => (G.rot ? [G.fx + y * G.k, G.fy + (P.W - x) * G.k] : [G.fx + x * G.k, G.fy + y * G.k]);
@@ -48,13 +50,17 @@
     ctx.controls.innerHTML = `
       <section class="pool-bar" id="pBar">
         <div class="pb-info"><small>Game for</small><strong id="pAmount">–</strong><em id="pNote"></em></div>
+        <div class="pb-target" id="pTargetBar"></div>
+        <div class="pb-spin" title="Spin: tap where the cue hits the cue ball (top: follow, bottom: draw, sides: english). Double-tap to reset.">
+          <div class="spin-ball" id="pSpin" role="slider" aria-label="Spin" tabindex="0"><i id="pSpinDot"></i><span></span></div><small>Spin</small></div>
         <div class="pb-aim"><button class="pbtn fine" data-fine="-1" aria-label="Aim left">◀</button><button class="pbtn fine" data-fine="1" aria-label="Aim right">▶</button></div>
-        <label class="pb-power"><span>Strength <b id="pPow">55</b>%</span><input type="range" id="pPower" min="5" max="100" value="55"></label>
+        <div class="cue-power" id="pPower" role="slider" aria-label="Strength" aria-valuemin="5" aria-valuemax="100" tabindex="0">
+          <div class="cp-meter"><i id="pMeter"></i></div><div class="cp-stick" id="pStick"></div><div class="cp-ball"></div>
+          <span class="cp-label">Strength <b id="pPow">55</b>%</span></div>
         <button class="pbtn gold shoot" id="pShoot">Shoot</button>
         <button class="pbtn quiet" id="pResign">Concede</button>
       </section>`;
-    const pw = document.getElementById('pPower');
-    pw.oninput = () => { power = Number(pw.value) / 100; document.getElementById('pPow').textContent = pw.value; };
+    wirePower(); wireSpin();
     ctx.controls.querySelectorAll('[data-fine]').forEach((b) => { b.onclick = () => { aim += Number(b.dataset.fine) * 0.004 * (G.rot ? -1 : 1); }; });
     document.getElementById('pShoot').onclick = shoot;
     document.getElementById('pResign').onclick = () => {
@@ -64,6 +70,56 @@
     cancelAnimationFrame(raf);
     const loop = () => { draw(); raf = requestAnimationFrame(loop); };
     raf = requestAnimationFrame(loop);
+  }
+
+  // ----- the strength: a cue you pull back -----
+  function setPower(v) {
+    power = Math.max(0.05, Math.min(1, v));
+    const pct = Math.round(power * 100);
+    const box = document.getElementById('pPower');
+    if (!box) return;
+    document.getElementById('pPow').textContent = pct;
+    document.getElementById('pMeter').style.width = pct + '%';
+    const travel = box.clientWidth * 0.32;
+    document.getElementById('pStick').style.transform = `translateX(${-power * travel}px)`;
+    box.setAttribute('aria-valuenow', pct);
+    box.classList.toggle('hot', power > 0.8);
+  }
+  function wirePower() {
+    const box = document.getElementById('pPower');
+    let start = null;
+    box.addEventListener('pointerdown', (e) => { box.setPointerCapture(e.pointerId); start = { x: e.clientX, p: power }; box.classList.add('pulling'); });
+    box.addEventListener('pointermove', (e) => { if (start) setPower(start.p + (start.x - e.clientX) / (box.clientWidth * 0.6)); });
+    const end = () => { start = null; box.classList.remove('pulling'); };
+    box.addEventListener('pointerup', end); box.addEventListener('pointercancel', end);
+    box.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { setPower(power + 0.05); e.preventDefault(); } if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { setPower(power - 0.05); e.preventDefault(); } });
+    box.addEventListener('wheel', (e) => { setPower(power - Math.sign(e.deltaY) * 0.03); e.preventDefault(); }, { passive: false });
+    requestAnimationFrame(() => setPower(power));
+  }
+  // ----- spin: tap where the cue hits the cue ball -----
+  function setSpin(x, y) {
+    const l = Math.hypot(x, y);
+    if (l > 0.85) { x *= 0.85 / l; y *= 0.85 / l; }
+    if (Math.hypot(x, y) < 0.12) { x = 0; y = 0; }
+    spin = { x, y };
+    const dot = document.getElementById('pSpinDot');
+    if (dot) { dot.style.left = 50 + x * 45 + '%'; dot.style.top = 50 - y * 45 + '%'; }
+    const lab = document.querySelector('#pSpin span');
+    if (lab) lab.textContent = !x && !y ? '' : y > 0.25 ? 'Follow' : y < -0.25 ? 'Draw back' : x > 0 ? 'Right' : 'Left';
+  }
+  function wireSpin() {
+    const el = document.getElementById('pSpin');
+    let down = false;
+    const at = (e) => { const r = el.getBoundingClientRect(); setSpin(((e.clientX - r.left) / r.width - 0.5) * 2, -((e.clientY - r.top) / r.height - 0.5) * 2); };
+    el.addEventListener('pointerdown', (e) => { down = true; el.setPointerCapture(e.pointerId); at(e); });
+    el.addEventListener('pointermove', (e) => { if (down) at(e); });
+    el.addEventListener('pointerup', () => { down = false; });
+    el.addEventListener('dblclick', () => setSpin(0, 0));
+    el.addEventListener('keydown', (e) => {
+      const k = { ArrowUp: [0, 0.2], ArrowDown: [0, -0.2], ArrowLeft: [-0.2, 0], ArrowRight: [0.2, 0] }[e.key];
+      if (k) { setSpin(spin.x + k[0], spin.y + k[1]); e.preventDefault(); }
+    });
+    setSpin(spin.x, spin.y);
   }
 
   const st = () => (window.App && App.S && App.S.state && App.S.state.game === 'billiards' ? App.S.state : null);
@@ -106,7 +162,7 @@
   function shoot() {
     if (!myTurn()) return;
     const s = st();
-    const amount = { angle: aim, power };
+    const amount = { angle: aim, power, spin };
     if (s.ballInHand) {
       const c = cuePos();
       if (!P.canPlace(s.balls, c.x, c.y, s.kitchen)) { ctxRef.toast(s.kitchen ? 'Place the cue ball behind the line' : 'Place the cue ball on a free spot', { kind: 'bad' }); return; }
@@ -123,8 +179,9 @@
       lastShot = state.shot.no;
       placed = null;
       if (isNew) {
-        const r = P.simulate(state.shot.before, { angle: state.shot.angle, power: state.shot.power }, { record: true });
-        play = { frames: r.frames, start: performance.now(), duration: r.duration * 1000, pots: r.events.pocketed.map((p) => p.t * 1000), hits: 0 };
+        const r = P.simulate(state.shot.before, { angle: state.shot.angle, power: state.shot.power, spin: state.shot.spin }, { record: true });
+        play = { frames: r.frames, start: performance.now(), duration: r.duration * 1000, pots: r.events.pocketed.map((p) => p.t * 1000),
+          clicks: [...r.events.hits, ...r.events.cushions].map((x) => x * 1000).sort((a, b) => a - b) };
         if (window.Sound) Sound.play('cue');
       }
     }
@@ -141,7 +198,7 @@
       const cue = cuePos();
       const t = state.balls.filter((b) => state.targets.includes(b.n) && !b.down).sort((a, b) => Math.hypot(a.x - cue.x, a.y - cue.y) - Math.hypot(b.x - cue.x, b.y - cue.y))[0];
       if (t) aim = Math.atan2(t.y - cue.y, t.x - cue.x);
-      if (state.isBreak) { aim = Math.atan2(P.FOOT.y - cue.y, P.FOOT.x - cue.x); power = 0.95; const pw = document.getElementById('pPower'); if (pw) { pw.value = 95; document.getElementById('pPow').textContent = 95; } }
+      if (state.isBreak) { aim = Math.atan2(P.FOOT.y - cue.y, P.FOOT.x - cue.x); setPower(0.95); setSpin(0, 0); }
     }
     paintUi();
   }
@@ -155,6 +212,8 @@
     if (play) {
       const t = performance.now() - play.start;
       while (play.pots.length && play.pots[0] <= t) { play.pots.shift(); if (window.Sound) Sound.play('pot'); }
+      let clicked = 0;
+      while (play.clicks.length && play.clicks[0] <= t) { play.clicks.shift(); if (window.Sound && clicked++ < 2) Sound.play('click'); }
       const f = play.frames;
       let i = f.findIndex((fr) => fr.t * 1000 > t);
       if (i === -1) { play = null; shown = null; paintUi(); }
@@ -171,30 +230,83 @@
     const [cx, cy] = [cuePos().x, cuePos().y];
     // aiming guide and cue
     if (myTurn()) drawAim(g, s, { x: cx, y: cy });
+    // your balls glow while it is your turn
+    if (myTurn() && s.targets && s.targets.length) {
+      const pulse = 0.55 + 0.35 * Math.sin(performance.now() / 260);
+      for (const b of balls) if (!b.down && s.targets.includes(b.n)) {
+        const [bx, by] = toS(b.x, b.y);
+        g.strokeStyle = `rgba(255, 226, 120, ${pulse})`; g.lineWidth = 3; g.beginPath(); g.arc(bx, by, P.R * G.k + 4, 0, Math.PI * 2); g.stroke();
+      }
+    }
+    for (const b of balls) if (!b.down) roll(b);
     for (const b of balls) if (!b.down && !(b.n === 0 && placed && !play)) drawBall(g, b.n, b.x, b.y);
     if (placed && !play && myTurn()) drawBall(g, 0, placed[0], placed[1], true);
     if (myTurn()) drawCue(g, { x: cx, y: cy });
   }
 
+  // the cloth's weave, drawn once
+  let clothTex = null;
+  function clothPattern(g) {
+    if (clothTex) return clothTex;
+    const c = document.createElement('canvas'); c.width = c.height = 96;
+    const x = c.getContext('2d');
+    let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (let k = 0; k < 2600; k++) { x.fillStyle = `rgba(${rnd() < 0.5 ? '255,255,255' : '0,0,0'},${0.03 + rnd() * 0.05})`; x.fillRect(rnd() * 96, rnd() * 96, 1, 1 + rnd()); }
+    clothTex = g.createPattern(c, 'repeat');
+    return clothTex;
+  }
+  // cushions follow the physics: each rail with its jaws, so the mouths look exactly as they play
+  function cushionPolys() {
+    const S = P.SEGMENTS, rails = S.slice(0, 6), jaws = S.slice(6);
+    const same = (ax, ay, bx, by) => Math.abs(ax - bx) < 1e-6 && Math.abs(ay - by) < 1e-6;
+    return rails.map(([ax, ay, bx, by]) => {
+      const ja = jaws.find((j) => same(j[0], j[1], ax, ay)), jb = jaws.find((j) => same(j[0], j[1], bx, by));
+      return [[ja[2], ja[3]], [ax, ay], [bx, by], [jb[2], jb[3]]];
+    });
+  }
   function drawTable(g, s) {
     const [x0, y0] = [G.fx, G.fy], w = fieldW(), h = fieldH(), r = G.rail;
-    // wooden frame
+    const poly = (pts) => { g.beginPath(); pts.forEach(([x, y], k) => { const [a, b] = toS(x, y); if (k) g.lineTo(a, b); else g.moveTo(a, b); }); g.closePath(); };
+    // the wooden frame, with a little grain
     const wood = g.createLinearGradient(x0 - r, y0 - r, x0 + w + r, y0 + h + r);
-    wood.addColorStop(0, '#6B3F22'); wood.addColorStop(0.5, '#4A2A16'); wood.addColorStop(1, '#2E1A0C');
+    wood.addColorStop(0, '#7A4A28'); wood.addColorStop(0.45, '#56311B'); wood.addColorStop(1, '#2E1A0C');
     g.fillStyle = wood; roundRect(g, x0 - r, y0 - r, w + 2 * r, h + 2 * r, r * 0.6); g.fill();
-    g.strokeStyle = 'rgba(255,220,170,.25)'; g.lineWidth = 2; roundRect(g, x0 - r + 2, y0 - r + 2, w + 2 * r - 4, h + 2 * r - 4, r * 0.55); g.stroke();
-    // cushions
-    g.fillStyle = '#0D5A35'; roundRect(g, x0 - r * 0.35, y0 - r * 0.35, w + r * 0.7, h + r * 0.7, 6); g.fill();
-    // cloth with the lamp above
+    g.save(); roundRect(g, x0 - r, y0 - r, w + 2 * r, h + 2 * r, r * 0.6); g.clip();
+    g.globalAlpha = 0.12; g.strokeStyle = '#000'; g.lineWidth = 1;
+    for (let k = -h; k < w + h; k += 7) { g.beginPath(); g.moveTo(x0 - r + k, y0 - r); g.bezierCurveTo(x0 + k + 20, y0 + h * 0.3, x0 + k - 20, y0 + h * 0.7, x0 - r + k + 10, y0 + h + r); g.stroke(); }
+    g.restore();
+    g.strokeStyle = 'rgba(255,220,170,.28)'; g.lineWidth = 2; roundRect(g, x0 - r + 2, y0 - r + 2, w + 2 * r - 4, h + 2 * r - 4, r * 0.55); g.stroke();
+    // pocket holes with leather liners
+    for (const p of P.POCKETS) {
+      const [px, py] = toS(p.x, p.y);
+      const pr = p.r * G.k * 1.08;
+      g.fillStyle = '#2A1A10'; g.beginPath(); g.arc(px, py, pr + 4, 0, Math.PI * 2); g.fill();
+      const hole = g.createRadialGradient(px, py, pr * 0.2, px, py, pr);
+      hole.addColorStop(0, '#000'); hole.addColorStop(0.8, '#050505'); hole.addColorStop(1, '#1A1A1A');
+      g.fillStyle = hole; g.beginPath(); g.arc(px, py, pr, 0, Math.PI * 2); g.fill();
+    }
+    // the cloth
     const cloth = g.createRadialGradient(x0 + w / 2, y0 + h / 2, 10, x0 + w / 2, y0 + h / 2, Math.max(w, h) * 0.7);
-    cloth.addColorStop(0, '#1E8A55'); cloth.addColorStop(0.6, '#147044'); cloth.addColorStop(1, '#0C5232');
+    cloth.addColorStop(0, '#22955C'); cloth.addColorStop(0.6, '#167647'); cloth.addColorStop(1, '#0D5534');
     g.fillStyle = cloth; g.fillRect(x0, y0, w, h);
+    g.fillStyle = clothPattern(g); g.fillRect(x0, y0, w, h);
+    // cushions (rubber noses lit from above)
+    for (const pts of cushionPolys()) {
+      poly(pts); g.fillStyle = '#0E6238'; g.fill();
+      const [[, ], [ax, ay], [bx, by]] = pts;
+      const [a1, a2] = toS(ax, ay), [b1, b2] = toS(bx, by);
+      g.strokeStyle = 'rgba(160,255,200,.18)'; g.lineWidth = 2; g.beginPath(); g.moveTo(a1, a2); g.lineTo(b1, b2); g.stroke();
+    }
+    // the cushions' shadow on the cloth
+    g.save(); g.beginPath(); g.rect(x0, y0, w, h); g.clip();
+    g.strokeStyle = 'rgba(0,0,0,.25)'; g.lineWidth = 6; g.strokeRect(x0 - 1, y0 - 1, w + 2, h + 2); g.restore();
     // diamonds
     g.fillStyle = '#F3E3BC';
-    const dia = (px, py) => { g.beginPath(); g.ellipse(px, py, 3, 3, 0, 0, Math.PI * 2); g.fill(); };
-    for (let k = 1; k < 8; k++) { if (k === 4) continue; const [ax, ay] = toS((P.W / 8) * k, 0); const [bx, by] = toS((P.W / 8) * k, P.H); dia(ax + (G.rot ? -r * 0.68 : 0), ay - (G.rot ? 0 : r * 0.68)); dia(bx + (G.rot ? r * 0.68 : 0), by + (G.rot ? 0 : r * 0.68)); }
-    for (let k = 1; k < 4; k++) { const [ax, ay] = toS(0, (P.H / 4) * k); const [bx, by] = toS(P.W, (P.H / 4) * k); dia(ax - (G.rot ? 0 : r * 0.68), ay + (G.rot ? r * 0.68 : 0)); dia(bx + (G.rot ? 0 : r * 0.68), by - (G.rot ? r * 0.68 : 0)); }
-    // head string and the kitchen while breaking
+    const dia = (px, py) => { g.save(); g.translate(px, py); g.rotate(Math.PI / 4); g.fillRect(-2.6, -2.6, 5.2, 5.2); g.restore(); };
+    const off = r * 0.62 + 0.35 * P.R;
+    for (let k = 1; k < 8; k++) { if (k === 4) continue; const [ax, ay] = toS((P.W / 8) * k, 0); const [bx, by] = toS((P.W / 8) * k, P.H); dia(ax + (G.rot ? -off : 0), ay - (G.rot ? 0 : off)); dia(bx + (G.rot ? off : 0), by + (G.rot ? 0 : off)); }
+    for (let k = 1; k < 4; k++) { const [ax, ay] = toS(0, (P.H / 4) * k); const [bx, by] = toS(P.W, (P.H / 4) * k); dia(ax - (G.rot ? 0 : off), ay + (G.rot ? off : 0)); dia(bx + (G.rot ? 0 : off), by - (G.rot ? off : 0)); }
+    // head string, foot spot, and the kitchen while breaking
     const [hx1, hy1] = toS(P.HEAD_X, 0), [hx2, hy2] = toS(P.HEAD_X, P.H);
     if (s.kitchen && s.ballInHand && s.stage === 'playing') {
       g.fillStyle = 'rgba(255,255,255,.06)';
@@ -203,43 +315,81 @@
     }
     g.strokeStyle = 'rgba(255,255,255,.16)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(hx1, hy1); g.lineTo(hx2, hy2); g.stroke();
     const [fsx, fsy] = toS(P.FOOT.x, P.FOOT.y); g.fillStyle = 'rgba(255,255,255,.25)'; g.beginPath(); g.arc(fsx, fsy, 2.5, 0, Math.PI * 2); g.fill();
-    // pockets
-    for (const p of P.POCKETS) {
-      const [px, py] = toS(p.x, p.y);
-      const pr = p.r * G.k * 1.05;
-      const rim = g.createRadialGradient(px, py, pr * 0.5, px, py, pr * 1.25);
-      rim.addColorStop(0, '#000'); rim.addColorStop(0.75, '#0a0a0a'); rim.addColorStop(1, 'rgba(0,0,0,0)');
-      g.fillStyle = rim; g.beginPath(); g.arc(px, py, pr * 1.25, 0, Math.PI * 2); g.fill();
-    }
-    // light falloff
-    const vig = g.createRadialGradient(x0 + w / 2, y0 + h / 2, Math.min(w, h) * 0.3, x0 + w / 2, y0 + h / 2, Math.max(w, h) * 0.75);
-    vig.addColorStop(0, 'rgba(0,0,0,0)'); vig.addColorStop(1, 'rgba(0,0,0,.28)');
+    // the lamp: light in the middle, darker towards the rails
+    const vig = g.createRadialGradient(x0 + w / 2, y0 + h / 2, Math.min(w, h) * 0.25, x0 + w / 2, y0 + h / 2, Math.max(w, h) * 0.75);
+    vig.addColorStop(0, 'rgba(255,250,220,.05)'); vig.addColorStop(1, 'rgba(0,0,0,.3)');
     g.fillStyle = vig; g.fillRect(x0, y0, w, h);
   }
 
+  // ----- rolling: each ball keeps where its number and stripe point, and turns as it moves -----
+  function rot(v, k, a) {           // turn v around the unit axis k by angle a
+    const c = Math.cos(a), sn = Math.sin(a), d = k[0] * v[0] + k[1] * v[1] + k[2] * v[2];
+    const cx = k[1] * v[2] - k[2] * v[1], cy = k[2] * v[0] - k[0] * v[2], cz = k[0] * v[1] - k[1] * v[0];
+    return [v[0] * c + cx * sn + k[0] * d * (1 - c), v[1] * c + cy * sn + k[1] * d * (1 - c), v[2] * c + cz * sn + k[2] * d * (1 - c)];
+  }
+  function roll(b) {
+    let o = orient.get(b.n);
+    if (!o) { const a = (b.n * 0.9) % (Math.PI * 2); o = { p: [Math.cos(a), Math.sin(a), 0], s: [0.25 * Math.sin(a), -0.25 * Math.cos(a), 0.97], at: [b.x, b.y] }; orient.set(b.n, o); }
+    const dx = b.x - o.at[0], dy = b.y - o.at[1], d = Math.hypot(dx, dy);
+    o.at = [b.x, b.y];
+    if (d < 1e-4 || d > 25) return;
+    const k = [-dy / d, dx / d, 0];
+    o.p = rot(o.p, k, d / P.R); o.s = rot(o.s, k, d / P.R);
+  }
+  // a direction on the ball, as seen on screen (the phone shows the table turned)
+  const proj = (v) => (G.rot ? [v[1], -v[0], v[2]] : [v[0], v[1], v[2]]);
+  function spot(g, sx, sy, r, v, size, fill) {
+    const [px, py, pz] = proj(v);
+    if (pz <= 0.02) return false;
+    const ang = Math.atan2(py, px);
+    g.save(); g.translate(sx + px * r * 0.98, sy + py * r * 0.98); g.rotate(ang);
+    g.fillStyle = fill; g.beginPath(); g.ellipse(0, 0, Math.max(0.6, r * size * pz), r * size, 0, 0, Math.PI * 2); g.fill();
+    g.restore();
+    return true;
+  }
   function drawBall(g, n, x, y, ghostly) {
     const [sx, sy] = toS(x, y);
     const r = P.R * G.k;
+    const o = orient.get(n) || { p: [1, 0, 0], s: [0, 0, 1] };
     g.save();
     if (ghostly) g.globalAlpha = 0.9;
-    g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(sx + r * 0.25, sy + r * 0.35, r, r * 0.85, 0, 0, Math.PI * 2); g.fill();
+    // shadow under the lamp
+    g.fillStyle = 'rgba(0,0,0,.38)'; g.beginPath(); g.ellipse(sx + r * 0.22, sy + r * 0.34, r * 1.02, r * 0.86, 0, 0, Math.PI * 2); g.fill();
     g.beginPath(); g.arc(sx, sy, r, 0, Math.PI * 2); g.closePath();
     g.save(); g.clip();
-    if (n === 0) { g.fillStyle = '#FBF8EE'; g.fill(); }
-    else if (n > 8) {
+    if (n === 0) {
       g.fillStyle = '#FBF8EE'; g.fillRect(sx - r, sy - r, 2 * r, 2 * r);
-      g.fillStyle = colorOf(n); if (G.rot) g.fillRect(sx - r * 0.55, sy - r, r * 1.1, 2 * r); else g.fillRect(sx - r, sy - r * 0.55, 2 * r, r * 1.1);
+      spot(g, sx, sy, r, o.s, 0.16, '#C8342A');                        // the red dot shows the cue ball turning
+    } else if (n > 8) {
+      g.fillStyle = colorOf(n); g.fillRect(sx - r, sy - r, 2 * r, 2 * r);
+      // the white caps of a stripe, at both poles
+      const [px, py, pz] = proj(o.p);
+      for (const sg of [1, -1]) {
+        const z = pz * sg;
+        if (z < -0.55) continue;
+        const ang = Math.atan2(py * sg, px * sg);
+        g.save(); g.translate(sx + px * sg * r * 0.9, sy + py * sg * r * 0.9); g.rotate(ang);
+        g.fillStyle = '#FBF8EE'; g.beginPath(); g.ellipse(0, 0, r * 0.75 * Math.max(0.18, Math.abs(z) * 0.9 + 0.1), r * 0.9, 0, 0, Math.PI * 2); g.fill();
+        g.restore();
+      }
     } else { g.fillStyle = colorOf(n); g.fillRect(sx - r, sy - r, 2 * r, 2 * r); }
-    // shading and a highlight
-    const sh = g.createRadialGradient(sx - r * 0.35, sy - r * 0.4, r * 0.1, sx, sy, r * 1.05);
-    sh.addColorStop(0, 'rgba(255,255,255,.55)'); sh.addColorStop(0.35, 'rgba(255,255,255,0)'); sh.addColorStop(1, 'rgba(0,0,0,.38)');
+    // the number on its white circle, turning with the ball
+    if (n > 0) {
+      const [px, py, pz] = proj(o.s);
+      if (pz > 0.02) {
+        spot(g, sx, sy, r, o.s, 0.46, '#FBF8EE');
+        if (pz > 0.4) {
+          g.save(); g.translate(sx + px * r * 0.98, sy + py * r * 0.98); g.scale(Math.max(0.5, pz), Math.max(0.5, pz));
+          g.fillStyle = '#111'; g.font = `700 ${Math.round(r * 0.6)}px Montserrat, system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+          g.fillText(String(n), 0, 0.5); g.restore();
+        }
+      }
+    }
+    // light: a bright highlight from the lamp, shade on the far side
+    const sh = g.createRadialGradient(sx - r * 0.32, sy - r * 0.38, r * 0.05, sx, sy, r * 1.05);
+    sh.addColorStop(0, 'rgba(255,255,255,.75)'); sh.addColorStop(0.18, 'rgba(255,255,255,.18)'); sh.addColorStop(0.5, 'rgba(255,255,255,0)'); sh.addColorStop(1, 'rgba(0,0,0,.45)');
     g.fillStyle = sh; g.fillRect(sx - r, sy - r, 2 * r, 2 * r);
     g.restore();
-    if (n > 0) {
-      g.fillStyle = '#FBF8EE'; g.beginPath(); g.arc(sx, sy, r * 0.46, 0, Math.PI * 2); g.fill();
-      g.fillStyle = '#111'; g.font = `700 ${Math.round(r * 0.62)}px Montserrat, system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillText(String(n), sx, sy + 0.5);
-    }
     if (ghostly) { g.strokeStyle = 'rgba(242,193,78,.95)'; g.lineWidth = 2; g.setLineDash([4, 3]); g.beginPath(); g.arc(sx, sy, r + 3, 0, Math.PI * 2); g.stroke(); g.setLineDash([]); }
     g.restore();
   }
@@ -293,6 +443,20 @@
   function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 
   // ----- players, cards and the bar -----
+  // Which balls a player still has to pocket: big and clear.
+  const ballHtml = (n, gone) => `<i class="tb ${n > 8 ? 'st' : ''}${n === 8 ? ' eight' : ''}${gone ? ' gone' : ''}" style="--c:${colorOf(n)}"><b>${n}</b></i>`;
+  function targetHtml(s, i, ctx) {
+    const p = s.seats[i];
+    if (!p) return '';
+    const down = new Set(s.balls.filter((b) => b.down).map((b) => b.n));
+    const who = i === s.mySeat ? 'You' : ctx.esc(p.name);
+    if (!p.group) return `<span class="tt"><b>${who}</b>: open table</span><span class="tsub">any ball except the 8</span>`;
+    const group = p.group === 'solids' ? [1, 2, 3, 4, 5, 6, 7] : [9, 10, 11, 12, 13, 14, 15];
+    if (p.onEight) return `<span class="tt"><b>${who}</b>: now the 8!</span><span class="tballs">${ballHtml(8, false)}</span>`;
+    const left = group.filter((n) => !down.has(n)).length;
+    return `<span class="tt"><b>${who}</b>: ${p.group === 'solids' ? 'Solids' : 'Stripes'}</span><span class="tballs">${group.map((n) => ballHtml(n, down.has(n))).join('')}</span><span class="tsub">${left} left, then the 8</span>`;
+  }
+
   function paintUi() {
     const s = st(), ctx = ctxRef;
     const ui = document.getElementById('pUi');
@@ -321,6 +485,16 @@
       ui.appendChild(el);
       if (p) ctx.plates[i] = [x + w / 2, port ? 20 : 30];
     });
+    // the overview: whose turn, and which balls must go in
+    const turn = s.stage === 'playing' ? (s.toAct !== -1 ? s.toAct : (play && s.shot ? s.shot.seat : -1)) : -1;
+    const focus = turn !== -1 ? turn : me;
+    const html = focus !== -1 && s.seats[focus] && s.stage === 'playing' ? targetHtml(s, focus, ctx) : '';
+    const bar = document.getElementById('pTargetBar');
+    if (port) { if (bar) { bar.innerHTML = html; bar.classList.toggle('mine', focus === me); } }
+    else {
+      if (bar) bar.innerHTML = '';
+      if (html) { const t = ctx.h('div', 'ptarget' + (focus === me ? ' mine' : ''), html); ui.appendChild(t); }
+    }
     const centre = () => { const [x, y] = [G.fx + fieldW() / 2, G.fy + fieldH() / 2]; return { left: x + 'px', top: y + 'px' }; };
     const card = (cls, html) => { const c = ctx.h('div', 'pcard ' + cls, html); Object.assign(c.style, centre()); ui.appendChild(c); return c; };
     const seated = s.seats.filter(Boolean).length;
@@ -363,5 +537,5 @@
     document.getElementById('pBar').classList.toggle('my-turn', mine);
   }
 
-  window.TableUI.billiards = { size: { land: [1440, 780], port: [440, 920] }, build, render };
+  window.TableUI.billiards = { size: { land: [1440, 780], port: [440, 872] }, build, render };
 })();

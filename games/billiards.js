@@ -119,9 +119,10 @@ class Billiards extends BaseTable {
     const before = this.balls.map((b) => ({ ...b }));
     // what counted as legal is decided by the table as it was before the shot
     const rules = { targets: this.targets(i), onEight: this.onEight(i) };
-    const r = Pool.simulate(before, { angle, power });
+    const spin = { x: Math.max(-1, Math.min(1, Number(a.spin && a.spin.x) || 0)), y: Math.max(-1, Math.min(1, Number(a.spin && a.spin.y) || 0)) };
+    const r = Pool.simulate(before, { angle, power, spin });
     this.shotNo++;
-    this.shot = { no: this.shotNo, seat: i, before, angle, power };
+    this.shot = { no: this.shotNo, seat: i, before, angle, power, spin };
     this.balls = r.balls;
     this.judge(i, r.events, rules);
     // the next player waits until the balls stop on screen
@@ -239,7 +240,9 @@ class Billiards extends BaseTable {
     if (this.isBreak) return { action: 'shoot', amount: { angle: Math.atan2(Pool.FOOT.y - cue.y + (Math.random() - 0.5) * 2, Pool.FOOT.x - cue.x), power: 0.92 + Math.random() * 0.08, cue: cuePos } };
     const plan = this.plan(i, cue, level) || this.safety(i, cue);
     const angle = plan.angle + (Math.random() - 0.5) * 2 * AIM_NOISE[level];
-    return { action: 'shoot', amount: { angle, power: plan.power, cue: cuePos || undefined } };
+    // stronger bots use a little follow or draw to keep the cue ball in play
+    const spin = level === 3 ? { x: 0, y: Math.random() < 0.5 ? 0.35 : -0.3 } : { x: 0, y: 0 };
+    return { action: 'shoot', amount: { angle, power: Math.min(1, plan.power * (1 + (Math.random() - 0.5) * (level === 1 ? 0.3 : 0.12))), spin, cue: cuePos || undefined } };
   }
   // the best pot from this cue position: ghost-ball aiming, clear paths, a gentle cut
   plan(i, cue, level) {
@@ -264,7 +267,12 @@ class Billiards extends BaseTable {
         if (cut > (level === 1 ? 1.0 : 1.25)) continue;
         if (!clear(cue.x, cue.y, gx, gy, [n]) || !clear(b.x, b.y, p.x, p.y, [n])) continue;
         const score = -cut * 60 - cd * 0.3 - pd * 0.4;
-        if (!best || score > best.score) best = { score, angle: Math.atan2(cy, cx), power: Math.min(1, 0.22 + (cd + pd * 1.6) / 420) };
+        // strength: the object ball must roll to the pocket (and a little more), the cue ball must get there
+        const vObj = Math.sqrt(2 * Pool.ROLL * (pd + 18)) * 1.4;
+        const vHit = vObj / Math.max(0.35, Math.cos(cut));
+        const speed = Math.sqrt(vHit * vHit + 2 * 150 * cd);
+        const power = Math.max(0.08, Math.min(1, (speed - Pool.MIN_SPEED) / (Pool.MAX_SPEED - Pool.MIN_SPEED)));
+        if (!best || score > best.score) best = { score, angle: Math.atan2(cy, cx), power };
       }
     }
     return best;
